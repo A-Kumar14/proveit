@@ -2,9 +2,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const judgeAnswer = vi.fn();
 const judgeTransfer = vi.fn();
+const judgeReview = vi.fn();
 vi.mock("./evaluator", () => ({
-  judgeAnswer: (...args: unknown[]) => judgeAnswer(...args),
-  judgeTransfer: (...args: unknown[]) => judgeTransfer(...args),
+  judgeAnswerForSpec: (...args: unknown[]) => judgeAnswer(...args),
+  judgeTransferForSpec: (...args: unknown[]) => judgeTransfer(...args),
+  judgeReviewForSpec: (...args: unknown[]) => judgeReview(...args),
 }));
 
 import { assess } from "./store";
@@ -12,6 +14,7 @@ import { assess } from "./store";
 beforeEach(() => {
   judgeAnswer.mockReset();
   judgeTransfer.mockReset();
+  judgeReview.mockReset();
   (globalThis as { __proveit?: unknown }).__proveit = undefined;
 });
 
