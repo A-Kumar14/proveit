@@ -22,7 +22,7 @@ const MAX_TURNS = 4;
 
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
-export function VoiceSession({ courseId, question, typeHref, uploads }: { courseId: string; question: QuestionView; typeHref: string; uploads: { enabled: boolean } }) {
+export function VoiceSession({ courseId, question, typeHref, uploads }: { courseId: string; question: QuestionView; typeHref: string; uploads: { enabled: boolean; demo: boolean } }) {
   const router = useRouter();
   const supported = useVoiceSupport();
   const [settings] = useSettings();
@@ -241,7 +241,7 @@ export function VoiceSession({ courseId, question, typeHref, uploads }: { course
               <button type="button" className={seg(tool === "sketch")} aria-pressed={tool === "sketch"} onClick={() => toggleTool("sketch")}><Pen size={14} strokeWidth={1.8} aria-hidden />Sketch</button>
               <button type="button" className={seg(tool === "camera")} aria-pressed={tool === "camera"} onClick={() => toggleTool("camera")}><Camera size={14} strokeWidth={1.8} aria-hidden />Camera</button>
               <AddFileMenu
-                conceptId={question.conceptId} onError={setError} buttonClassName={seg(false)}
+                conceptId={question.conceptId} demo={uploads.demo} onError={setError} buttonClassName={seg(false)}
                 onChecked={({ name, check }) => { setTool(null); setError(null); setShown({ name, ok: check.is_student_work && check.relevant, summary: check.summary, reason: check.reason || "That upload doesn't look like your own work." }); }}
               />
             </div>
