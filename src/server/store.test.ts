@@ -133,6 +133,18 @@ describe("correct-answer transfer path", () => {
     expect(() => getTransferChallenge(first.attemptId)).toThrow(NotFoundError);
   });
 
+  it("keeps a vague direct-transfer miss on the direct transfer path in history", async () => {
+    const first = await run("Over repeated samples, about 95% of intervals made by the method contain the true mean.");
+    const miss = await submitTransfer(first.attemptId, "Around 95 maybe");
+    expect(miss.result).toBe("fail");
+    expect(getHistory()[0]).toMatchObject({
+      title: "Tried the new question on CI interpretation",
+      tone: "warn",
+      href: `/course/intro-stats/transfer/${first.attemptId}`,
+    });
+    expect(state("cii")).toBe("developing");
+  });
+
   it("rejects an old correct attempt after newer conclusive evidence changes the concept", async () => {
     const first = await run("Over repeated samples, about 95% of intervals made by the method contain the true mean.");
     expect(getTransferChallenge(first.attemptId).attemptId).toBe(first.attemptId);
@@ -209,7 +221,7 @@ describe("repair and transfer", () => {
     expect(getHistory()[0]).toMatchObject({
       title: "Tried the new question on CI interpretation",
       tone: "warn",
-      href: `/course/intro-stats/transfer/${attemptId}`,
+      href: `/course/intro-stats/lesson/${attemptId}`,
     });
     const pass = await submitTransfer(attemptId, RIGHT_TRANSFER);
     if (pass.result !== "pass") throw new Error("expected pass");
