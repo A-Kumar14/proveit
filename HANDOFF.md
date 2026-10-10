@@ -1,124 +1,139 @@
 # Handoff
 
-Written for an AI coding agent (Cursor) picking this repo up mid-flight. Read this, then `README.md`, `CHECKLIST.md` and `AGENTS.md`.
+Current source of truth for an AI coding agent joining ProveIt mid-flight.
 
-## What this is
+## Product
 
-Mastery (repo name `proveit`). A study app that finds the specific misconception behind a wrong answer, teaches only that gap, then tests it again with a different question before it raises mastery. Loop: explain, diagnose, reteach, transfer test, update mastery. North star: never confuse showing the correct answer with proving the student understands it.
+ProveIt is an AI mastery/evidence engine. It does not treat a correct answer as mastery.
 
-Hackathon project, 4 people. This repo is the frontend plus a stand-in backend. The owner works on UI and product; teammates own the real backend, data and AI evaluation.
-
-- GitHub: https://github.com/A-Kumar14/proveit (private)
-- Local path: `/Users/arsshkumar/ProveIt`
-- Design source of truth: `mastery-ui-handoff.zip` (8 reference screens as HTML plus `UI_HANDOFF.md`). The zip has no `support.js`, so the references don't render. Compare against their markup.
-
-## Run it
-
-```bash
-pnpm install
-pnpm dev                                  # http://localhost:3000
-PROVEIT_DATA=demo pnpm dev                # seeded demo data and sample courses (default is empty)
-NEXT_PUBLIC_DEMO_MODE=1 pnpm dev          # shows demo upload items and the "Preview tier-up" button
-pnpm typecheck && pnpm lint && pnpm test  # run all three before calling anything done
+```
+course material -> assess -> evaluate
+  -> uncertain: ask one discriminating follow-up
+  -> misconception: diagnose -> focused remediation -> transfer
+  -> sound answer: transfer
+transfer pass -> provisional
+delayed retrieval pass -> mastered
+later retention failure -> needs_work -> repair again
 ```
 
-Env (see `.env.example`): `GOOGLE_GENERATIVE_AI_API_KEY` (optional), `GEMINI_MODEL` (optional, default `gemini-3.8-flash`), `NEXT_PUBLIC_DEMO_MODE`, `PROVEIT_DATA`. There is a local `.env` the owner edits. Do not read it, print it or commit it.
+North star: **Know what you actually know.**
 
-Restart the dev server after changing `src/server/store.ts`: state lives on `globalThis.__proveit`, so hot reload keeps stale seed data.
+## Current branch/data policy
 
-## Stack and version traps
+- `main` contains real/default runtime behavior only. No fabricated learner progress, sample courses, sample calendar events, sample upload answers, or starting rank.
+- Unit tests may use fixtures under `src/test/`; those fixtures never enter runtime state.
+- Presentation/sample data is isolated on demo-data branches.
+- Never reintroduce `PROVEIT_DATA=demo` or other seeded product state to `main`.
 
-- Next.js 16.4 App Router, React 19, Tailwind 4 (`@theme` tokens in `src/app/globals.css`), TypeScript strict, pnpm.
-- Next 16 differs from older versions. `AGENTS.md` says to read `node_modules/next/dist/docs/` before writing Next code.
-  - `cacheComponents` is turned OFF in `next.config.ts` on purpose. It breaks pages that read changing server state.
-  - Page props use the generated `PageProps<"/route">` and `LayoutProps` types. Run `npx next typegen` after adding routes or tsc will say they're missing.
-  - `params` and `searchParams` are promises.
-- AI SDK v7 (`ai`, `@ai-sdk/google`, `@ai-sdk/react`). Structured output is `generateText` / `streamText` with `output: Output.object({ schema })`, not `generateObject`. Streaming to the client uses `createTextStreamResponse` + `toTextStream`, and the client uses `experimental_useObject`. Image input is a `{ type: "file", data, mediaType }` part.
-- Tests: Vitest 5. Component tests use jsdom via a `// @vitest-environment jsdom` docblock plus Testing Library. `server-only` is aliased to a stub in `vitest.config.mts`.
-- No tRPC (decided: the backend may be FastAPI, and streaming needs plain route handlers). Plain route handlers plus zod.
+## Stack
+
+- Next.js 16.4 App Router, React 19, Tailwind 4, TypeScript strict, pnpm.
+- AI SDK v7 + Gemini.
+- Route handlers + Zod contracts, no tRPC.
+- Local persistence uses Node 24 `node:sqlite` through `src/server/persistence.ts`.
+- Tests: Vitest 5, jsdom for component tests.
+
+Read `AGENTS.md` before changing Next.js code.
+
+## Persistence
+
+Default local DB: `.data/proveit.sqlite` (gitignored).
+
+`PROVEIT_DB_PATH` can point to another SQLite file. Tests disable persistence unless they explicitly set this variable. Vercel/local ephemeral files are not a production database; deployed durability still requires persistent storage or swapping the adapter.
+
+Static course/catalog content remains in code for this hackathon. Learner-derived state is what persists: concept mastery/skills/evidence, attempts, review dates, task state, peak points, and course completion override. Calendar connection state is persisted separately.
+
+## Evidence model
+
+Every learner response is an evidence event:
+
+- `initial`
+- `clarification`
+- `transfer`
+- `review`
+
+Each event stores outcome, parent/root lineage, answer, evaluator result when applicable, previous mastery state, and timestamp. Diagnosis and History surface this lineage.
+
+Mastery:
+- `not_started`
+- `developing`
+- `needs_work`
+- `provisional`
+- `mastered`
+
+A transfer pass is required for `provisional`. A due delayed-retrieval pass is required for `mastered`. Reviews use 7/14/30-day spacing after the latest transfer proof; relearning resets the spacing progression.
 
 ## Architecture
 
 ```
 src/
   app/
-    (app)/                  routes: / , /courses, /calendar, /review, /history, /settings,
-                            /course/[id]/{page,tutor,practice/[conceptId],diagnosis/[attemptId],
-                            lesson/[attemptId],result/[attemptId],misconceptions,files}
-    api/                    assess, clarify, transfer, mastery-review, upload/check,
-                            courses/complete, todos/complete, calendar/{connect,refresh,disconnect}
-    _components/            shell, chat, mastery, practice, dashboard, courses, calendar, upload, voice, settings
-  lib/                      schemas.ts (zod contracts), api.ts (browser fetch client), rewards.ts (tiers, points),
-                            dates.ts, settings.ts (localStorage prefs), mastery.ts (state looks), cn.ts
+    (app)/
+    api/
+    _components/
+  lib/
+    api.ts
+    schemas.ts
+    rewards.ts
   server/
-    store.ts                THE BACKEND SEAM. In-memory data layer. Every exported function is what pages and
-                            routes call. The real database replaces this file's internals.
-    content.ts              hand-authored questions, misconceptions, lessons, transfer rubrics (2 concepts)
-    evaluator.ts            Gemini grading (3 votes) with a regex fallback when no key is set
-    calendar.ts             iCal fetch, parse, safe-URL checks, sample events, free-slot finder
-    schedule.ts             merges calendar + course events, attaches suggested slots to tasks
-    route.ts, page.ts       shared error mapping for routes, 404 helper for pages
-    ai.ts                   key check and model
+    store.ts
+    persistence.ts
+    content.ts
+    evaluator.ts
+    calendar.ts
+    schedule.ts
+    tutor.ts
+    converse.ts
+    practice.ts
+  test/
+    demo-state.ts     # test-only legacy fixtures
+    setup.ts
 ```
 
-Pattern: server components call `store`/`schedule` functions directly for reads. Mutations go browser -> `lib/api.ts` -> `app/api/*/route.ts` -> `store`. Routes use `handle(req, zodSchema, fn)` from `server/route.ts`.
+Server components read from `store` / `schedule`. Browser mutations go `lib/api.ts -> app/api/* -> store`. Keep that seam.
 
-## What is built
+## Built
 
-- Course map (graph, units view, detail panel), practice, diagnosis (highlighted evidence), lesson, new-question transfer step, mastery-updated result with rank points.
-- Tutor page is a general course chat (`/api/tutor`, streamed, images and PDFs, dictation, spoken mode, stop). "How am I doing?" drops in the mastery review card (numbers computed in code, AI text streams in). Chat history lives in the page only. Chatting never changes mastery.
-- Upload check (rejects non-student work, never reaches grading). Voice mode (speech recognition, editable transcript, Sketch, Camera, Add file).
-- Review queue, history, misconception log, course files, settings (answer mode, hints, read-aloud).
-- Courses page: filters, row select, batch and right-click "Mark as completed", undo. Sidebar splits In progress and Completed.
-- Dashboard, top to bottom: Rank card, Courses ticker (scrolls left to right, pausable), To-do list (read-only, finishes from progress, hand-tick with confetti) beside a Calendar card.
-- Calendar: month view, connect any iCal link (Google/Apple/Outlook), Refresh, sample events until connected, suggested study slots from free gaps, review queue times.
-- Rank: 7 tiers (Bronze to Legend, each step asks 500 more points). Points come only from evidence. Tier-up celebration plays when the tier is higher than last seen.
-- Tests: about 111 passing (store, evaluator voting, calendar, routes, several components).
+- Dashboard, course map, practice, diagnosis, dispute/clarification, lesson, transfer, result.
+- Delayed review and Mastered/retention lifecycle.
+- Evidence trail in diagnosis and evidence metadata in History.
+- Review queue and spacing.
+- General Tutor chat with images/PDFs, dictation and spoken mode.
+- Upload check, voice answer flow, sketch/camera.
+- Courses/to-dos/calendar/rank UI.
+- iCal connection with SSRF protections.
+- SQLite-backed local learner/calendar persistence.
 
-## Rules the code enforces (keep them)
+## Known gaps
 
-- A concept becomes Provisional only after a passed transfer question. Hand-ticking a task or marking a course done never changes mastery.
-- A course is completed when marked by hand, otherwise when every concept is Mastered and it has at least one concept.
-- Rank points are derived from current evidence, with a once-per-concept cap on repaired and first-try bonuses, and a peak so rank never drops. Hand ticks and hand-completed courses earn nothing.
-- Without an AI key the app uses deterministic regex judges so the demo path repeats. With a key, grading runs 3 independent checks and a split becomes "uncertain". Model failures surface as a retry state, never a silent fallback.
-- Calendar fetches: https only, no private or loopback addresses, redirects re-checked, 2 MB cap. The feed URL is never returned to the browser.
-- Anything unfinished is hidden or visibly disabled, not faked.
+- Only CI interpretation and Standard Error are authored end-to-end.
+- Course upload/concept extraction is still disabled.
+- Transfer/review questions are hand-authored for the current concepts.
+- Source retrieval/citations are not built.
+- No multi-user auth.
+- Hosted durable DB is not wired; SQLite is local persistence.
+- Real Gemini/calendar/mic/camera need presentation-device smoke tests.
+- Calendar scheduling uses server timezone and suggested blocks are not written back.
+- End-to-end browser automation and production error/loading pages still need hardening.
 
-## Known gaps (full list in `CHECKLIST.md`)
+## Rules to preserve
 
-- Nothing has been run against a real Gemini key, a real calendar link, or a real microphone and camera. Mocked tests only.
-- Only 2 concepts (CI interpretation, Standard error) run end to end. Others show "Not in the demo yet".
-- Linear Algebra (completed) and Personal Finance 101 are sample courses: viewable, not practicable. They also inflate starting rank points (demo starts at Platinum, 6,000).
-- No path from Provisional to Mastered (delayed review does nothing yet).
-- Persistence is in memory. Peak points live in server memory, the celebrated tier in localStorage.
-- Calendar uses the server's time zone. Study blocks are suggestions only, not written to the student's calendar. No Google OAuth, only the iCal link.
-- Course upload and a free-text tutor chat are not built.
-- No end-to-end test, no `error.tsx` / `loading.tsx`, no rate limiting, no real auth (one hard-coded demo user).
+- Never mark Mastered from one immediate correct answer.
+- Never demote on `uncertain`; only confirmed evidence changes mastery.
+- Never silently fall back from a failed model call.
+- Hand-ticking tasks and manually completing courses never earns mastery/rank evidence.
+- Keep exact evidence lineage. Do not overwrite old attempts.
+- Do not put sample/presentation data on `main`.
+- Never commit `.env`, SQLite DB files, keys, calendar URLs or other secrets.
 
-## Branches (state as of this handoff)
+## Verification before merge
 
-`main` = `899604a`. Everything after it is on stacked, unmerged branches:
+```bash
+pnpm exec next typegen
+pnpm typecheck
+pnpm lint
+pnpm test
+pnpm build
+```
 
-`main` -> `feat/dashboard-redesign` (91d3925) -> `feat/todo-and-calendar` (7cfb5ff) -> `feat/rank-tiers` (127b0cf, current, has all work). Older branches (`feat/initial-ui`, `feat/sidebar-completed-courses`, `feat/courses-page`) are already in `main`.
-
-To land everything: fast-forward `main` to `feat/rank-tiers` (`git checkout main && git merge --ff-only feat/rank-tiers && git push origin main`). The owner asked for merges to be a deliberate step, so confirm first.
-
-## Working agreements (from the owner's global instructions)
-
-- Terse replies. No preamble or wrap-up summary. No em dashes, no colon connectors mid-sentence, sentence-case headings, plain words. Push back if an approach is wrong.
-- Plan first on non-trivial work. Trivial fixes: just do them and report.
-- Done means typecheck, lint and tests all pass, and you ran them.
-- Write tests for new logic. Match the repo's framework and layout.
-- Git: feature branches, never force-push or rewrite pushed history, Conventional Commits, one logical change per commit, scan for secrets before every commit, no AI attribution trailer in commits. Never commit `.env`.
-- pnpm, TypeScript strict, ESLint + Prettier. Flag any new dependency and why.
-- Lint rules that bite here: `react-hooks/set-state-in-effect` (don't call setState synchronously in an effect, defer with a timeout or derive it) and `react-hooks/refs` (don't write refs during render).
-- Vitest quirk: `mockRejectedValue` on a `generateText` mock was reported as an unhandled error. Throwing from inside the resolved value's getter worked.
-
-## Good next steps
-
-1. Run the whole loop with a real Gemini key in `.env.local` and fix what breaks.
-2. Author 3 to 4 more concepts in `src/server/content.ts` (question, misconception, lesson, transfer rubric).
-3. Wire a passed review to promote Provisional to Mastered, and mark its review task done.
-4. Swap `store.ts` internals for the real database, keeping the exported function signatures.
-5. Tune rank points and thresholds; exclude sample and seeded courses from points.
-6. Add an end-to-end test of the demo path, plus `error.tsx` and `loading.tsx`.
+Also inspect the exact PR head against the latest `main` before merging.
