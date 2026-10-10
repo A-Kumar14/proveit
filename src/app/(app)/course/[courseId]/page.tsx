@@ -1,3 +1,4 @@
+import { withUserPage } from "@proveit/server/userBoundary";
 import { CourseMapCard } from "@proveit/app/_components/mastery/CourseMapCard";
 import { FilesPanel, MisconceptionPanel, PracticePanel, TutorPanel } from "@proveit/app/_components/course/CoursePanels";
 import { AppShell } from "@proveit/app/_components/shell/AppShell";
@@ -6,7 +7,7 @@ import { getCourse, getFiles, getMisconceptionLog, getReviewBase } from "@provei
 
 export const dynamic = "force-dynamic";
 
-export default async function CoursePage({ params }: PageProps<"/course/[courseId]">) {
+async function CoursePage({ params }: PageProps<"/course/[courseId]">) {
   const { courseId } = await params;
   const { course, review, log, files } = orNotFound(() => ({
     course: getCourse(courseId),
@@ -35,3 +36,5 @@ export default async function CoursePage({ params }: PageProps<"/course/[courseI
     </AppShell>
   );
 }
+
+export default withUserPage(CoursePage);

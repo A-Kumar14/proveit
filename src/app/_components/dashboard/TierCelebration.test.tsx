@@ -23,6 +23,20 @@ beforeEach(() => { localStorage.clear(); fire.mockReset(); });
 afterEach(cleanup);
 
 describe("TierCelebration", () => {
+  it("keeps tier memories separate when accounts share a browser", async () => {
+    localStorage.setItem(KEY, "6");
+    const { unmount } = render(<TierCelebration userId="A" tierIndex={2} tierId="gold" tierName="Gold" points={2500} previewable={false} />);
+    await settle();
+    expect(localStorage.getItem(`${KEY}:"A"`)).toBe("2");
+    unmount();
+    render(<TierCelebration userId="B" tierIndex={0} tierId="bronze" tierName="Bronze" points={0} previewable={false} />);
+    await settle();
+    expect(localStorage.getItem(`${KEY}:"B"`)).toBe("0");
+    expect(localStorage.getItem(`${KEY}:"A"`)).toBe("2");
+    expect(localStorage.getItem(KEY)).toBe("6");
+    expect(screen.queryByRole("status")).toBeNull();
+  });
+
   it("stays quiet on the first visit and only records the tier", async () => {
     mount(3);
     await settle();

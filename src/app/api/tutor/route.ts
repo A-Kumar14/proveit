@@ -1,3 +1,4 @@
+import { withUserRoute } from "@proveit/server/userBoundary";
 import { createTextStreamResponse, streamText, toTextStream, type ModelMessage } from "ai";
 import { NextResponse } from "next/server";
 import { aiEnabled, model } from "@proveit/server/ai";
@@ -8,7 +9,7 @@ import { parseTutorForm, tutorSystem } from "@proveit/server/tutor";
 export const maxDuration = 60;
 
 /** Streams the tutor's reply as plain text. Files go with the last message only. */
-export async function POST(req: Request) {
+async function POSTForUser(req: Request) {
   const form = await req.formData().catch(() => null);
   if (!form) return NextResponse.json({ error: "Write a message first." }, { status: 400 });
   const parsed = parseTutorForm(form);
@@ -42,3 +43,5 @@ export async function POST(req: Request) {
   });
   return createTextStreamResponse({ stream });
 }
+
+export const POST = withUserRoute(POSTForUser);

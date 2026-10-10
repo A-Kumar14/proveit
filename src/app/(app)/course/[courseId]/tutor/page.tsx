@@ -1,3 +1,4 @@
+import { withUserPage } from "@proveit/server/userBoundary";
 import { AppShell } from "@proveit/app/_components/shell/AppShell";
 import { TutorChat } from "@proveit/app/_components/tutor/TutorChat";
 import { aiEnabled } from "@proveit/server/ai";
@@ -6,7 +7,7 @@ import { getCourse, getReviewBase } from "@proveit/server/store";
 
 export const dynamic = "force-dynamic";
 
-export default async function TutorPage({ params }: PageProps<"/course/[courseId]/tutor">) {
+async function TutorPage({ params }: PageProps<"/course/[courseId]/tutor">) {
   const { courseId } = await params;
   const { course, base } = orNotFound(() => ({ course: getCourse(courseId), base: getReviewBase(courseId) }));
   return (
@@ -15,3 +16,5 @@ export default async function TutorPage({ params }: PageProps<"/course/[courseId
     </AppShell>
   );
 }
+
+export default withUserPage(TutorPage);

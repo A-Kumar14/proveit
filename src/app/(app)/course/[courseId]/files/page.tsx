@@ -1,3 +1,4 @@
+import { withUserPage } from "@proveit/server/userBoundary";
 import { AppShell } from "@proveit/app/_components/shell/AppShell";
 import { ListPage } from "@proveit/app/_components/shell/ListPage";
 import { CourseFiles, type FileRow } from "@proveit/app/_components/files/CourseFiles";
@@ -7,7 +8,7 @@ import { getFiles } from "@proveit/server/store";
 
 export const dynamic = "force-dynamic";
 
-export default async function CourseFilesPage({ params }: PageProps<"/course/[courseId]/files">) {
+async function CourseFilesPage({ params }: PageProps<"/course/[courseId]/files">) {
   const { courseId } = await params;
   const { courseName, files, uploaded } = orNotFound(() => ({ ...getFiles(courseId), uploaded: listMaterials(courseId) }));
   const rows: FileRow[] = [
@@ -23,3 +24,5 @@ export default async function CourseFilesPage({ params }: PageProps<"/course/[co
     </AppShell>
   );
 }
+
+export default withUserPage(CourseFilesPage);

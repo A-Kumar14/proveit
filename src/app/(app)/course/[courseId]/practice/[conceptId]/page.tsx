@@ -1,3 +1,4 @@
+import { withUserPage } from "@proveit/server/userBoundary";
 import { SwitchToVoice } from "@proveit/app/_components/voice/SwitchToVoice";
 import { VoiceSession } from "@proveit/app/_components/voice/VoiceSession";
 import { AppShell } from "@proveit/app/_components/shell/AppShell";
@@ -8,7 +9,7 @@ import { clarify, getAttempt, getQuestion } from "@proveit/server/store";
 
 export const dynamic = "force-dynamic";
 
-export default async function PracticePage({ params, searchParams }: PageProps<"/course/[courseId]/practice/[conceptId]">) {
+async function PracticePage({ params, searchParams }: PageProps<"/course/[courseId]/practice/[conceptId]">) {
   const { courseId, conceptId } = await params;
   const { clarify: clarifyId, mode } = await searchParams;
   const modeParam = typeof mode === "string" ? mode : undefined;
@@ -26,3 +27,5 @@ export default async function PracticePage({ params, searchParams }: PageProps<"
     </AppShell>
   );
 }
+
+export default withUserPage(PracticePage);

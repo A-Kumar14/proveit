@@ -1,3 +1,4 @@
+import { withUserPage } from "@proveit/server/userBoundary";
 import { notFound } from "next/navigation";
 import { AppShell } from "@proveit/app/_components/shell/AppShell";
 import { LessonFlow } from "@proveit/app/_components/practice/LessonFlow";
@@ -6,7 +7,7 @@ import { getCourse, getRemediation } from "@proveit/server/store";
 
 export const dynamic = "force-dynamic";
 
-export default async function LessonPage({ params }: PageProps<"/course/[courseId]/lesson/[attemptId]">) {
+async function LessonPage({ params }: PageProps<"/course/[courseId]/lesson/[attemptId]">) {
   const { courseId, attemptId } = await params;
   const { r, courseName } = orNotFound(() => ({ r: getRemediation(attemptId), courseName: getCourse(courseId).name }));
   if (r.courseId !== courseId) notFound();
@@ -16,3 +17,5 @@ export default async function LessonPage({ params }: PageProps<"/course/[courseI
     </AppShell>
   );
 }
+
+export default withUserPage(LessonPage);

@@ -1,3 +1,4 @@
+import { withUserPage } from "@proveit/server/userBoundary";
 import Link from "next/link";
 import { CircleAlert, CircleCheck, CircleHelp } from "lucide-react";
 import { AppShell } from "@proveit/app/_components/shell/AppShell";
@@ -9,7 +10,7 @@ export const dynamic = "force-dynamic";
 
 const TONE = { good: [CircleCheck, "text-mastered-text"], warn: [CircleHelp, "text-developing-text"], bad: [CircleAlert, "text-needswork-text"] } as const;
 
-export default function HistoryPage() {
+function HistoryPage() {
   const events = getHistory();
   const course = getDashboard().courses[0];
   return (
@@ -36,3 +37,5 @@ export default function HistoryPage() {
     </AppShell>
   );
 }
+
+export default withUserPage(HistoryPage);

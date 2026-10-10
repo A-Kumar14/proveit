@@ -1,3 +1,4 @@
+import { withUserPage } from "@proveit/server/userBoundary";
 import Link from "next/link";
 import { AppShell } from "@proveit/app/_components/shell/AppShell";
 import { EmptyState } from "@proveit/app/_components/shell/EmptyState";
@@ -13,7 +14,7 @@ export const dynamic = "force-dynamic";
 const DAYS = 7;
 const when = (iso: string) => new Date(iso).toLocaleString("en-US", { weekday: "short", hour: "numeric", minute: "2-digit" });
 
-export default function ReviewPage() {
+function ReviewPage() {
   const now = new Date();
   const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const rows = getReviewQueue(now);
@@ -96,3 +97,5 @@ export default function ReviewPage() {
     </AppShell>
   );
 }
+
+export default withUserPage(ReviewPage);
