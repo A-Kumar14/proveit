@@ -177,6 +177,9 @@ function recordAttempt(data: NewAttempt): Attempt {
 const transferMissesFor = (rootAttemptId: string, beforeOrAt = Number.POSITIVE_INFINITY) =>
   db().attempts.filter((a) => a.rootAttemptId === rootAttemptId && a.kind === "transfer" && a.outcome === "fail" && a.createdAt <= beforeOrAt).length;
 
+const rootHasPassedTransfer = (rootAttemptId: string) =>
+  db().attempts.some((a) => a.rootAttemptId === rootAttemptId && a.kind === "transfer" && a.outcome === "pass");
+
 function descendsFrom(candidate: Attempt, ancestorId: string): boolean {
   let current: Attempt | null = candidate;
   const seen = new Set<string>();
@@ -383,6 +386,7 @@ export async function assess(input: AssessInput): Promise<AssessResult> {
     throw new InvalidAttemptLinkError("follow-up must stay in the same course and concept");
   }
   if (parent && !parent.evaluation) throw new InvalidAttemptLinkError("follow-up parent has no diagnosable response");
+  if (parent && rootHasPassedTransfer(parent.rootAttemptId)) throw new InvalidAttemptLinkError("learning episode is already complete");
   if (parent && latestEvaluatedInRoot(parent.rootAttemptId)?.id !== parent.id) {
     throw new InvalidAttemptLinkError("follow-up parent is stale");
   }
@@ -461,6 +465,7 @@ export function getAttempt(id: string): AttemptView {
 export function clarify(attemptId: string) {
   const a = attempt(attemptId);
   if (!a.evaluation) throw new NotFoundError(`attempt ${attemptId} has no evaluation to clarify`);
+  if (rootHasPassedTransfer(a.rootAttemptId)) throw new InvalidAttemptLinkError("learning episode is already complete");
   return { courseId: a.courseId, conceptId: a.conceptId, followUp: clarificationPromptFor(a) };
 }
 
@@ -494,7 +499,7 @@ export function getTransferChallenge(attemptId: string): TransferChallengeView {
   const au = AUTHORED[c.id];
   if (!au || source.evaluation?.verdict !== "correct") throw new NotFoundError(`no direct transfer challenge for ${attemptId}`);
   if (latestConclusiveForConcept(c.id)?.id !== source.id) throw new NotFoundError(`stale transfer challenge ${attemptId}`);
-  if (db().attempts.some((a) => a.rootAttemptId === source.rootAttemptId && a.kind === "transfer" && a.outcome === "pass")) {
+  if (rootHasPassedTransfer(source.rootAttemptId)) {
     throw new NotFoundError(`transfer already passed for ${attemptId}`);
   }
   return {
@@ -509,7 +514,7 @@ export async function submitTransfer(attemptId: string, answer: string): Promise
   const au = AUTHORED[c.id];
   if (!au) throw new NotFoundError(`no content for ${c.id}`);
   if (latestConclusiveForConcept(c.id)?.id !== parent.id) throw new InvalidAttemptLinkError("transfer source is stale");
-  if (db().attempts.some((a) => a.rootAttemptId === parent.rootAttemptId && a.kind === "transfer" && a.outcome === "pass")) {
+  if (rootHasPassedTransfer(parent.rootAttemptId)) {
     throw new InvalidAttemptLinkError("this evidence chain already passed its transfer test");
   }
   const before = c.state;
@@ -587,7 +592,7 @@ export function getResult(attemptId: string): ResultView {
   const proven = course.concepts.filter((x) => x.state === "mastered").length;
   const prov = course.concepts.filter((x) => x.state === "provisional").length;
   return {
-    courseId: a.courseId, courseName: course.name, conceptName: c.name, previous: a.previousState, next: c.state,
+    courseId: a.courseId, courseName: course.name, conceptName: c.name, previous: a.previousState, next: "provisional",
     diagnosisLabel: diagnosed ? "Misconception found" : "Diagnosis",
     misconception: diagnosed ?? (hadOverturnedDiagnosis ? "Not confirmed after clarification" : "None detected"),
     intervention: diagnosed ? "1 short lesson" : hadOverturnedDiagnosis ? "Clarified the diagnosis" : "No remediation needed",
