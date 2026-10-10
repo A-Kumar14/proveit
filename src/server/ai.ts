@@ -10,9 +10,14 @@ export const aiEnabled = () => Boolean(process.env.OPENROUTER_API_KEY || process
 export const aiProvider = (): "openrouter" | "google" | null =>
   process.env.OPENROUTER_API_KEY ? "openrouter" : process.env.GOOGLE_GENERATIVE_AI_API_KEY ? "google" : null;
 
+export const aiModelId = (): string =>
+  aiProvider() === "openrouter"
+    ? process.env.OPENROUTER_MODEL || "google/gemini-3.8-flash"
+    : process.env.GEMINI_MODEL || "gemini-3.8-flash";
+
 export const model = () => {
   if (aiProvider() === "openrouter") {
-    return createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY })(process.env.OPENROUTER_MODEL || "google/gemini-3.8-flash");
+    return createOpenRouter({ apiKey: process.env.OPENROUTER_API_KEY })(aiModelId());
   }
-  return google(process.env.GEMINI_MODEL || "gemini-3.8-flash");
+  return google(aiModelId());
 };
