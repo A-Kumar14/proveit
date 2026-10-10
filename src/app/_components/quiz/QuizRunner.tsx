@@ -2,18 +2,19 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, ArrowRight, Check, LoaderCircle, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, LoaderCircle } from "lucide-react";
 import { api } from "@proveit/lib/api";
 import { cn } from "@proveit/lib/cn";
 import type { QuizResult, QuizStartResult } from "@proveit/lib/schemas";
 import { buttonStyles } from "../Button";
+import { QuizResultView } from "./QuizResultView";
 
 type Phase = { name: "intro" } | { name: "loading" } | { name: "taking"; quiz: QuizStartResult; answers: (number | null)[]; at: number } | { name: "grading"; quiz: QuizStartResult; answers: (number | null)[] } | { name: "done"; quiz: QuizStartResult; result: QuizResult };
 
 const LETTERS = ["A", "B", "C", "D"];
 
 /** A self-check quiz. It gives a score and a review, and it never changes mastery or rank. */
-export function QuizRunner({ courseId, courseName }: { courseId: string; courseName: string }) {
+export function QuizRunner({ courseId, courseName, conceptId, conceptName }: { courseId: string; courseName: string; conceptId?: string; conceptName?: string }) {
   const [phase, setPhase] = useState<Phase>({ name: "intro" });
   const [error, setError] = useState<string | null>(null);
 
@@ -21,7 +22,7 @@ export function QuizRunner({ courseId, courseName }: { courseId: string; courseN
     setPhase({ name: "loading" });
     setError(null);
     try {
-      const quiz = await api.startQuiz(courseId);
+      const quiz = await api.startQuiz(courseId, undefined, conceptId);
       setPhase({ name: "taking", quiz, answers: quiz.questions.map(() => null), at: 0 });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't build the quiz. Retry.");
@@ -44,11 +45,12 @@ export function QuizRunner({ courseId, courseName }: { courseId: string; courseN
     const loading = phase.name === "loading";
     return (
       <section aria-label="Quiz" className="flex max-w-xl flex-col gap-4 rounded-md border border-line bg-surface p-6">
-        <h2 className="m-0 text-lg font-semibold">Quiz on {courseName}</h2>
+        <h2 className="m-0 text-lg font-semibold">{conceptName ? `Quiz on ${conceptName}` : `Quiz on ${courseName}`}</h2>
         <ul className="m-0 flex list-disc flex-col gap-1 pl-5 text-[13px] leading-normal text-ink-muted">
-          <li>8 multiple-choice questions, built from the course notes and your uploaded files.</li>
-          <li>Questions lean on the concepts you are weakest in.</li>
-          <li>You get a score and a review of every answer. A quiz is practice, so it never changes your mastery or rank.</li>
+          <li>{conceptName ? "4 multiple-choice questions on this one concept" : "8 multiple-choice questions"}, built from the course notes and your uploaded files.</li>
+          {!conceptName && <li>Questions lean on the concepts you are weakest in.</li>}
+          <li>You get a score and a review of every answer, saved to your History.</li>
+          <li>Each question counts toward its concept on the course map. A quiz can start a concept or flag one that is going badly, and it earns a few rank points. Proving a concept still takes a new-question test.</li>
         </ul>
         {error && <p role="alert" className="m-0 text-xs text-needswork-text">{error}</p>}
         <div className="flex items-center gap-2">
@@ -107,49 +109,5 @@ export function QuizRunner({ courseId, courseName }: { courseId: string; courseN
     );
   }
 
-  const { result } = phase;
-  return (
-    <section aria-label="Quiz results" className="flex max-w-2xl flex-col gap-5">
-      <div className="flex flex-col gap-3 rounded-md border border-line bg-surface p-5">
-        <div className="eyebrow">Your score</div>
-        <div className="flex items-baseline gap-3"><span className="text-[32px] font-semibold leading-none tabular-nums">{result.score} / {result.total}</span><span className="text-sm text-ink-muted">{result.pct}%</span></div>
-        <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
-          {result.byConcept.map((c) => (
-            <li key={c.concept} className="flex items-center gap-3 text-[13px]">
-              <span className="min-w-0 flex-1 truncate">{c.concept}</span>
-              <span className="tabular-nums text-ink-muted">{c.right} of {c.total}</span>
-              <span className="h-1.5 w-24 rounded-full bg-surface-active"><span className={cn("block h-full rounded-full", c.right === c.total ? "bg-mastered" : c.right === 0 ? "bg-needswork" : "bg-developing")} style={{ width: `${Math.round((c.right / c.total) * 100)}%` }} /></span>
-            </li>
-          ))}
-        </ul>
-        <p className="m-0 text-xs text-ink-faint">This quiz is practice. It does not change your mastery or rank. Use Test this concept to prove a concept.</p>
-      </div>
-      <ol className="m-0 flex list-none flex-col gap-3 p-0" aria-label="Review">
-        {result.items.map((it, i) => {
-          const right = it.picked === it.correct;
-          return (
-            <li key={it.id} className={cn("flex flex-col gap-2 rounded-md border bg-surface p-4", right ? "border-mastered-line" : "border-needswork-line")}>
-              <div className="flex items-start gap-2">
-                {right ? <Check size={16} className="mt-0.5 shrink-0 text-mastered-text" aria-label="Correct" /> : <X size={16} className="mt-0.5 shrink-0 text-needswork-text" aria-label="Incorrect" />}
-                <div className="min-w-0"><div className="text-[11px] text-ink-faint">{i + 1}. {it.concept}</div><div className="text-sm font-semibold leading-normal">{it.prompt}</div></div>
-              </div>
-              <ul className="m-0 flex list-none flex-col gap-1 p-0 text-[13px]">
-                {it.options.map((o, j) => (
-                  <li key={j} className={cn("rounded-sm px-2.5 py-1.5", j === it.correct ? "bg-mastered-bg text-mastered-text" : j === it.picked ? "bg-needswork-bg text-needswork-text" : "text-ink-muted")}>
-                    <span className="mr-2 font-semibold">{LETTERS[j]}</span>{o}{j === it.correct && <span className="ml-2 text-[11px] font-semibold">Correct answer</span>}{j === it.picked && j !== it.correct && <span className="ml-2 text-[11px] font-semibold">Your answer</span>}
-                  </li>
-                ))}
-              </ul>
-              {it.picked === null && <p className="m-0 text-xs text-ink-faint">You left this one blank.</p>}
-              <p className="m-0 text-xs leading-normal text-ink-muted">{it.explanation}</p>
-            </li>
-          );
-        })}
-      </ol>
-      <div className="flex gap-2">
-        <button type="button" onClick={start} className={cn(buttonStyles(), "cursor-pointer")}>New quiz</button>
-        <Link href={`/course/${courseId}/practice`} className={buttonStyles({ variant: "secondary" })}>Back to practice</Link>
-      </div>
-    </section>
-  );
+  return <QuizResultView result={phase.result} onRetake={start} />;
 }

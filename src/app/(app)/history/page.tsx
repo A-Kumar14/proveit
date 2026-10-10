@@ -22,11 +22,12 @@ function HistoryPage() {
           <Rows>
             {events.map((e) => {
               const [Icon, color] = TONE[e.tone];
-              const evidence = getEvidenceAttempt(e.id);
+              // A quiz is not an attempt, so it has no evidence record. It shows its score instead.
+              const chips = e.quizPct !== undefined ? ["quiz", `${e.quizPct}%`] : (({ kind, outcome }) => [kind, outcome])(getEvidenceAttempt(e.id));
               return (
                 <RowItem key={e.id}>
                   <Icon size={16} strokeWidth={1.8} className={color} aria-hidden />
-                  <Link href={e.href} className="flex-1 text-ink no-underline hover:underline"><div className="text-sm font-semibold">{e.title}</div><div className="text-xs text-ink-muted">{e.detail}</div><div className="mt-1 flex gap-1.5 text-[10px] text-ink-faint"><span className="rounded-full border border-line px-1.5 py-px capitalize">{evidence.kind}</span><span className="rounded-full border border-line px-1.5 py-px capitalize">{evidence.outcome}</span></div></Link>
+                  <Link href={e.href} className="flex-1 text-ink no-underline hover:underline"><div className="text-sm font-semibold">{e.title}</div><div className="text-xs text-ink-muted">{e.detail}</div><div className="mt-1 flex gap-1.5 text-[10px] text-ink-faint">{chips.map((c) => <span key={c} className="rounded-full border border-line px-1.5 py-px capitalize">{c}</span>)}</div></Link>
                   <time dateTime={new Date(e.at).toISOString()} className="text-xs text-ink-faint">{new Date(e.at).toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit" })}</time>
                 </RowItem>
               );

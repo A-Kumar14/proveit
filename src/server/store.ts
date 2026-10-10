@@ -34,7 +34,7 @@ type Attempt = {
 /** `completedOverride` is the student's own call. null means derive it from the concepts. */
 type Course = { id: string; name: string; deadline: string; concepts: Concept[]; edges: [string, string][]; files: CourseFile[]; completedOverride: boolean | null; /** ISO date of the next quiz, if any. */ examDate: string | null; /** True for courses added at runtime (uploads, imports, the curated catalog). They have a map, but no authored questions, so no diagnose loop yet. */ runtime?: boolean; /** The notes a curated course was built from. */ spec?: CourseSpec };
 /** `course` is the one being worked on. `samples` are every other course (added at runtime, plus placeholders in tests): viewable, not practicable yet. */
-type Db = { course: Course; samples: Course[]; attempts: Attempt[]; provenDays: Set<string>; /** Tasks the student ticked off by hand. */ taskDone: Set<string>; /** Highest point total ever shown. Rank never drops when a concept slips. */ peakPoints: number; /** Same rule per course, so a course's rank never drops either. */ peakByCourse: Record<string, number>; seq: number };
+type Db = { course: Course; samples: Course[]; /** Every quiz taken, with what it changed. Absent in snapshots saved before quizzes were recorded. */ quizzes?: QuizRecord[]; attempts: Attempt[]; provenDays: Set<string>; /** Tasks the student ticked off by hand. */ taskDone: Set<string>; /** Highest point total ever shown. Rank never drops when a concept slips. */ peakPoints: number; /** Same rule per course, so a course's rank never drops either. */ peakByCourse: Record<string, number>; seq: number };
 
 const app = (answers: number, sound: number, transferPassed = false) => ({ answers, sound, transferPassed });
 
@@ -77,6 +77,7 @@ function initialState(): Db {
 type StoredLearning = {
   concepts: Record<string, Pick<Concept, "state" | "skills" | "evidence" | "nextReview">>;
   attempts: Attempt[];
+  quizzes?: QuizRecord[];
   provenDays: string[];
   taskDone: string[];
   peakPoints: number;
@@ -97,6 +98,7 @@ function restoreLearning(): Db {
     if (saved) Object.assign(concept, saved);
   }
   if (Array.isArray(stored.attempts)) data.attempts = stored.attempts;
+  if (Array.isArray(stored.quizzes)) data.quizzes = stored.quizzes;
   if (Array.isArray(stored.provenDays)) data.provenDays = new Set(stored.provenDays);
   if (Array.isArray(stored.taskDone)) data.taskDone = new Set(stored.taskDone);
   if (Number.isFinite(stored.peakPoints)) data.peakPoints = stored.peakPoints;
@@ -116,6 +118,7 @@ function persistLearning(): void {
   const snapshot: StoredLearning = {
     concepts: Object.fromEntries(current.course.concepts.map((c) => [c.id, { state: c.state, skills: c.skills, evidence: c.evidence, nextReview: c.nextReview }])),
     attempts: current.attempts,
+    quizzes: current.quizzes ?? [],
     provenDays: [...current.provenDays],
     taskDone: [...current.taskDone],
     peakPoints: current.peakPoints,
@@ -381,7 +384,7 @@ export function getCourse(courseId: string): CourseView {
     provisional: course.concepts.filter((c) => c.state === "provisional").length,
     total: course.concepts.length,
     needsWork: course.concepts.filter((c) => c.state === "needs_work").length,
-    concepts: course.concepts.map((c) => ({ id: c.id, name: c.name, short: c.short, unit: c.unit, desc: c.desc, x: c.x, y: c.y, state: c.state, dims: dimsFor(c), evidence: evidenceText(c), cta: active ? ctaFor(c) : course.runtime ? { label: "Study with the tutor", href: `/course/${course.id}/tutor` } : { label: c.state === "mastered" ? "Mastered" : "Not authored yet", href: null } })),
+    concepts: course.concepts.map((c) => ({ id: c.id, name: c.name, short: c.short, unit: c.unit, desc: c.desc, x: c.x, y: c.y, state: c.state, dims: dimsFor(c), evidence: evidenceText(c), cta: active ? ctaFor(c) : course.runtime ? { label: "Quiz me on this", href: `/course/${course.id}/practice/quiz?concept=${c.id}` } : { label: c.state === "mastered" ? "Mastered" : "Not authored yet", href: null } })),
     edges: course.edges,
     nextUp: next ? { id: next.id, name: next.name } : null,
   };
@@ -885,10 +888,19 @@ export function getReviewResult(attemptId: string): ReviewResultView {
   };
 }
 
-export type HistoryEvent = { id: string; at: number; title: string; detail: string; tone: "good" | "warn" | "bad"; href: string };
+export type HistoryEvent = { id: string; at: number; title: string; detail: string; tone: "good" | "warn" | "bad"; href: string; /** Set for a quiz. Every other event is an attempt with its own evidence record. */ quizPct?: number };
 export function getHistory(): HistoryEvent[] {
   const { attempts } = db();
-  return [...attempts].reverse().map((a) => {
+  const quizEvents: HistoryEvent[] = (db().quizzes ?? []).filter((q) => hasCourse(q.courseId)).map((q) => {
+    const right = q.items.filter((it) => it.picked === it.correct);
+    const rightIds = new Set(right.map((it) => it.conceptId));
+    const weak = [...new Set(q.items.filter((it) => !rightIds.has(it.conceptId)).map((it) => it.concept))];
+    const strong = [...new Set(right.map((it) => it.concept))];
+    const list = (names: string[]) => `${names.slice(0, 2).join(", ")}${names.length > 2 ? ` and ${names.length - 2} more` : ""}`;
+    const detail = [strong.length ? `Right on ${list(strong)}.` : "", weak.length ? `Weak on ${list(weak)}.` : ""].filter(Boolean).join(" ");
+    return { id: q.id, at: q.at, title: `Quiz on ${q.courseName}: ${q.score} of ${q.total}`, detail: detail || "Review your answers", tone: q.pct >= 70 ? "good" as const : q.pct >= 40 ? "warn" as const : "bad" as const, href: `/course/${q.courseId}/quiz/${q.id}`, quizPct: q.pct };
+  });
+  const fromAttempts = [...attempts].reverse().map((a) => {
     const c = concept(a.conceptId);
     const base = `/course/${a.courseId}`;
     if (a.kind === "review" && a.outcome === "pass") return { id: a.id, at: a.createdAt, title: `Passed delayed review on ${c.name}`, detail: "Mastered with delayed retrieval", tone: "good" as const, href: `${base}/review-result/${a.id}` };
@@ -909,6 +921,13 @@ export function getHistory(): HistoryEvent[] {
     if (v === "correct") return { id: a.id, at: a.createdAt, title: `${verb} ${c.name}`, detail: "No misconception found", tone: "good" as const, href: `${base}/diagnosis/${a.id}` };
     return { id: a.id, at: a.createdAt, title: `${verb} ${c.name}`, detail: "Needed one more answer", tone: "warn" as const, href: `${base}/practice/${c.id}?clarify=${a.id}` };
   });
+  // Attempt events keep their own order. Each quiz goes in before the first event that is not newer than it.
+  const out = [...fromAttempts];
+  for (const q of [...quizEvents].sort((a, b) => b.at - a.at)) {
+    const i = out.findIndex((e) => e.at <= q.at);
+    out.splice(i < 0 ? out.length : i, 0, q);
+  }
+  return out;
 }
 
 export type MisconceptionEntry = { key: string; name: string; concept: string; quote: string | null; /** What the misconception gets wrong, in one sentence. */ gap: string; open: boolean; note: string; href: string };
@@ -1139,6 +1158,7 @@ export function getRewards(courseId?: string): Rewards {
     { label: "Concepts proved with a new question", count: concepts.filter((c) => c.state === "provisional").length, each: POINTS.proved },
     { label: "Misconceptions repaired", count: repairedConcepts.size, each: POINTS.repaired },
     { label: "Passed a new question first try", count: firstTryConcepts.size, each: POINTS.firstTry },
+    { label: "Concepts answered right in a quiz", count: quizConceptsRight(courseId), each: POINTS.quiz },
     { label: "Courses mastered end to end", count: scope.filter((c) => c.completedOverride === null && c.concepts.length > 0 && c.concepts.every((x) => x.state === "mastered")).length, each: POINTS.course },
     ...(courseId ? [] : [{ label: "Streak days, up to 7", count: Math.min(streak(), STREAK_CAP), each: POINTS.streakDay }]),
   ].map((r) => ({ ...r, points: r.count * r.each }));
@@ -1153,6 +1173,79 @@ export function getRewards(courseId?: string): Rewards {
   const s = standing(peak);
   return { ...s, breakdown: rows, ladder: TIERS.map((t, i) => ({ id: t.id, name: t.name, min: t.min, reached: i <= s.tierIndex, current: i === s.tierIndex })) };
 }
+
+// ---- quiz evidence ----
+
+export type QuizItemRecord = { conceptId: string; concept: string; prompt: string; options: string[]; picked: number | null; correct: number; explanation: string };
+export type QuizChange = { conceptId: string; concept: string; from: MasteryState; to: MasteryState };
+export type QuizRecord = { id: string; courseId: string; courseName: string; at: number; score: number; total: number; pct: number; items: QuizItemRecord[]; changes: QuizChange[]; pointsGained: number };
+
+const quizList = () => (db().quizzes ??= []);
+const hasCourse = (id: string) => db().course.id === id || db().samples.some((c) => c.id === id);
+
+/** Concepts answered right at least once in any quiz, for one course or all of them. Each counts once, so retaking a quiz earns nothing new. */
+export function quizConceptsRight(courseId?: string): number {
+  const found = new Set<string>();
+  for (const q of quizList()) {
+    if ((courseId && q.courseId !== courseId) || !hasCourse(q.courseId)) continue;
+    for (const it of q.items) if (it.picked === it.correct) found.add(`${q.courseId}:${it.conceptId}`);
+  }
+  return found.size;
+}
+
+/**
+ * What a quiz may do to a concept. A quiz is practice, so it can start a concept or flag one that is going badly,
+ * and nothing more. Provisional and Mastered come only from a new-question test or a delayed review, and an open
+ * misconception only clears through a lesson and a new question.
+ */
+export function stateAfterQuiz(state: MasteryState, right: number, answered: number): MasteryState {
+  if (answered === 0 || state === "provisional" || state === "mastered" || state === "needs_work") return state;
+  if (right > 0) return state === "not_started" ? "developing" : state;
+  // Nothing right. One miss on a concept you were already working on isn't enough to call it a problem.
+  return state === "not_started" || answered >= 2 ? "needs_work" : state;
+}
+
+/** Saves a finished quiz and moves each concept it covered. Called once per quiz. */
+export function recordQuiz(input: { courseId: string; items: QuizItemRecord[] }): QuizRecord {
+  const course = courseFor(input.courseId);
+  const before = quizConceptsRight(input.courseId);
+  // Only questions that were answered count as evidence. A blank says nothing about the concept.
+  const per = new Map<string, { right: number; answered: number }>();
+  for (const it of input.items) {
+    if (it.picked === null) continue;
+    const t = per.get(it.conceptId) ?? { right: 0, answered: 0 };
+    t.answered++;
+    if (it.picked === it.correct) t.right++;
+    per.set(it.conceptId, t);
+  }
+  const changes: QuizChange[] = [];
+  for (const [conceptId, t] of per) {
+    const c = course.concepts.find((x) => x.id === conceptId);
+    if (!c) continue;
+    const to = stateAfterQuiz(c.state, t.right, t.answered);
+    c.evidence.answers += t.answered;
+    c.evidence.sound += t.right;
+    upsertSkill(c, { label: "Quiz", pct: Math.round((t.right / t.answered) * 100) });
+    if (to !== c.state) { changes.push({ conceptId, concept: c.name, from: c.state, to }); c.state = to; }
+  }
+  const score = input.items.filter((it) => it.picked === it.correct).length;
+  const record: QuizRecord = {
+    id: `q${++db().seq}`, courseId: course.id, courseName: course.name, at: Date.now(), score, total: input.items.length,
+    pct: input.items.length ? Math.round((score / input.items.length) * 100) : 0, items: input.items, changes, pointsGained: 0,
+  };
+  quizList().push(record);
+  record.pointsGained = (quizConceptsRight(input.courseId) - before) * POINTS.quiz;
+  persistLearning();
+  return record;
+}
+
+export function getQuizRecord(id: string): QuizRecord {
+  const q = quizList().find((x) => x.id === id);
+  if (!q || !hasCourse(q.courseId)) throw new NotFoundError(`quiz ${id}`);
+  return q;
+}
+
+export const listQuizRecords = (courseId?: string): QuizRecord[] => quizList().filter((q) => hasCourse(q.courseId) && (!courseId || q.courseId === courseId)).sort((a, b) => b.at - a.at);
 
 export type CourseRank = { courseId: string; name: string } & Standing;
 /** Each course's own rank, using the same tiers. */

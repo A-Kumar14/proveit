@@ -7,13 +7,15 @@ import { getCourse } from "@proveit/server/store";
 
 export const dynamic = "force-dynamic";
 
-async function QuizPage({ params }: PageProps<"/course/[courseId]/practice/quiz">) {
+async function QuizPage({ params, searchParams }: PageProps<"/course/[courseId]/practice/quiz">) {
   const { courseId } = await params;
+  const { concept } = await searchParams;
   const course = orNotFound(() => getCourse(courseId));
+  const focus = typeof concept === "string" ? course.concepts.find((c) => c.id === concept) : undefined;
   return (
     <AppShell active="practice" courseId={courseId} crumbs={[{ label: course.name, href: `/course/${courseId}` }, { label: "Practice", href: `/course/${courseId}/practice` }, { label: "Quiz" }]}>
       <ListPage eyebrow="Practice" title="Quiz">
-        <QuizRunner courseId={courseId} courseName={course.name} />
+        <QuizRunner key={focus?.id ?? "all"} courseId={courseId} courseName={course.name} conceptId={focus?.id} conceptName={focus?.name} />
       </ListPage>
     </AppShell>
   );

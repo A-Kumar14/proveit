@@ -9,6 +9,7 @@ export const POINTS = {
   /** Fixed a caught misconception, once per concept. */ repaired: 100,
   /** Passed the new question on the first try, once per concept. */ firstTry: 50,
   /** Every concept in a course Mastered. Marking it done by hand earns nothing. */ course: 1000,
+  /** A concept answered right in a quiz, once per concept. A quiz is practice, so this is small. */ quiz: 25,
   /** Per day of streak, up to STREAK_CAP days. */ streakDay: 25,
 } as const;
 export const STREAK_CAP = 7;
