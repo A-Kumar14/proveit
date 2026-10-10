@@ -224,3 +224,21 @@ export const ConnectResult = z.union([z.object({ url: z.string() }), z.object({ 
 export const ImportInput = ProviderInput.extend({ topic: z.string().trim().min(2, "Say what the course is about.").max(120), name: z.string().trim().max(80).optional() });
 export const CreateCourseResult = z.object({ id: z.string(), concepts: z.number(), documents: z.number().optional(), failed: z.array(z.object({ name: z.string(), reason: z.string() })).optional() });
 export type CreateCourseResult = z.infer<typeof CreateCourseResult>;
+
+// ---- course upload ----
+
+/** What the model (or the outline parser) pulls out of uploaded course files. The store trims it to fit the map. */
+export const CourseOutline = z.object({
+  units: z.array(z.object({
+    name: z.string().describe("Short unit name, 1 to 3 words."),
+    concepts: z.array(z.object({
+      name: z.string().describe("Concept name, at most 5 words."),
+      short: z.string().describe("1 or 2 word label for the map node."),
+      desc: z.string().describe("One sentence saying what the student must be able to do."),
+    })),
+  })),
+  prerequisites: z.array(z.object({ from: z.string(), to: z.string() })).describe("Concept names. `from` must be understood before `to`. Only real logical dependencies."),
+});
+export type CourseOutline = z.infer<typeof CourseOutline>;
+
+export const CourseUploadResult = z.object({ courseId: z.string() });

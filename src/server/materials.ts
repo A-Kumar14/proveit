@@ -78,6 +78,23 @@ export async function addMaterial(courseId: string, file: File): Promise<Materia
   return saveMaterial(courseId, { name: file.name, mime: file.type, size: file.size }, text, readBy);
 }
 
+/**
+ * Keeps uploaded course notes as files of the course. A file that can't be read is skipped,
+ * because the course is already built and the student can add it again from Course files.
+ */
+export async function saveUploadsAsMaterials(courseId: string, files: File[]): Promise<number> {
+  let saved = 0;
+  for (const f of files) {
+    try {
+      await addMaterial(courseId, f);
+      saved++;
+    } catch (e) {
+      if (!(e instanceof MaterialError)) console.error(e);
+    }
+  }
+  return saved;
+}
+
 export function removeMaterial(courseId: string, id: string): boolean {
   getCourse(courseId);
   const h = held();

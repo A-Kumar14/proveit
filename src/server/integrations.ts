@@ -4,7 +4,7 @@ import { createMCPClient, auth, type OAuthClientInformation, type OAuthClientMet
 import { generateText, Output, stepCountIs, type ToolSet } from "ai";
 import { z } from "zod";
 import { aiEnabled, model } from "./ai";
-import { createCourse, type Source } from "./ingest";
+import { createCourseFromSources, type Source } from "./ingest";
 import { MaterialError } from "./materials";
 import { loadJson, saveJson, deleteJson } from "./persistence";
 
@@ -143,6 +143,6 @@ export async function fetchNotes(user: string, id: ProviderId, origin: string, t
 /** Pulls notes about a topic from a connected app and builds a course from them. */
 export async function importCourse(user: string, id: ProviderId, origin: string, topic: string, name?: string): Promise<{ id: string; concepts: number; documents: number }> {
   const sources = await fetchNotes(user, id, origin, topic.trim());
-  const made = await createCourse(name?.trim() || topic.trim(), sources, "import");
+  const made = await createCourseFromSources(name?.trim() || topic.trim(), sources, "Notes");
   return { ...made, documents: sources.length };
 }

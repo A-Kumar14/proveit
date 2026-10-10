@@ -5,7 +5,7 @@ let ai = false;
 vi.mock("ai", () => ({ generateText: (...a: unknown[]) => generateText(...a), Output: { object: (o: unknown) => o } }));
 vi.mock("./ai", () => ({ aiEnabled: () => ai, model: () => "mock-model" }));
 
-import { addMaterial, courseMaterial, listMaterials, MaterialError, materialKind, removeMaterial } from "./materials";
+import { addMaterial, courseMaterial, listMaterials, MaterialError, materialKind, removeMaterial, saveUploadsAsMaterials } from "./materials";
 import { addCatalogCourse } from "./courses";
 import { NotFoundError } from "./store";
 
@@ -78,6 +78,12 @@ describe("course files", () => {
     expect(removeMaterial("intro-stats", "nope")).toBe(false);
     expect(removeMaterial("intro-stats", m.id)).toBe(true);
     expect(listMaterials("intro-stats")).toEqual([]);
+  });
+
+  it("keeps uploaded course notes as files, and skips one it can't read instead of failing the course", async () => {
+    const n = await saveUploadsAsMaterials("intro-stats", [file("a.md", "", "Notes about sampling."), file("b.exe", "application/x-msdownload"), file("c.txt", "text/plain", "More notes on error.")]);
+    expect(n).toBe(2);
+    expect(listMaterials("intro-stats").map((m) => m.name).sort()).toEqual(["a.md", "c.txt"]);
   });
 
   it("rejects an unknown course", async () => {

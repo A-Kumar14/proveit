@@ -21,14 +21,18 @@ function UploadCourse() {
   const [error, setError] = useState<string | null>(null);
   const [over, setOver] = useState(false);
 
-  const add = (list: FileList | File[]) => setFiles((cur) => [...cur, ...Array.from(list)].slice(0, 5));
+  const add = (list: FileList | File[]) => setFiles((cur) => {
+    const known = new Set(cur.map((f) => `${f.name}:${f.size}`));
+    return [...cur, ...Array.from(list).filter((f) => !known.has(`${f.name}:${f.size}`))].slice(0, 5);
+  });
 
   async function build() {
     setBusy(true);
     setError(null);
     try {
-      const made = await api.createCourseFromFiles(name, files);
-      router.push(`/course/${made.id}`);
+      const { courseId } = await api.uploadCourse(name.trim(), files);
+      router.push(`/course/${courseId}`);
+      router.refresh();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't build the course. Retry.");
       setBusy(false);
@@ -63,7 +67,7 @@ function UploadCourse() {
       <label className="flex items-start gap-2 text-xs text-ink-muted"><input type="checkbox" checked={ok} onChange={(e) => setOk(e.target.checked)} className="mt-0.5 accent-ink" />I have the right to use these files for my own studying.</label>
       {error && <p role="alert" className="m-0 text-xs text-needswork-text">{error}</p>}
       <button type="button" onClick={() => void build()} disabled={busy || !ok || !name.trim() || files.length === 0} className={cn(buttonStyles(), "w-fit cursor-pointer")}>
-        {busy && <LoaderCircle size={14} className="animate-spin" aria-hidden />}{busy ? "Building your course..." : "Build course"}
+        {busy && <LoaderCircle size={14} className="animate-spin" aria-hidden />}{busy ? "Building map..." : "Build concept map"}
       </button>
     </section>
   );

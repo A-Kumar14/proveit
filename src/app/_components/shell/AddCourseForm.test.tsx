@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const push = vi.fn();
 const refresh = vi.fn();
-const { api } = vi.hoisted(() => ({ api: { createCourseFromFiles: vi.fn(), connectApp: vi.fn(), disconnectApp: vi.fn(), importFromApp: vi.fn() } }));
+const { api } = vi.hoisted(() => ({ api: { uploadCourse: vi.fn(), connectApp: vi.fn(), disconnectApp: vi.fn(), importFromApp: vi.fn() } }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push, refresh }) }));
 vi.mock("@proveit/lib/api", () => ({ api }));
 
@@ -28,7 +28,7 @@ afterEach(cleanup);
 describe("AddCourseForm, starting from nothing", () => {
   it("keeps Build course off until there is a name, a file and the rights box ticked", async () => {
     render(<AddCourseForm apps={apps()} />);
-    const build = screen.getByRole("button", { name: "Build course" }) as HTMLButtonElement;
+    const build = screen.getByRole("button", { name: "Build concept map" }) as HTMLButtonElement;
     expect(build.disabled).toBe(true);
     await userEvent.type(screen.getByLabelText("Course name"), "Biology");
     await userEvent.upload(screen.getByLabelText("Choose notes"), new File(["# Bio"], "bio.md", { type: "text/markdown" }));
@@ -38,25 +38,25 @@ describe("AddCourseForm, starting from nothing", () => {
   });
 
   it("builds the course and opens it", async () => {
-    api.createCourseFromFiles.mockResolvedValue({ id: "biology", concepts: 3 });
+    api.uploadCourse.mockResolvedValue({ courseId: "biology" });
     render(<AddCourseForm apps={apps()} />);
     await userEvent.type(screen.getByLabelText("Course name"), "Biology");
     await userEvent.upload(screen.getByLabelText("Choose notes"), new File(["# Bio"], "bio.md", { type: "text/markdown" }));
     await userEvent.click(screen.getByRole("checkbox"));
-    await userEvent.click(screen.getByRole("button", { name: "Build course" }));
-    expect(api.createCourseFromFiles).toHaveBeenCalledWith("Biology", [expect.objectContaining({ name: "bio.md" })]);
+    await userEvent.click(screen.getByRole("button", { name: "Build concept map" }));
+    expect(api.uploadCourse).toHaveBeenCalledWith("Biology", [expect.objectContaining({ name: "bio.md" })]);
     expect(push).toHaveBeenCalledWith("/course/biology");
   });
 
   it("shows why a build failed and lets the student fix it", async () => {
-    api.createCourseFromFiles.mockRejectedValue(new Error("No AI key is set."));
+    api.uploadCourse.mockRejectedValue(new Error("No AI key is set."));
     render(<AddCourseForm apps={apps()} />);
     await userEvent.type(screen.getByLabelText("Course name"), "Notes");
     await userEvent.upload(screen.getByLabelText("Choose notes"), new File(["text"], "n.txt", { type: "text/plain" }));
     await userEvent.click(screen.getByRole("checkbox"));
-    await userEvent.click(screen.getByRole("button", { name: "Build course" }));
+    await userEvent.click(screen.getByRole("button", { name: "Build concept map" }));
     expect((await screen.findByRole("alert")).textContent).toContain("No AI key is set.");
-    expect((screen.getByRole("button", { name: "Build course" }) as HTMLButtonElement).disabled).toBe(false);
+    expect((screen.getByRole("button", { name: "Build concept map" }) as HTMLButtonElement).disabled).toBe(false);
   });
 
   it("explains what connecting does, before asking for anything", async () => {

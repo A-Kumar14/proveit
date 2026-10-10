@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ApiError, AssessResult, AuditResult, CatalogAddResult, ConnectResult, CreateCourseResult, FileUploadResult, CatalogRemoveResult, ConverseResult, PracticeResult, QuizResult, QuizStartResult, ClarifyResult, CourseCompleteResult, Ok, ReviewSubmitResult, TransferResult, UploadCheck, type AssessInput, type ConverseInput } from "./schemas";
+import { ApiError, AssessResult, AuditResult, CatalogAddResult, ConnectResult, CreateCourseResult, FileUploadResult, CatalogRemoveResult, ConverseResult, PracticeResult, QuizResult, QuizStartResult, ClarifyResult, CourseCompleteResult, CourseUploadResult, Ok, ReviewSubmitResult, TransferResult, UploadCheck, type AssessInput, type ConverseInput } from "./schemas";
 
 /** Client side of the API. Components call these; the route handlers behind them are the backend seam. */
 async function post<T>(url: string, body: unknown, schema: z.ZodType<T>): Promise<T> {
@@ -36,20 +36,21 @@ async function uploadFiles(courseId: string, files: File[]) {
   return FileUploadResult.parse(json);
 }
 
-async function createCourseFromFiles(name: string, files: File[]) {
+async function uploadCourse(name: string, files: File[]) {
   const form = new FormData();
   form.set("name", name);
+  form.set("rights", "1");
   for (const f of files) form.append("files", f);
-  const res = await fetch("/api/courses/create", { method: "POST", body: form }).catch(() => null);
+  const res = await fetch("/api/courses/upload", { method: "POST", body: form }).catch(() => null);
   if (!res) throw new Error("Can't reach the server. Check your connection and retry.");
   const json: unknown = await res.json().catch(() => null);
-  if (!res.ok) throw new Error(ApiError.safeParse(json).data?.error ?? "Couldn't build the course. Retry.");
-  return CreateCourseResult.parse(json);
+  if (!res.ok) throw new Error(ApiError.safeParse(json).data?.error ?? "Building the concept map failed. Retry.");
+  return CourseUploadResult.parse(json);
 }
 
 export const api = {
   uploadFiles,
-  createCourseFromFiles,
+  uploadCourse,
   connectApp: (provider: "granola" | "wispr", returnTo: string) => post(`/api/integrations/${provider}/connect`, { returnTo }, ConnectResult),
   disconnectApp: (provider: "granola" | "wispr") => post("/api/integrations/disconnect", { provider }, Ok),
   importFromApp: (provider: "granola" | "wispr", topic: string, name?: string) => post("/api/integrations/import", { provider, topic, name }, CreateCourseResult),

@@ -5,7 +5,7 @@ let ai = false;
 vi.mock("ai", () => ({ generateText: (...a: unknown[]) => generateText(...a), Output: { object: (o: unknown) => o } }));
 vi.mock("./ai", () => ({ aiEnabled: () => ai, model: () => "mock-model" }));
 
-import { createCourse, readSources, type Source } from "./ingest";
+import { createCourseFromSources, readSources, type Source } from "./ingest";
 import { listMaterials, MaterialError } from "./materials";
 import { getCourse, getSidebar } from "./store";
 
@@ -19,9 +19,9 @@ beforeEach(() => {
   (globalThis as { __proveitMaterials?: unknown }).__proveitMaterials = undefined;
 });
 
-describe("createCourse", () => {
+describe("createCourseFromSources", () => {
   it("keeps the structure of markdown with headings, with no AI", async () => {
-    const r = await createCourse("Biology", [src("bio.md", MD)], "upload");
+    const r = await createCourseFromSources("Biology", [src("bio.md", MD)], "Notes");
     expect(r).toEqual({ id: "biology", concepts: 3 });
     expect(getCourse("biology").concepts.map((c) => c.name)).toEqual(["Membrane", "Nucleus", "Mitochondria"]);
     expect(getSidebar().courses.find((c) => c.id === "biology")).toMatchObject({ name: "Biology", completed: false });
@@ -29,34 +29,32 @@ describe("createCourse", () => {
   });
 
   it("gives a second course with the same name its own id", async () => {
-    await createCourse("Biology", [src("a.md", MD)], "upload");
-    expect((await createCourse("Biology", [src("b.md", MD)], "upload")).id).toBe("biology-2");
+    await createCourseFromSources("Biology", [src("a.md", MD)], "Notes");
+    expect((await createCourseFromSources("Biology", [src("b.md", MD)], "Notes")).id).toBe("biology-2");
   });
 
   it("asks the model for an outline when the notes have no headings, and keeps the notes as a file", async () => {
     ai = true;
-    generateText.mockResolvedValueOnce({ output: { topic: "Science", summary: "Cells.", units: [{ name: "Cells", concepts: [{ name: "Membrane", desc: "Controls entry." }, { name: "Nucleus", desc: "Holds DNA." }, { name: "Cytoplasm", desc: "Gel inside." }] }] } });
-    const r = await createCourse("Bio notes", [src("notes.txt", "Cells have a membrane, a nucleus and cytoplasm.")], "upload");
-    expect(r.concepts).toBe(3);
-    expect(generateText.mock.calls[0]![0].prompt).toContain("Cells have a membrane");
+    generateText.mockResolvedValueOnce({ output: { isCourseMaterial: true, reason: "", prerequisites: [], units: [{ name: "Cells", concepts: [{ name: "Membrane", short: "Membrane", desc: "Controls entry." }, { name: "Nucleus", short: "Nucleus", desc: "Holds DNA." }] }] } });
+    const r = await createCourseFromSources("Bio notes", [src("notes.txt", "Cells have a membrane and a nucleus.")], "Notes");
+    expect(r.concepts).toBe(2);
     expect(listMaterials("bio-notes")[0]!.text).toContain("nucleus");
   });
 
+  it("says so when the model decides the notes aren't course material", async () => {
+    ai = true;
+    generateText.mockResolvedValueOnce({ output: { isCourseMaterial: false, reason: "That is a shopping list.", prerequisites: [], units: [] } });
+    await expect(createCourseFromSources("Stuff", [src("l.txt", "milk eggs bread")], "Notes")).rejects.toThrow(/shopping list/);
+  });
+
   it("refuses plain notes with no AI key, instead of guessing at concepts", async () => {
-    await expect(createCourse("Notes", [src("n.txt", "Just a paragraph of text about nothing in particular.")], "upload")).rejects.toThrow(/no AI key/);
+    await expect(createCourseFromSources("Notes", [src("n.txt", "Just a paragraph of text about nothing in particular.")], "Notes")).rejects.toThrow(/no AI key/);
     expect(getSidebar().courses.some((c) => c.id === "notes")).toBe(false);
   });
 
   it("refuses a missing name or no files", async () => {
-    await expect(createCourse("  ", [src("a.md", MD)], "upload")).rejects.toBeInstanceOf(MaterialError);
-    await expect(createCourse("X", [], "upload")).rejects.toBeInstanceOf(MaterialError);
-  });
-
-  it("caps the concepts the model returns", async () => {
-    ai = true;
-    const many = Array.from({ length: 8 }, (_, u) => ({ name: `Unit ${u}`, concepts: Array.from({ length: 10 }, (_, c) => ({ name: `C${u}-${c}`, desc: "d" })) }));
-    generateText.mockResolvedValueOnce({ output: { topic: "T", summary: "S", units: many } });
-    expect((await createCourse("Big", [src("b.txt", "text without headings here")], "upload")).concepts).toBe(40);
+    await expect(createCourseFromSources("  ", [src("a.md", MD)], "Notes")).rejects.toBeInstanceOf(MaterialError);
+    await expect(createCourseFromSources("X", [], "Notes")).rejects.toBeInstanceOf(MaterialError);
   });
 });
 

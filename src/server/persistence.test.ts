@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { demoStateForTests } from "../test/demo-state";
 import { closePersistenceForTests, loadJson, saveJson } from "./persistence";
-import { assess, getCourse } from "./store";
+import { assess, createCourse, getCourse, listCourses } from "./store";
 
 const DB = join(tmpdir(), "proveit-persistence-test.sqlite");
 type TestGlobal = { __proveit?: unknown; __proveitTestSeedFactory?: () => unknown };
@@ -52,5 +52,19 @@ describe("SQLite persistence", () => {
     closePersistenceForTests();
 
     expect(getCourse("intro-stats").concepts.find((c) => c.id === "cii")?.state).toBe("developing");
+  });
+
+  it("keeps uploaded courses after the in-memory cache is cleared", () => {
+    const id = createCourse({
+      name: "Biology 101",
+      outline: { units: [{ name: "Cells", concepts: [{ name: "Cell membrane", short: "Membrane", desc: "Say what crosses it." }] }], prerequisites: [] },
+      files: [{ name: "outline.md", kind: "Notes, uploaded", detail: "" }],
+    });
+
+    (globalThis as unknown as TestGlobal).__proveit = undefined;
+    closePersistenceForTests();
+
+    expect(listCourses().map((c) => c.id)).toContain(id);
+    expect(getCourse(id).concepts.map((c) => c.name)).toEqual(["Cell membrane"]);
   });
 });
