@@ -132,7 +132,7 @@ describe("correct-answer transfer path", () => {
     const first = await run("Over repeated samples, about 95% of intervals made by the method contain the true mean.");
     expect(getTransferChallenge(first.attemptId).attemptId).toBe(first.attemptId);
     await run(WRONG);
-    expect(() => getTransferChallenge(first.attemptId)).toThrow(InvalidAttemptLinkError);
+    expect(() => getTransferChallenge(first.attemptId)).toThrow(NotFoundError);
     await expect(submitTransfer(first.attemptId, RIGHT_TRANSFER)).rejects.toThrow(InvalidAttemptLinkError);
     expect(state("cii")).toBe("needs_work");
   });
