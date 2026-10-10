@@ -48,7 +48,7 @@ Fabricated presentation/demo state is kept off `main` on the dedicated demo-data
 
 ## Model calls
 
-Set `GOOGLE_GENERATIVE_AI_API_KEY` to use Gemini for grading, tutoring, upload checks, and generated text. Assessment grading uses independent model votes. When no key is present, deterministic judges keep the two authored end-to-end concepts repeatable.
+Set `OPENROUTER_API_KEY` (model from `OPENROUTER_MODEL`, default `google/gemini-3.8-flash`) or `GOOGLE_GENERATIVE_AI_API_KEY` to use Gemini for grading, tutoring, upload checks, and generated text. Assessment grading uses independent model votes. When no key is present, deterministic judges keep the two authored end-to-end concepts repeatable.
 
 ## Mastery semantics
 

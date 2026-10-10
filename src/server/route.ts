@@ -2,6 +2,7 @@ import "server-only";
 import { NextResponse } from "next/server";
 import type { z } from "zod";
 import { CalendarError } from "./calendar";
+import { modelErrorMessage } from "./modelError";
 import { InvalidAttemptLinkError, NotFoundError, ReviewNotDueError, TaskLockedError } from "./store";
 
 /** Shared body for the POST handlers: parse with zod, map known errors to JSON. */
@@ -17,6 +18,6 @@ export async function handle<S extends z.ZodType, R>(req: Request, schema: S, ru
     if (e instanceof ReviewNotDueError) return NextResponse.json({ error: e.message }, { status: 409 });
     if (e instanceof InvalidAttemptLinkError) return NextResponse.json({ error: "That learning step is no longer current. Refresh or restart the question." }, { status: 409 });
     console.error(e);
-    return NextResponse.json({ error: "The evaluator failed. Retry." }, { status: 500 });
+    return NextResponse.json({ error: modelErrorMessage(e, "The evaluator failed. Retry.") }, { status: 500 });
   }
 }

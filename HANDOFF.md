@@ -18,6 +18,8 @@ later retention failure -> needs_work -> repair again
 
 North star: **Know what you actually know.**
 
+Model calls go through `src/server/ai.ts`. `OPENROUTER_API_KEY` (model `OPENROUTER_MODEL`, default `google/gemini-3.8-flash`) wins when set, otherwise `GOOGLE_GENERATIVE_AI_API_KEY`. Never read, print or commit `.env`.
+
 ## Current branch/data policy
 
 - `main` contains real/default runtime behavior only. No fabricated learner progress, sample courses, sample calendar events, sample upload answers, or starting rank.
