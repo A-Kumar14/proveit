@@ -12,7 +12,9 @@
   },
   "dependencies": {
     "@ai-sdk/google": "^4.0.93",
+    "@ai-sdk/mcp": "^2.0.73",
     "@ai-sdk/react": "^4.0.140",
+    "@clerk/nextjs": "^7.9.14",
     "@openrouter/ai-sdk-provider": "^3.1.0",
     "ai": "^7.0.137",
     "class-variance-authority": "^0.7.1",
