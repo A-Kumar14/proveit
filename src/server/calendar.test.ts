@@ -74,10 +74,9 @@ describe("assertSafeUrl", () => {
 describe("connect, refresh, disconnect", () => {
   const feed = (body = ICS, status = 200) => vi.fn().mockResolvedValue(new Response(body, { status }));
 
-  it("starts on the sample calendar and refusing to refresh it", async () => {
-    expect(getCalendarState()).toMatchObject({ mode: "sample", provider: null, syncedAt: null });
-    expect(getCalendarState().events.length).toBeGreaterThan(5);
-    await expect(refreshCalendar()).rejects.toThrow("sample calendar");
+  it("starts disconnected with no fabricated events and refuses to refresh", async () => {
+    expect(getCalendarState()).toMatchObject({ mode: "none", provider: null, syncedAt: null, events: [] });
+    await expect(refreshCalendar()).rejects.toThrow("No calendar is connected");
   });
 
   it("connects a feed, names the provider and never exposes the secret link", async () => {
@@ -96,10 +95,10 @@ describe("connect, refresh, disconnect", () => {
     expect(getCalendarState().events.some((e) => e.title === "Quiz moved")).toBe(true);
   });
 
-  it("rejects a link that is not a calendar and leaves the sample in place", async () => {
+  it("rejects a link that is not a calendar and stays disconnected", async () => {
     vi.stubGlobal("fetch", feed("<html>sign in</html>"));
     await expect(connectCalendar("https://example.com/page")).rejects.toThrow("iCal");
-    expect(getCalendarState().mode).toBe("sample");
+    expect(getCalendarState().mode).toBe("none");
   });
 
   it("reports an HTTP error and a failed connection", async () => {
@@ -114,10 +113,10 @@ describe("connect, refresh, disconnect", () => {
     await expect(connectCalendar("https://example.com/a.ics")).rejects.toThrow("public calendar");
   });
 
-  it("disconnects back to the sample", async () => {
+  it("disconnects back to an empty calendar", async () => {
     vi.stubGlobal("fetch", feed());
     await connectCalendar("https://example.com/a.ics");
-    expect(disconnectCalendar()).toMatchObject({ mode: "sample", provider: null });
+    expect(disconnectCalendar()).toMatchObject({ mode: "none", provider: null, events: [] });
   });
 });
 
