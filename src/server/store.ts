@@ -3,7 +3,10 @@ import "server-only";
 import { cardStatus, type AssessInput, type AssessResult, type AttemptKind, type AttemptOutcome, type CourseOutline, type Evaluation, type MasteryState, type ReviewSubmitResult, type ReviewText, type TransferResult } from "@proveit/lib/schemas";
 import { toneForPct, type Tone } from "@proveit/lib/mastery";
 import { AUTHORED } from "./content";
-import { judgeAnswer, judgeReview, judgeTransfer, type AnswerContext } from "./evaluator";
+import { judgeAnswerForSpec, judgeReviewForSpec, judgeTransferForSpec, type AnswerContext } from "./evaluator";
+import { ensureConceptLearningSpec } from "./learningSpecGenerator";
+import { getLearningSpec } from "./learningSpecStore";
+import type { ConceptLearningSpec } from "@proveit/lib/conceptLearningSpec";
 import { loadUserJson, saveUserJson } from "./persistence";
 import type { CourseSpec } from "@proveit/lib/courseSpec";
 import type { CalEvent } from "./calendar";
@@ -27,6 +30,8 @@ type Attempt = {
   id: string; courseId: string; conceptId: string; kind: AttemptKind; outcome: AttemptOutcome;
   /** Immediate predecessor and stable episode root let the DB preserve the complete evidence chain. */
   parentAttemptId: string | null; rootAttemptId: string;
+  /** Exact canonical learning-spec revision used to judge this evidence. Optional only for legacy persisted attempts. */
+  learningSpecRevision?: number;
   answer: string; imageName?: string; evaluation: Evaluation | null;
   previousState: MasteryState; createdAt: number;
 };
@@ -178,36 +183,48 @@ const isoDay = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padSt
 const addDays = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
 const shortDate = (d: Date) => d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
-const concept = (id: string) => {
-  const c = db().course.concepts.find((x) => x.id === id);
-  if (!c) throw new NotFoundError(`concept ${id}`);
-  return c;
-};
 const attempt = (id: string) => {
   const a = db().attempts.find((x) => x.id === id);
   if (!a) throw new NotFoundError(`attempt ${id}`);
   return a;
 };
-/** Any course, including finished samples. Use assertCourse for anything that needs the active course. */
+/** Any course, including the built-in course and courses added from uploads/imports. */
 const courseFor = (id: string): Course => {
   const { course, samples } = db();
   const found = course.id === id ? course : samples.find((c) => c.id === id);
   if (!found) throw new NotFoundError(`course ${id}`);
   return found;
 };
+const conceptFor = (courseId: string, conceptId: string): Concept => {
+  const c = courseFor(courseId).concepts.find((x) => x.id === conceptId);
+  if (!c) throw new NotFoundError(`concept ${conceptId}`);
+  return c;
+};
+/** Legacy helper for built-in dashboard-only paths. New mastery paths should use conceptFor(courseId, conceptId). */
+const concept = (id: string) => conceptFor(db().course.id, id);
 const assertCourse = (id: string) => {
   if (db().course.id !== id) throw new NotFoundError(`course ${id}`);
 };
 const newId = () => `a${++db().seq}`;
-const primaryMisconception = (conceptId: string) => AUTHORED[conceptId]?.misconceptions[0] ?? null;
-const misconceptionFor = (conceptId: string, misconceptionId: string | null) =>
-  misconceptionId ? AUTHORED[conceptId]?.misconceptions.find((m) => m.id === misconceptionId) ?? null : null;
+
+const specFor = (courseId: string, conceptId: string, revision?: number): ConceptLearningSpec => {
+  const spec = getLearningSpec(courseId, conceptId, revision);
+  if (!spec) throw new NotFoundError(`no learning content for ${conceptId}`);
+  return spec;
+};
+const specForAttempt = (a: Attempt): ConceptLearningSpec =>
+  specFor(a.courseId, a.conceptId, a.learningSpecRevision);
+const misconceptionForSpec = (spec: ConceptLearningSpec, misconceptionId: string | null) =>
+  misconceptionId ? spec.misconceptions.find((m) => m.id === misconceptionId) ?? null : null;
+const primaryMisconception = (conceptId: string) =>
+  getLearningSpec(db().course.id, conceptId)?.misconceptions[0] ?? null;
 
 function clarificationPromptFor(a: Attempt): string {
   if (a.evaluation?.followUp) return a.evaluation.followUp;
-  const m = misconceptionFor(a.conceptId, a.evaluation?.misconceptionId ?? null);
-  if (m) return m.clarify;
-  return AUTHORED[a.conceptId]?.probe ?? "Say what you meant and what the idea applies to.";
+  const spec = specForAttempt(a);
+  const m = misconceptionForSpec(spec, a.evaluation?.misconceptionId ?? null);
+  if (m) return m.clarificationQuestion;
+  return spec.assessment.probe ?? "Say what you meant and what the idea applies to.";
 }
 
 function answerContext(parent: Attempt): AnswerContext {
