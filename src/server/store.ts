@@ -640,7 +640,7 @@ export function getEvidenceTrail(id: string): EvidenceAttemptView[] {
 
 export type AttemptView = {
   id: string; courseId: string; conceptId: string; conceptName: string; question: string; state: MasteryState; answer: string; attachment: string | null; evaluation: Evaluation;
-  kind: AttemptKind; outcome: AttemptOutcome; parentAttemptId: string | null; rootAttemptId: string; learningSpecRevision: number | null; createdAt: number;
+  kind: AttemptKind; outcome: AttemptOutcome; parentAttemptId: string | null; rootAttemptId: string; learningSpecRevision?: number | null; createdAt: number;
 };
 export function getAttempt(id: string): AttemptView {
   const a = attempt(id);
