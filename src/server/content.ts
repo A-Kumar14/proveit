@@ -43,6 +43,9 @@ const ciWrong = [
   /(?:a\s+)?95\s*(?:%|percent)\s*(?:probability|chance|likelihood)[^.!?]*/i,
   /probability[^.!?]*?95\s*(?:%|percent)[^.!?]*/i,
 ];
+const rejectsCiProbability = (s: string) =>
+  /(?:does\s+not|doesn't|do\s+not|don't|not)\s+(?:mean\s+)?(?:that\s+)?(?:there(?:'s|\s+is)\s+)?(?:a\s+)?95\s*(?:%|percent)\s*(?:probability|chance|likelihood)/i.test(s) ||
+  /(?:there(?:'s|\s+is)\s+)?no\s+95\s*(?:%|percent)\s*(?:probability|chance|likelihood)/i.test(s);
 
 export const AUTHORED: Record<string, Authored> = {
   cii: {
@@ -58,7 +61,7 @@ export const AUTHORED: Record<string, Authored> = {
     judge: (answer) => {
       if (words(answer) < 6) return { verdict: "uncertain", quote: null, misconceptionId: null };
       const quote = firstMatch(answer, ciWrong);
-      if (quote) return { verdict: "incorrect", quote, misconceptionId: "parameter_probability_trap" };
+      if (quote && !rejectsCiProbability(answer)) return { verdict: "incorrect", quote, misconceptionId: "parameter_probability_trap" };
       const explainsMethod = /(method|procedure|process|repeat|many (samples|studies)|long run|intervals)/i.test(answer);
       const explicitCorrection = /(method|procedure|long run|repeat)/i.test(answer) && /(not|rather than|instead of)[^.!?]*(one|single|this)[^.!?]*interval/i.test(answer);
       const ok = (/95/.test(answer) && explainsMethod) || explicitCorrection;
@@ -79,11 +82,11 @@ export const AUTHORED: Record<string, Authored> = {
       judge: (a) => {
         // Check the complete rubric first so a correct phrase such as "no 95% chance" is not
         // mistaken for the misconception merely because it contains the words "95% chance".
+        const quote = firstMatch(a, ciWrong);
+        if (quote && !rejectsCiProbability(a)) return { verdict: "fail", quote, misconceptionId: "parameter_probability_trap", feedback: "For one already-calculated interval, don't assign a 95% probability to the fixed mean." };
         const pass = /\b95\b/.test(a) &&
           /(either (contains|contain|does|is)|already (been )?(calculated|computed|built)|no (95\s*%|probability|chance)|not (a )?95\s*%|describes? the (method|procedure)|the method|long.?run)/i.test(a);
         if (pass) return { verdict: "pass", quote: null, misconceptionId: null, feedback: null };
-        const quote = firstMatch(a, ciWrong);
-        if (quote) return { verdict: "fail", quote, misconceptionId: "parameter_probability_trap", feedback: "For one already-calculated interval, don't assign a 95% probability to the fixed mean." };
         return { verdict: "uncertain", quote: null, misconceptionId: null, feedback: "Answer both parts: the long-run count out of 100, and what the 95% means for one interval after it is calculated." };
       },
     },
@@ -106,7 +109,10 @@ export const AUTHORED: Record<string, Authored> = {
         /(?:larger|bigger|higher|more)\s+(?:sample|n\b)[^.!?]*?(?:larger|bigger|higher|more)\s+(?:standard error|se\b|error)[^.!?]*/i,
         /(?:standard error|se)\s+(?:is|gets|grows|increases)[^.!?]*?(?:larger|bigger|higher|more)[^.!?]*/i,
       ]);
-      if (quote) return { verdict: "incorrect", quote, misconceptionId: "more_data_more_error" };
+      const rejectsMoreError =
+        /(?:does\s+not|doesn't|not)\s+(?:mean\s+)?[^.!?]{0,50}(?:larger|bigger|higher|more)\s+(?:standard error|se\b|error)/i.test(answer) ||
+        /(?:standard error|se)\s+(?:does\s+not|doesn't|is\s+not|isn't)\s+(?:larger|bigger|higher|more)/i.test(answer);
+      if (quote && !rejectsMoreError) return { verdict: "incorrect", quote, misconceptionId: "more_data_more_error" };
       const ok = /(smaller|lower|less|shrink|decrease)/i.test(answer) && /(400|larger|bigger|more)/i.test(answer);
       return { verdict: ok ? "correct" : "uncertain", quote: null, misconceptionId: null };
     },
