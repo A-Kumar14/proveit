@@ -189,3 +189,12 @@ export const TutorMessages = z.array(TutorMessage).min(1).max(40);
 export const CatalogAddInput = z.object({ id: z.string().min(1).max(80) });
 export const CatalogAddResult = z.object({ id: z.string(), added: z.boolean() });
 export const CatalogRemoveResult = z.object({ removed: z.boolean() });
+
+// ---- course files ----
+
+export const FileRemoveInput = z.object({ courseId: z.string(), id: z.string() });
+export const FileUploadResult = z.object({
+  added: z.array(z.object({ id: z.string(), name: z.string(), words: z.number(), readBy: z.enum(["text", "ai"]) })),
+  failed: z.array(z.object({ name: z.string(), reason: z.string() })),
+});
+export type FileUploadResult = z.infer<typeof FileUploadResult>;

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { aiEnabled, model } from "./ai";
 import { AUTHORED } from "./content";
 import { compile, keyTex, notesTex, paperTex, type Notes, type Paper } from "./latex";
+import { courseMaterial } from "./materials";
 import { getCourse, getMisconceptionLog } from "./store";
 import type { MasteryState, PracticeDoc, PracticeResult } from "@proveit/lib/schemas";
 
@@ -74,9 +75,10 @@ async function buildPaper(courseId: string): Promise<Paper> {
 - Exactly ${QUESTIONS} open-ended questions, ${MARKS} marks each, at least 6 of them on concepts marked weak. Cover each weak concept before repeating one.
 - For a weak concept with listed mistakes, write at least one question that a student with that mistake would get wrong.
 - "key" has one entry per question in the same order. "answer" is the correct answer. "marking" says what earns the marks.
-- Use only the course material given. No outside facts. Plain text, no LaTeX, no markdown.`,
+- Use only the course material given, including courseNotes. No outside facts. Plain text, no LaTeX, no markdown.
+- Write any non-Latin script in Latin letters, such as pinyin for Chinese, because the PDF font can't show other scripts.`,
     output: Output.object({ schema: PaperOut }),
-    prompt: JSON.stringify({ course: w.courseName, concepts: w.concepts.map((c) => ({ name: c.name, about: c.desc, weak: c.weak, courseMaterial: c.material, mistakes: c.mistakes.map((m) => ({ name: m.name, whatIsWrong: m.gap })) })) }),
+    prompt: JSON.stringify({ course: w.courseName, courseNotes: courseMaterial(courseId, 20_000), concepts: w.concepts.map((c) => ({ name: c.name, about: c.desc, weak: c.weak, courseMaterial: c.material, mistakes: c.mistakes.map((m) => ({ name: m.name, whatIsWrong: m.gap })) })) }),
   });
   if (output.questions.length === 0 || output.key.length !== output.questions.length) throw new Error("the model returned a paper whose key doesn't match");
   return { title: output.title.trim() || "Sample question paper", courseName: w.courseName, questions: output.questions, key: output.key };
@@ -98,9 +100,10 @@ async function buildNotes(courseId: string): Promise<Notes> {
       model: model(),
       system: `You write study notes for one course, one section per concept, in the order given.
 - "summary" is two or three plain sentences. "points" has up to 5 short facts or steps.
-- Use only the course material given. Where none is given, stay within the description. No outside facts, no LaTeX, no markdown.`,
+- Use only the course material given, including courseNotes. Where none is given, stay within the description. No outside facts, no LaTeX, no markdown.
+- Write any non-Latin script in Latin letters, such as pinyin for Chinese, because the PDF font can't show other scripts.`,
       output: Output.object({ schema: SectionsOut }),
-      prompt: JSON.stringify({ course: w.courseName, concepts: ordered.map((c) => ({ name: c.name, about: c.desc, courseMaterial: c.material })) }),
+      prompt: JSON.stringify({ course: w.courseName, courseNotes: courseMaterial(courseId, 20_000), concepts: ordered.map((c) => ({ name: c.name, about: c.desc, courseMaterial: c.material })) }),
     });
     // Keep the concept order and names from the course, in case the model reorders or renames.
     const byName = new Map(output.sections.map((s) => [s.concept, s]));

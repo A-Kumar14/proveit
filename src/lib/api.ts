@@ -1,5 +1,5 @@
-import type { z } from "zod";
-import { ApiError, AssessResult, AuditResult, CatalogAddResult, CatalogRemoveResult, ConverseResult, PracticeResult, ClarifyResult, CourseCompleteResult, Ok, ReviewSubmitResult, TransferResult, UploadCheck, type AssessInput, type ConverseInput } from "./schemas";
+import { z } from "zod";
+import { ApiError, AssessResult, AuditResult, CatalogAddResult, FileUploadResult, CatalogRemoveResult, ConverseResult, PracticeResult, ClarifyResult, CourseCompleteResult, Ok, ReviewSubmitResult, TransferResult, UploadCheck, type AssessInput, type ConverseInput } from "./schemas";
 
 /** Client side of the API. Components call these; the route handlers behind them are the backend seam. */
 async function post<T>(url: string, body: unknown, schema: z.ZodType<T>): Promise<T> {
@@ -25,7 +25,20 @@ async function checkUpload(file: File, conceptId: string) {
   return UploadCheck.parse(json);
 }
 
+async function uploadFiles(courseId: string, files: File[]) {
+  const form = new FormData();
+  form.set("courseId", courseId);
+  for (const f of files) form.append("files", f);
+  const res = await fetch("/api/courses/files", { method: "POST", body: form }).catch(() => null);
+  if (!res) throw new Error("Can't reach the server. Check your connection and retry.");
+  const json: unknown = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(ApiError.safeParse(json).data?.error ?? "The upload failed. Retry.");
+  return FileUploadResult.parse(json);
+}
+
 export const api = {
+  uploadFiles,
+  removeFile: (courseId: string, id: string) => post("/api/courses/files/remove", { courseId, id }, z.object({ removed: z.boolean() })),
   checkUpload,
   setTaskDone: (id: string, done: boolean) => post("/api/todos/complete", { id, done }, Ok),
   connectCalendar: (url: string) => post("/api/calendar/connect", { url }, Ok),
