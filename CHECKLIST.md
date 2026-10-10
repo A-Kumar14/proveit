@@ -56,6 +56,16 @@ Status as of the last push to `main`. Tick items as they land.
 - [ ] Fix fixed widths that break (500px graph column, 600px show panel, 640px transcript card)
 - [ ] Decide whether phone width matters for the demo
 
+## Calendar and to-do
+
+- [ ] Connect a real Google calendar through its secret iCal link and check the events and Refresh
+- [ ] Replace the iCal link with Google OAuth, so students don't paste a secret link (needs a Google Cloud client)
+- [ ] Store the calendar link per user in the database, not server memory
+- [ ] Use the student's time zone for events and slots (today they use the server's)
+- [ ] Add study blocks to the student's own calendar (write access), not only suggest them
+- [ ] Let a passed review mark its review task done and promote Provisional to Mastered
+- [ ] Decide what happens to hand-ticked tasks when the same concept is later proved by answers
+
 ## Hardening
 
 - [ ] Add an end-to-end test of the demo path
@@ -83,6 +93,9 @@ Status as of the last push to `main`. Tick items as they land.
 - [x] Voice mode with transcript review, Sketch, Camera and Add file
 - [x] Store, evaluator and upload route tests (23)
 - [x] Dashboard with a scrolling course ticker and seven widgets (up next, needs attention, due for review, mastery overview, upcoming quizzes, study week, recent activity)
+- [x] Dashboard to-do list that finishes by itself, hand ticking with confetti, and a calendar card
+- [x] Calendar page with a month view, iCal connect and refresh, and suggested study slots
+- [x] Review queue suggests times from free gaps in the calendar
 - [x] Courses page with filters, row selection, batch and right-click "Mark as completed"
 - [x] Sidebar splits courses into In progress and Completed, with a sample completed course
 - [x] Repo on GitHub, `main` up to date

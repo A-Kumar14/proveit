@@ -3,6 +3,7 @@ import { cardStatus, type AssessInput, type AssessResult, type Evaluation, type 
 import { toneForPct, type Tone } from "@proveit/lib/mastery";
 import { AUTHORED } from "./content";
 import { judgeAnswer, judgeTransfer } from "./evaluator";
+import type { CalEvent } from "./calendar";
 
 /**
  * In-memory stand-in for the real data layer. Every exported function is the seam the backend
@@ -26,7 +27,7 @@ type Attempt = {
 /** `completedOverride` is the student's own call. null means derive it from the concepts. */
 type Course = { id: string; name: string; deadline: string; concepts: Concept[]; edges: [string, string][]; files: CourseFile[]; completedOverride: boolean | null; /** ISO date of the next quiz, if any. */ examDate: string | null };
 /** `course` is the one being worked on. `samples` are finished courses that only fill the sidebar and map views. */
-type Db = { course: Course; samples: Course[]; attempts: Attempt[]; provenDays: Set<string>; seq: number };
+type Db = { course: Course; samples: Course[]; attempts: Attempt[]; provenDays: Set<string>; /** Tasks the student ticked off by hand. */ taskDone: Set<string>; seq: number };
 
 const app = (answers: number, sound: number, transferPassed = false) => ({ answers, sound, transferPassed });
 const M: Skill[] = [{ label: "Application", pct: 90 }, { label: "New-question test", pct: 85 }];
@@ -61,6 +62,7 @@ function seed(): Db {
     samples: [sampleLinearAlgebra(), samplePersonalFinance()],
     attempts: [],
     provenDays: new Set(),
+    taskDone: new Set(),
     seq: 0,
   };
 }
@@ -566,42 +568,90 @@ export function setCoursesCompleted(ids: string[], completed: boolean): string[]
 // ---- dashboard widgets ----
 
 export type DashboardWidgets = {
-  activeCourseId: string;
-  upNext: { concept: string; course: string; state: MasteryState; why: string; href: string } | null;
-  attention: MisconceptionEntry[];
-  reviews: { due: number; upcoming: number; nextWhen: string | null };
   mastery: { state: MasteryState; count: number }[];
   week: { streak: number; days: { label: string; iso: string; active: boolean; today: boolean }[] };
-  quizzes: { course: string; href: string; label: string; daysLeft: number }[];
   recent: HistoryEvent[];
 };
 
 export function getDashboardWidgets(): DashboardWidgets {
   const { course, samples, provenDays } = db();
-  const next = nextConcept();
-  const reviews = getReviews();
   const now = new Date();
   const todayIso = isoDay(now);
-  const upNext = next ? { concept: next.name, course: course.name, state: next.state, why: getQuestion(course.id, next.id).why, href: practiceHref(next) } : null;
   const all = [course, ...samples].flatMap((c) => c.concepts);
   const order: MasteryState[] = ["mastered", "provisional", "developing", "needs_work", "not_started"];
   const days = Array.from({ length: 7 }, (_, i) => {
     const d = addDays(now, i - 6);
     return { label: d.toLocaleDateString("en-US", { weekday: "narrow" }), iso: isoDay(d), active: provenDays.has(isoDay(d)), today: isoDay(d) === todayIso };
   });
-  const quizzes = [course, ...samples].flatMap((c) => {
-    if (!c.examDate || isCompleted(c)) return [];
-    const daysLeft = Math.round((new Date(`${c.examDate}T00:00:00`).getTime() - new Date(`${todayIso}T00:00:00`).getTime()) / 86_400_000);
-    return daysLeft < 0 ? [] : [{ course: c.name, href: `/course/${c.id}`, label: c.deadline, daysLeft }];
-  }).sort((a, b) => a.daysLeft - b.daysLeft);
   return {
-    activeCourseId: course.id,
-    upNext,
-    attention: getMisconceptionLog(course.id).filter((m) => m.open).slice(0, 3),
-    reviews: { due: reviews.due.length, upcoming: reviews.upcoming.length, nextWhen: reviews.due[0]?.when ?? reviews.upcoming[0]?.when ?? null },
     mastery: order.map((state) => ({ state, count: all.filter((c) => c.state === state).length })),
     week: { streak: streak(), days },
-    quizzes,
     recent: getHistory().slice(0, 4),
   };
+}
+
+// ---- to-do list ----
+
+export type Task = {
+  id: string; title: string; courseId: string; courseName: string; state: MasteryState; kind: "practice" | "review";
+  done: boolean; /** "progress" means your answers finished it, so it can't be unticked. */ doneBy: "progress" | "you" | null;
+  href: string | null; why: string;
+};
+export type TodoGroup = { courseId: string; courseName: string; open: Task[]; done: Task[]; total: number; doneCount: number };
+
+export class TaskLockedError extends Error {}
+
+export const taskRank = (t: Task) => (t.kind === "review" ? 1 : t.state === "needs_work" ? 0 : t.state === "developing" ? 2 : 3);
+
+function tasksFor(c: Course, active: boolean): Task[] {
+  const today = isoDay(new Date());
+  return c.concepts.flatMap((x): Task[] => {
+    const provedByWork = x.state === "provisional" || x.state === "mastered";
+    const href = active && testable(x) ? practiceHref(x) : null;
+    const practice: Task = {
+      id: x.id, title: x.name, courseId: c.id, courseName: c.name, state: x.state, kind: "practice",
+      done: provedByWork || db().taskDone.has(x.id), doneBy: provedByWork ? "progress" : db().taskDone.has(x.id) ? "you" : null, href,
+      why: x.state === "needs_work" ? "Open misconception" : x.state === "developing" ? "Started, not yet proved" : x.state === "not_started" ? "Not started" : "Proved",
+    };
+    const reviewDue = x.nextReview && x.nextReview <= today && provedByWork;
+    const review: Task[] = reviewDue ? [{ id: `review:${x.id}`, title: `Review ${x.name}`, courseId: c.id, courseName: c.name, state: x.state, kind: "review", done: db().taskDone.has(`review:${x.id}`), doneBy: db().taskDone.has(`review:${x.id}`) ? "you" : null, href, why: "Review due" }] : [];
+    return [practice, ...review];
+  });
+}
+
+/** Tasks grouped by course, open ones first by urgency. Completed courses drop out. */
+export function getTodos(): TodoGroup[] {
+  const { course, samples } = db();
+  return [course, ...samples].filter((c) => !isCompleted(c)).map((c) => {
+    const all = tasksFor(c, c === course);
+    const open = all.filter((t) => !t.done).sort((a, b) => taskRank(a) - taskRank(b));
+    return { courseId: c.id, courseName: c.name, open, done: all.filter((t) => t.done), total: all.length, doneCount: all.filter((t) => t.done).length };
+  });
+}
+
+/** Ticks or unticks a task by hand. Progress-based completion can't be undone, and a hand tick never changes mastery. */
+export function setTaskDone(id: string, done: boolean): void {
+  const { course, samples } = db();
+  const task = [course, ...samples].flatMap((c) => tasksFor(c, c === course)).find((t) => t.id === id);
+  if (!task) throw new NotFoundError(`task ${id}`);
+  if (task.doneBy === "progress") throw new TaskLockedError("Your answers already completed this task.");
+  if (done) db().taskDone.add(id);
+  else db().taskDone.delete(id);
+}
+
+// ---- events that come from courses ----
+
+/** Quizzes and due reviews as all-day events, so the calendar shows them next to the student's own. */
+export function getCourseEvents(): CalEvent[] {
+  const { course, samples } = db();
+  const out: CalEvent[] = [];
+  for (const c of [course, ...samples]) {
+    if (isCompleted(c)) continue;
+    if (c.examDate) out.push({ id: `quiz:${c.id}`, title: c.deadline.replace(/^Quiz /, `${c.name} quiz, `), start: new Date(`${c.examDate}T00:00:00`).toISOString(), end: new Date(`${c.examDate}T23:59:59`).toISOString(), allDay: true, kind: "quiz", href: `/course/${c.id}` });
+    for (const x of c.concepts) {
+      if (!x.nextReview || !(x.state === "provisional" || x.state === "mastered")) continue;
+      out.push({ id: `review:${x.id}`, title: `Review ${x.name}`, start: new Date(`${x.nextReview}T00:00:00`).toISOString(), end: new Date(`${x.nextReview}T23:59:59`).toISOString(), allDay: true, kind: "review", href: "/review" });
+    }
+  }
+  return out;
 }

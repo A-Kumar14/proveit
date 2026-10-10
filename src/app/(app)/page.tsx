@@ -3,15 +3,19 @@ import { Plus } from "lucide-react";
 import { AppShell } from "@proveit/app/_components/shell/AppShell";
 import { AddCourseModal } from "@proveit/app/_components/shell/AddCourseModal";
 import { buttonStyles } from "@proveit/app/_components/Button";
+import { ConnectCalendarModal } from "@proveit/app/_components/calendar/ConnectCalendarModal";
+import { CalendarCard } from "@proveit/app/_components/dashboard/CalendarCard";
 import { CourseTicker } from "@proveit/app/_components/dashboard/CourseTicker";
 import { TickerCard } from "@proveit/app/_components/dashboard/TickerCard";
-import { DueForReview, MasteryOverview, NeedsAttention, RecentActivity, StudyWeek, UpNext, UpcomingQuizzes } from "@proveit/app/_components/dashboard/Widgets";
+import { TodoCard } from "@proveit/app/_components/dashboard/TodoCard";
+import { MasteryOverview, RecentActivity, StudyWeek } from "@proveit/app/_components/dashboard/Widgets";
+import { getScheduledTodos, getSchedule } from "@proveit/server/schedule";
 import { getCourse, getDashboard, getDashboardWidgets, listCourses } from "@proveit/server/store";
 
 export const dynamic = "force-dynamic";
 
 export default async function Dashboard({ searchParams }: PageProps<"/">) {
-  const { add } = await searchParams;
+  const { add, connect } = await searchParams;
   const head = getDashboard();
   const courses = listCourses();
   const widgets = getDashboardWidgets();
@@ -32,18 +36,20 @@ export default async function Dashboard({ searchParams }: PageProps<"/">) {
             <CourseTicker count={courses.length}>{courses.map((c) => <TickerCard key={c.id} c={c} />)}</CourseTicker>
           </section>
 
+          <div className="grid grid-cols-2 items-start gap-4">
+            <TodoCard groups={getScheduledTodos()} />
+            <CalendarCard schedule={getSchedule()} />
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
-            <UpNext d={widgets} />
-            <NeedsAttention d={widgets} />
-            <DueForReview d={widgets} />
             <MasteryOverview d={widgets} />
-            <UpcomingQuizzes d={widgets} />
             <StudyWeek d={widgets} />
             <RecentActivity d={widgets} />
           </div>
         </div>
       </div>
       {add && demo && <AddCourseModal demoCourseId={demo.id} demoConcepts={getCourse(demo.id).total} />}
+      {connect && <ConnectCalendarModal closeHref="/" />}
     </AppShell>
   );
 }

@@ -1,5 +1,5 @@
 import type { z } from "zod";
-import { ApiError, AssessResult, ClarifyResult, CourseCompleteResult, TransferResult, UploadCheck, type AssessInput } from "./schemas";
+import { ApiError, AssessResult, ClarifyResult, CourseCompleteResult, Ok, TransferResult, UploadCheck, type AssessInput } from "./schemas";
 
 /** Client side of the API. Components call these; the route handlers behind them are the backend seam. */
 async function post<T>(url: string, body: unknown, schema: z.ZodType<T>): Promise<T> {
@@ -27,6 +27,10 @@ async function checkUpload(file: File, conceptId: string) {
 
 export const api = {
   checkUpload,
+  setTaskDone: (id: string, done: boolean) => post("/api/todos/complete", { id, done }, Ok),
+  connectCalendar: (url: string) => post("/api/calendar/connect", { url }, Ok),
+  refreshCalendar: () => post("/api/calendar/refresh", {}, Ok),
+  disconnectCalendar: () => post("/api/calendar/disconnect", {}, Ok),
   setCoursesCompleted: (ids: string[], completed: boolean) => post("/api/courses/complete", { ids, completed }, CourseCompleteResult),
   assess: (input: AssessInput) => post("/api/assess", input, AssessResult),
   clarify: (attemptId: string) => post("/api/clarify", { attemptId }, ClarifyResult),

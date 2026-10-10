@@ -68,6 +68,12 @@ export const CourseCompleteInput = z.object({
 export type CourseCompleteInput = z.infer<typeof CourseCompleteInput>;
 export const CourseCompleteResult = z.object({ updated: z.array(z.string()) });
 
+// ---- to-do and calendar ----
+
+export const TaskDoneInput = z.object({ id: z.string().min(1), done: z.boolean() });
+export const CalendarConnectInput = z.object({ url: z.string().trim().min(1, "Paste your calendar link.").max(2000) });
+export const Ok = z.object({ ok: z.literal(true) });
+
 // ---- mastery review (Tutor card) ----
 
 /** Only these fields come from the model. Numbers and statuses are computed in code and stay stable across runs. */

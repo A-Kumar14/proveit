@@ -214,21 +214,16 @@ describe("dashboard widgets and ticker rows", () => {
 
   it("builds every widget from real state", () => {
     const w = getDashboardWidgets();
-    expect(w.upNext).toMatchObject({ concept: "CI interpretation", href: "/course/intro-stats/practice/cii" });
-    expect(w.attention.map((m) => m.name)).toEqual(["Parameter probability trap"]);
     expect(w.mastery.reduce((n, m) => n + m.count, 0)).toBe(28);
     expect(w.week.days).toHaveLength(7);
     expect(w.week.days.filter((d) => d.today)).toHaveLength(1);
-    expect(w.quizzes.map((q) => q.course)).toEqual(["Intro Statistics", "Personal Finance 101"]);
     expect(w.recent).toEqual([]);
   });
 
-  it("records the day a concept is proven and drops a completed course's quiz", async () => {
+  it("records the day a concept is proven", async () => {
     const { attemptId } = await run(WRONG);
     await submitTransfer(attemptId, RIGHT_TRANSFER);
     expect(getDashboardWidgets().week.days.at(-1)).toMatchObject({ today: true, active: true });
     expect(getDashboardWidgets().recent[0]?.tone).toBe("good");
-    setCoursesCompleted(["intro-stats"], true);
-    expect(getDashboardWidgets().quizzes.map((q) => q.course)).toEqual(["Personal Finance 101"]);
   });
 });

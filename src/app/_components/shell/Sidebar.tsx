@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { BarChart3, BookOpen, CircleCheck, ChevronRight, Flame, FolderOpen, History, LayoutDashboard, MessageSquare, Mic, Plus, RotateCcw, Settings, TriangleAlert } from "lucide-react";
+import { BarChart3, BookOpen, CalendarDays, CircleCheck, ChevronRight, Flame, FolderOpen, History, LayoutDashboard, MessageSquare, Mic, Plus, RotateCcw, Settings, TriangleAlert } from "lucide-react";
 import { cn } from "@proveit/lib/cn";
 import type { SidebarView } from "@proveit/server/store";
 
-export type NavKey = "dashboard" | "courses" | "review" | "history" | "map" | "tutor" | "practice" | "misconceptions" | "files" | "settings";
+export type NavKey = "dashboard" | "courses" | "review" | "history" | "calendar" | "map" | "tutor" | "practice" | "misconceptions" | "files" | "settings";
 
 const item = (on: boolean) =>
   cn("flex items-center gap-2.5 rounded-md px-2.5 py-[7px] text-sm no-underline", on ? "bg-surface-active font-semibold text-ink" : "text-ink-muted hover:bg-surface-hover");
@@ -37,6 +37,7 @@ export function Sidebar({ data, active, courseId }: { data: SidebarView; active:
           {data.reviewsDue > 0 && <span className="rounded-full bg-developing-bg px-[7px] py-px text-[11px] font-semibold text-developing">{data.reviewsDue}</span>}
         </NavLink>
         <NavLink href="/history" on={active === "history"}><History {...icon} />History</NavLink>
+        <NavLink href="/calendar" on={active === "calendar"}><CalendarDays {...icon} />Calendar</NavLink>
       </div>
 
       <div className="flex flex-col gap-0.5">
