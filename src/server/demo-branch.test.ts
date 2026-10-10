@@ -55,7 +55,8 @@ describe("isolated demo-data branch", () => {
     expect(calendar.events.length).toBeGreaterThanOrEqual(6);
 
     const course = getCourse("intro-stats");
-    expect(new Set(course.concepts.map((c) => c.state))).toEqual(expect.objectContaining(new Set(["mastered", "developing", "needs_work", "provisional", "not_started"])));
+    const states = new Set(course.concepts.map((c) => c.state));
+    for (const state of ["mastered", "developing", "needs_work", "provisional", "not_started"] as const) expect(states.has(state)).toBe(true);
     expect(getDashboard().recentlyCaught.length).toBeGreaterThanOrEqual(2);
     expect(getDashboard().risk?.concept).toContain("CI interpretation");
     expect(getTodos().some((g) => g.courseId === "personal-finance")).toBe(true);
