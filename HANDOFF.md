@@ -155,3 +155,7 @@ Also inspect the exact PR head against the latest `main` before merging.
 `src/server/userBoundary.ts` wraps all API exports and application page components, plus AppShell (React renders nested server components separately). `src/server/userScope.ts` uses AsyncLocalStorage to retain trusted identity across asynchronous evaluation, and isolates account caches. An auth-enabled unscoped state access fails closed. `loadUserJson` / `saveUserJson` namespace learning/calendar/material keys; raw persistence functions remain available for existing per-user OAuth keys.
 
 The no-auth `local` namespace keeps original keys and test reset hooks. Pre-auth global snapshots are not assigned to new accounts. Isolation tests cover concurrent grading/failure, account memory and reload state, foreign attempt/course/material/quiz access, rank and calendar, plus anonymous route rejection. No sample data is introduced on main.
+
+## Concept learning spec architecture
+
+`docs/concept-learning-spec.md` describes the versioned JSON contract in `src/lib/conceptLearningSpec.ts`. CI interpretation and Standard Error now have canonical validated specs in `src/server/authoredLearningSpecs.ts`. `content.ts` derives its legacy view from those specs; deterministic grader functions live separately in `authoredJudges.ts`. Existing mastery/evaluator behavior is preserved. Generated content, its persistence/revision lifecycle, generalized evaluation and runtime-course mastery remain subsequent milestones.
