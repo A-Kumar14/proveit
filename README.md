@@ -79,9 +79,14 @@ An incomplete or ambiguous answer creates an `uncertain` evidence event and does
 | `src/lib/schemas.ts` | Shared Zod contracts |
 | `src/app/api/*` | Route-handler mutation boundary |
 | `src/app/_components/*` | UI |
+| `examples/signbridge/service.py` | Local model-service entry point for the isolated SignBridge feature |
 
 ## Current scope
 
 Built: dashboard, course map, practice, misconception diagnosis, dispute/clarification, focused remediation, transfer proof, delayed review, retained mastery, history/evidence trail, review queue, tutor chat, upload validation, voice/dictation, rank, to-dos, and iCal integration.
 
 Still intentionally incomplete: course ingestion/concept extraction, broader authored course coverage (only CI interpretation and Standard Error run fully end-to-end), source retrieval/citations, dynamic validated transfer generation, multi-user auth, and durable hosted persistence.
+
+## SignBridge
+
+ProveIt includes an isolated sign-to-speech conversation backed by hand detection and a pretrained ASL landmark classifier. Static letters are not added when no hand is detected or the model score is uncertain. Movement recognition is opt-in and needs a configured vision provider or trained upstream sequence model. See [docs/signbridge.md](docs/signbridge.md) for setup and run commands.
