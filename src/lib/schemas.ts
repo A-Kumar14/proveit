@@ -3,6 +3,14 @@ import { z } from "zod";
 export const MasteryState = z.enum(["not_started", "developing", "needs_work", "provisional", "mastered"]);
 export type MasteryState = z.infer<typeof MasteryState>;
 
+/** Every learner response is stored as evidence. The kind records where it occurred in the learning loop. */
+export const AttemptKind = z.enum(["initial", "clarification", "transfer", "review"]);
+export type AttemptKind = z.infer<typeof AttemptKind>;
+
+/** Outcome is separate from kind so failed transfer/review evidence is never lost. */
+export const AttemptOutcome = z.enum(["correct", "incorrect", "uncertain", "pass", "fail"]);
+export type AttemptOutcome = z.infer<typeof AttemptOutcome>;
+
 /** Card status is a 3-value view of the stored state. not_started rows are hidden from review cards. */
 export const cardStatus = (s: MasteryState): "mastered" | "reteaching" | "transfer-pending" | null =>
   s === "mastered" ? "mastered"
@@ -53,7 +61,7 @@ export const TransferInput = z.object({
 });
 export const TransferResult = z.discriminatedUnion("result", [
   z.object({ result: z.literal("pass"), resultAttemptId: z.string() }),
-  z.object({ result: z.literal("fail"), nextAttemptId: z.string().nullable(), followUp: z.string().nullable() }),
+  z.object({ result: z.literal("fail"), failedAttemptId: z.string(), nextAttemptId: z.string().nullable(), followUp: z.string().nullable() }),
 ]);
 export type TransferResult = z.infer<typeof TransferResult>;
 

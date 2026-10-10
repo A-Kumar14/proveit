@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { getRewards, listCourses, setCoursesCompleted, setTaskDone } from "./store";
-import { assess, getAttempt, getCourse, getDashboard, getQuestion, getRemediation, getFiles, getHistory, getMisconceptionLog, getResult, getReviewBase, getReviews, getSidebar, NotFoundError, submitTransfer } from "./store";
+import { assess, clarify, getAttempt, getEvidenceAttempt, getCourse, getDashboard, getQuestion, getRemediation, getFiles, getHistory, getMisconceptionLog, getResult, getReviewBase, getReviews, getSidebar, getTransferChallenge, InvalidAttemptLinkError, NotFoundError, submitTransfer } from "./store";
 
 const WRONG = "It means there's a 95% probability that the true population mean is inside our interval.";
 const RIGHT_TRANSFER = "About 95 of them. But for any one interval that's already calculated, there's no 95% chance. It either contains the mean or it doesn't.";
@@ -41,6 +41,94 @@ describe("diagnosis", () => {
   });
 });
 
+describe("evidence lineage", () => {
+  it("records a clarification as a child of the response it clarifies", async () => {
+    const first = await run("Not sure");
+    const second = await assess({ courseId: "intro-stats", conceptId: "cii", answer: WRONG, followUpTo: first.attemptId });
+    expect(getAttempt(first.attemptId)).toMatchObject({ kind: "initial", outcome: "uncertain", parentAttemptId: null, rootAttemptId: first.attemptId });
+    expect(getAttempt(second.attemptId)).toMatchObject({ kind: "clarification", outcome: "incorrect", parentAttemptId: first.attemptId, rootAttemptId: first.attemptId });
+  });
+
+  it("preserves one root across a multi-turn clarification chain", async () => {
+    const first = await run("Not sure");
+    const second = await assess({ courseId: "intro-stats", conceptId: "cii", answer: "Still not sure", followUpTo: first.attemptId });
+    const third = await assess({ courseId: "intro-stats", conceptId: "cii", answer: WRONG, followUpTo: second.attemptId });
+    expect(getAttempt(second.attemptId)).toMatchObject({ parentAttemptId: first.attemptId, rootAttemptId: first.attemptId });
+    expect(getAttempt(third.attemptId)).toMatchObject({ parentAttemptId: second.attemptId, rootAttemptId: first.attemptId });
+    expect(getHistory().map((h) => h.title)).toEqual(["Clarified CI interpretation", "Clarified CI interpretation", "Answered CI interpretation"]);
+  });
+
+  it("rejects a follow-up linked to a different concept without mutating that concept", async () => {
+    const first = await run("Not sure");
+    await expect(assess({ courseId: "intro-stats", conceptId: "se", answer: "Researcher B has the smaller standard error because n is larger.", followUpTo: first.attemptId })).rejects.toThrow(InvalidAttemptLinkError);
+    expect(state("se")).toBe("developing");
+  });
+
+  it("rejects a missing follow-up parent instead of silently starting a new chain", async () => {
+    await expect(assess({ courseId: "intro-stats", conceptId: "cii", answer: WRONG, followUpTo: "missing" })).rejects.toThrow(NotFoundError);
+  });
+
+  it("uses the diagnosed misconception to ask a discriminating dispute question", async () => {
+    const first = await run(WRONG);
+    const q = clarify(first.attemptId).followUp;
+    expect(q).toContain("long-run method");
+    expect(q).toContain("one already-calculated interval");
+  });
+
+  it("lets a clarification explicitly correct earlier wording without requiring the exact original phrase", async () => {
+    const first = await run(WRONG);
+    const second = await assess({
+      courseId: "intro-stats", conceptId: "cii",
+      answer: "I meant the long-run method, not this one interval.",
+      followUpTo: first.attemptId,
+    });
+    expect(second.evaluation.verdict).toBe("correct");
+    expect(getAttempt(second.attemptId)).toMatchObject({ kind: "clarification", parentAttemptId: first.attemptId, rootAttemptId: first.attemptId });
+    expect(state("cii")).toBe("developing");
+    expect(getTransferChallenge(second.attemptId).attemptId).toBe(second.attemptId);
+  });
+});
+
+describe("correct-answer transfer path", () => {
+  it("requires a different question before a correct first answer becomes provisional", async () => {
+    const first = await run("Over repeated samples, about 95% of intervals made by the method contain the true mean.");
+    expect(first.evaluation.verdict).toBe("correct");
+    expect(state("cii")).toBe("developing");
+    const challenge = getTransferChallenge(first.attemptId);
+    expect(challenge.transfer.question).toContain("100 researchers");
+    const pass = await submitTransfer(first.attemptId, RIGHT_TRANSFER);
+    if (pass.result !== "pass") throw new Error("expected transfer pass");
+    const result = getResult(pass.resultAttemptId);
+    expect(result).toMatchObject({ previous: "developing", next: "provisional", diagnosisLabel: "Diagnosis", misconception: "None detected", intervention: "No remediation needed" });
+    expect(state("cii")).toBe("provisional");
+  });
+
+  it("does not let an incorrect first answer skip remediation and jump to transfer", async () => {
+    const first = await run(WRONG);
+    expect(() => getTransferChallenge(first.attemptId)).toThrow(NotFoundError);
+  });
+
+  it("treats a successful dispute clarification as an overturned diagnosis, not a repaired misconception", async () => {
+    const first = await run(WRONG);
+    const clarified = await assess({
+      courseId: "intro-stats", conceptId: "cii",
+      answer: "I meant the long-run method, not this one interval.",
+      followUpTo: first.attemptId,
+    });
+    expect(clarified.evaluation.verdict).toBe("correct");
+    expect(getMisconceptionLog("intro-stats")).toEqual([]);
+    expect(getDashboard().recentlyCaught).toEqual([]);
+
+    const pass = await submitTransfer(clarified.attemptId, RIGHT_TRANSFER);
+    if (pass.result !== "pass") throw new Error("expected transfer pass");
+    expect(getResult(pass.resultAttemptId)).toMatchObject({
+      diagnosisLabel: "Diagnosis",
+      misconception: "Not confirmed after clarification",
+      intervention: "Clarified the diagnosis",
+    });
+  });
+});
+
 describe("repair and transfer", () => {
   it("runs the full loop: wrong, lesson, transfer pass, provisional", async () => {
     const { attemptId } = await run(WRONG);
@@ -61,23 +149,76 @@ describe("repair and transfer", () => {
     const t = await submitTransfer(attemptId, "Each interval has a 95% chance of containing the mean, even after it's built.");
     expect(t.result).toBe("fail");
     if (t.result !== "fail" || !t.nextAttemptId) throw new Error("expected a new diagnosis");
+    expect(getAttempt(t.nextAttemptId)).toMatchObject({ kind: "transfer", outcome: "fail", parentAttemptId: attemptId, rootAttemptId: attemptId });
     expect(getAttempt(t.nextAttemptId).evaluation.verdict).toBe("incorrect");
     const pass = await submitTransfer(t.nextAttemptId, RIGHT_TRANSFER);
+    if (pass.result !== "pass") throw new Error("expected pass");
+    expect(getEvidenceAttempt(pass.resultAttemptId)).toMatchObject({ kind: "transfer", outcome: "pass", parentAttemptId: t.nextAttemptId, rootAttemptId: attemptId, evaluation: null });
+    expect(getResult(pass.resultAttemptId).transferText).toBe("Correct after 1 earlier miss");
+  });
+
+  it("persists a vague transfer miss, keeps state unchanged, and counts it when the student later passes", async () => {
+    const { attemptId } = await run(WRONG);
+    const t = await submitTransfer(attemptId, "I think around ninety five maybe");
+    expect(t).toMatchObject({ result: "fail", nextAttemptId: null });
+    if (t.result !== "fail") throw new Error("expected a failed transfer");
+    expect(getEvidenceAttempt(t.failedAttemptId)).toMatchObject({ kind: "transfer", outcome: "fail", parentAttemptId: attemptId, rootAttemptId: attemptId, evaluation: { verdict: "uncertain", errorType: "uncertain" } });
+    expect(state("cii")).toBe("needs_work");
+    expect(getHistory()[0]).toMatchObject({ title: "Tried the new question on CI interpretation", tone: "warn" });
+    const pass = await submitTransfer(attemptId, RIGHT_TRANSFER);
     if (pass.result !== "pass") throw new Error("expected pass");
     expect(getResult(pass.resultAttemptId).transferText).toBe("Correct after 1 earlier miss");
   });
 
-  it("a vague transfer answer stays on the lesson with a follow-up and leaves state alone", async () => {
+  it("rejects another transfer submission after the evidence chain has already passed", async () => {
     const { attemptId } = await run(WRONG);
-    const t = await submitTransfer(attemptId, "I think around ninety five maybe");
-    expect(t).toMatchObject({ result: "fail", nextAttemptId: null });
-    expect(state("cii")).toBe("needs_work");
+    const pass = await submitTransfer(attemptId, RIGHT_TRANSFER);
+    if (pass.result !== "pass") throw new Error("expected pass");
+    const before = getHistory().length;
+    await expect(submitTransfer(attemptId, RIGHT_TRANSFER)).rejects.toThrow(InvalidAttemptLinkError);
+    expect(getHistory()).toHaveLength(before);
+    expect(state("cii")).toBe("provisional");
   });
 
   it("only offers a result page for a passed transfer", async () => {
     const { attemptId } = await run(WRONG);
     expect(() => getResult(attemptId)).toThrow(NotFoundError);
     expect(() => getRemediation("missing")).toThrow(NotFoundError);
+  });
+});
+
+describe("standard-error transfer semantics", () => {
+  const start = () => assess({
+    courseId: "intro-stats", conceptId: "se",
+    answer: "Researcher B with 400 students has the smaller standard error because standard error decreases as sample size gets larger.",
+  });
+
+  it("passes only when the factor and square-root reasoning are both present", async () => {
+    const first = await start();
+    expect(first.evaluation.verdict).toBe("correct");
+    const pass = await submitTransfer(first.attemptId, "The standard error is cut in half because n is four times larger and sqrt(4) = 2.");
+    expect(pass.result).toBe("pass");
+    expect(state("se")).toBe("provisional");
+  });
+
+  it("diagnoses the known direction misconception on a clearly wrong transfer", async () => {
+    const first = await start();
+    const fail = await submitTransfer(first.attemptId, "The standard error doubles because 400 is four times the sample size.");
+    expect(fail.result).toBe("fail");
+    if (fail.result !== "fail" || !fail.nextAttemptId) throw new Error("expected a diagnosed transfer failure");
+    expect(getAttempt(fail.nextAttemptId).evaluation).toMatchObject({
+      verdict: "incorrect", misconceptionId: "more_data_more_error", misconceptionName: "More data means more error",
+    });
+    expect(state("se")).toBe("needs_work");
+  });
+
+  it("treats an incomplete factor-only answer as insufficient evidence, not a misconception", async () => {
+    const first = await start();
+    const fail = await submitTransfer(first.attemptId, "It gets cut in half.");
+    expect(fail).toMatchObject({ result: "fail", nextAttemptId: null, followUp: expect.any(String) });
+    if (fail.result !== "fail") throw new Error("expected failed transfer");
+    expect(getEvidenceAttempt(fail.failedAttemptId).evaluation).toMatchObject({ verdict: "uncertain", misconceptionId: null });
+    expect(state("se")).toBe("developing");
   });
 });
 
