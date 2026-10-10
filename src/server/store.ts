@@ -406,6 +406,7 @@ export async function assess(input: AssessInput): Promise<AssessResult> {
   } else if (j.verdict === "incorrect") {
     upsertSkill(c, a.skillOnWrong);
     c.state = "needs_work";
+    c.evidence.transferPassed = false;
     c.evidence.answers++;
     evaluation = {
       ...base, errorType: "conceptual", misconceptionId: diagnosed!.id, misconceptionName: diagnosed!.name,
@@ -541,6 +542,7 @@ export async function submitTransfer(attemptId: string, answer: string): Promise
     upsertSkill(c, au.skillOnWrong);
     upsertSkill(c, { label: "New-question test", pct: 25 });
     c.state = "needs_work";
+    c.evidence.transferPassed = false;
     evaluation = {
       verdict: "incorrect", errorType: "conceptual", misconceptionId: diagnosed.id, misconceptionName: diagnosed.name,
       evidenceQuote: judged.quote && answer.includes(judged.quote) ? judged.quote : null, gapSentence: diagnosed.gap,
