@@ -183,3 +183,21 @@ export type PracticeResult = z.infer<typeof PracticeResult>;
 export const TutorMessage = z.object({ role: z.enum(["user", "assistant"]), text: z.string().trim().min(1).max(8000) });
 export type TutorMessage = z.infer<typeof TutorMessage>;
 export const TutorMessages = z.array(TutorMessage).min(1).max(40);
+
+// ---- course upload ----
+
+/** What the model (or the outline parser) pulls out of uploaded course files. The store trims it to fit the map. */
+export const CourseOutline = z.object({
+  units: z.array(z.object({
+    name: z.string().describe("Short unit name, 1 to 3 words."),
+    concepts: z.array(z.object({
+      name: z.string().describe("Concept name, at most 5 words."),
+      short: z.string().describe("1 or 2 word label for the map node."),
+      desc: z.string().describe("One sentence saying what the student must be able to do."),
+    })),
+  })),
+  prerequisites: z.array(z.object({ from: z.string(), to: z.string() })).describe("Concept names. `from` must be understood before `to`. Only real logical dependencies."),
+});
+export type CourseOutline = z.infer<typeof CourseOutline>;
+
+export const CourseUploadResult = z.object({ courseId: z.string() });

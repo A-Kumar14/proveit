@@ -1,5 +1,5 @@
 import "server-only";
-import { cardStatus, type AssessInput, type AssessResult, type AttemptKind, type AttemptOutcome, type Evaluation, type MasteryState, type ReviewSubmitResult, type ReviewText, type TransferResult } from "@proveit/lib/schemas";
+import { cardStatus, type AssessInput, type AssessResult, type AttemptKind, type AttemptOutcome, type CourseOutline, type Evaluation, type MasteryState, type ReviewSubmitResult, type ReviewText, type TransferResult } from "@proveit/lib/schemas";
 import { toneForPct, type Tone } from "@proveit/lib/mastery";
 import { AUTHORED } from "./content";
 import { judgeAnswer, judgeReview, judgeTransfer, type AnswerContext } from "./evaluator";
@@ -30,7 +30,7 @@ type Attempt = {
 };
 /** `completedOverride` is the student's own call. null means derive it from the concepts. */
 type Course = { id: string; name: string; deadline: string; concepts: Concept[]; edges: [string, string][]; files: CourseFile[]; completedOverride: boolean | null; /** ISO date of the next quiz, if any. */ examDate: string | null };
-/** `course` is the one being worked on. `samples` are finished courses that only fill the sidebar and map views. */
+/** `course` is the one being worked on. `samples` are every other course (uploads, plus placeholders in tests): viewable, not practicable yet. */
 type Db = { course: Course; samples: Course[]; attempts: Attempt[]; provenDays: Set<string>; /** Tasks the student ticked off by hand. */ taskDone: Set<string>; /** Highest point total ever shown. Rank never drops when a concept slips. */ peakPoints: number; seq: number };
 
 const app = (answers: number, sound: number, transferPassed = false) => ({ answers, sound, transferPassed });
@@ -78,6 +78,8 @@ type StoredLearning = {
   peakPoints: number;
   seq: number;
   completedOverride: boolean | null;
+  /** Courses built from uploads. Optional so snapshots saved before uploads existed still load. */
+  courses?: Course[];
 };
 
 function restoreLearning(): Db {
@@ -95,6 +97,7 @@ function restoreLearning(): Db {
   if (Number.isFinite(stored.peakPoints)) data.peakPoints = stored.peakPoints;
   if (Number.isFinite(stored.seq)) data.seq = stored.seq;
   if (stored.completedOverride === null || typeof stored.completedOverride === "boolean") data.course.completedOverride = stored.completedOverride;
+  if (Array.isArray(stored.courses)) data.samples = stored.courses;
   return data;
 }
 
@@ -112,6 +115,7 @@ function persistLearning(): void {
     peakPoints: current.peakPoints,
     seq: current.seq,
     completedOverride: current.course.completedOverride,
+    courses: current.samples,
   };
   saveJson("learning", snapshot);
 }
@@ -885,6 +889,65 @@ export type CourseFile = { name: string; kind: string; detail: string };
 export function getFiles(courseId: string): { courseName: string; files: CourseFile[] } {
   const course = courseFor(courseId);
   return { courseName: course.name, files: course.files };
+}
+
+// ---- course upload ----
+
+/** The map is a 4-column by 3-row canvas (480 by 336), so an uploaded course is trimmed to fit it. */
+export const MAX_UNITS = 4;
+export const MAX_PER_UNIT = 3;
+const ROWS = [72, 165, 258];
+
+export class EmptyOutlineError extends Error {}
+
+const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);
+const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s);
+
+/**
+ * Turns an extracted outline into a viewable course. Every concept starts not_started, so a new course adds no rank points.
+ * Prerequisites are kept only when both ends exist and `from` sits in the same or an earlier unit, which is also what the graph can draw.
+ */
+export function createCourse(input: { name: string; outline: CourseOutline; files: CourseFile[] }): string {
+  const units = input.outline.units
+    .map((u) => ({ name: u.name.trim(), concepts: u.concepts.filter((c) => c.name.trim()).slice(0, MAX_PER_UNIT) }))
+    .filter((u) => u.name && u.concepts.length > 0)
+    .slice(0, MAX_UNITS);
+  if (units.length === 0) throw new EmptyOutlineError("No concepts found in those files.");
+
+  const { course, samples } = db();
+  const taken = new Set([course, ...samples].map((c) => c.id));
+  const base = slug(input.name) || "course";
+  let id = base;
+  for (let n = 2; taken.has(id); n++) id = `${base}-${n}`;
+
+  const concepts: Concept[] = [];
+  const unitOf = new Map<string, number>();
+  const byName = new Map<string, string>();
+  units.forEach((u, ui) => {
+    const unit = `${String(ui + 1).padStart(2, "0")} ${clip(u.name, 24).toUpperCase()}`;
+    u.concepts.forEach((c, row) => {
+      const cid = `${id}-${concepts.length + 1}`;
+      const name = clip(c.name.trim(), 48);
+      concepts.push({
+        id: cid, name, short: clip(c.short.trim() || name.split(/\s+/).slice(0, 2).join(" "), 16), unit, desc: clip(c.desc.trim(), 160),
+        x: Math.round((480 / units.length) * (ui + 0.5)), y: ROWS[row]!,
+        state: "not_started", skills: null, evidence: app(0, 0), nextReview: null,
+      });
+      unitOf.set(cid, ui);
+      if (!byName.has(name.toLowerCase())) byName.set(name.toLowerCase(), cid);
+    });
+  });
+
+  const edges: [string, string][] = [];
+  for (const p of input.outline.prerequisites) {
+    const from = byName.get(clip(p.from.trim(), 48).toLowerCase()), to = byName.get(clip(p.to.trim(), 48).toLowerCase());
+    if (!from || !to || from === to || unitOf.get(from)! > unitOf.get(to)!) continue;
+    if (!edges.some(([a, b]) => a === from && b === to)) edges.push([from, to]);
+  }
+
+  samples.push({ id, name: clip(input.name.trim(), 60), deadline: "No quiz date set", examDate: null, concepts, edges, files: input.files, completedOverride: null });
+  persistLearning();
+  return id;
 }
 
 // ---- courses list ----
