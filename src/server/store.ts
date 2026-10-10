@@ -2,7 +2,6 @@ import { userCache } from "./userScope";
 import "server-only";
 import { cardStatus, type AssessInput, type AssessResult, type AttemptKind, type AttemptOutcome, type CourseOutline, type Evaluation, type MasteryState, type ReviewSubmitResult, type ReviewText, type TransferResult } from "@proveit/lib/schemas";
 import { toneForPct, type Tone } from "@proveit/lib/mastery";
-import { AUTHORED } from "./content";
 import { judgeAnswerForSpec, judgeReviewForSpec, judgeTransferForSpec, type AnswerContext } from "./evaluator";
 import { ensureConceptLearningSpec } from "./learningSpecGenerator";
 import { getLearningSpec } from "./learningSpecStore";
@@ -345,20 +344,29 @@ const streak = () => {
   return n;
 };
 
+const allCourses = (): Course[] => [db().course, ...db().samples];
+
 const dueConcepts = () => {
   const today = isoDay(new Date());
-  return db().course.concepts.filter((c) => c.nextReview && c.nextReview <= today && (c.state === "provisional" || c.state === "mastered"));
+  return allCourses().flatMap((course) =>
+    course.concepts
+      .filter((c) => c.nextReview && c.nextReview <= today && (c.state === "provisional" || c.state === "mastered"))
+      .map((concept) => ({ course, concept }))
+  );
 };
 
 const testableIn = (courseId: string, c: Concept) => Boolean(getLearningSpec(courseId, c.id));
+const canPractice = (course: Course, c: Concept) => course.runtime === true || testableIn(course.id, c);
 const testable = (c: Concept) => testableIn(db().course.id, c);
-const upsertSkill = (c: Concept, s: Skill) => {
+const upsertSkill = (c: Concept, skill: Skill) => {
   const skills = c.skills ?? [];
-  c.skills = skills.some((x) => x.label === s.label) ? skills.map((x) => (x.label === s.label ? s : x)) : [...skills, s];
+  c.skills = skills.some((x) => x.label === skill.label)
+    ? skills.map((x) => (x.label === skill.label ? skill : x))
+    : [...skills, skill];
 };
 
 function nextConceptFor(course: Course): Concept | null {
-  const cs = course.concepts.filter((c) => testableIn(course.id, c));
+  const cs = course.concepts.filter((c) => canPractice(course, c));
   return cs.find((c) => c.state === "needs_work") ??
     cs.find((c) => c.state === "developing") ??
     cs.find((c) => c.state === "not_started") ??
@@ -399,15 +407,18 @@ const dimsFor = (c: Concept): DimView[] => {
 const evidenceText = (c: Concept) =>
   c.evidence.answers === 0 ? "none yet" : c.evidence.transferPassed ? "new question passed" : `${c.evidence.sound} of ${c.evidence.answers} answers sound`;
 
-const ctaFor = (c: Concept): ConceptView["cta"] => {
-  if (!testable(c)) return { label: "Not authored yet", href: null };
-  const label = c.state === "mastered" || c.state === "provisional" ? "Review anyway" : c.state === "not_started" ? "Start this concept" : "Test this concept";
-  return { label, href: practiceHref(c) };
+const ctaFor = (course: Course, c: Concept): ConceptView["cta"] => {
+  if (!canPractice(course, c)) return { label: "Not authored yet", href: null };
+  const label = c.state === "mastered" || c.state === "provisional"
+    ? "Review anyway"
+    : c.state === "not_started"
+      ? "Start this concept"
+      : "Test this concept";
+  return { label, href: practiceHrefFor(course.id, c) };
 };
 
 export function getCourse(courseId: string): CourseView {
   const course = courseFor(courseId);
-  const active = course === db().course;
   const next = nextConceptFor(course);
   return {
     id: course.id, name: course.name, deadline: course.deadline,
@@ -416,7 +427,10 @@ export function getCourse(courseId: string): CourseView {
     provisional: course.concepts.filter((c) => c.state === "provisional").length,
     total: course.concepts.length,
     needsWork: course.concepts.filter((c) => c.state === "needs_work").length,
-    concepts: course.concepts.map((c) => ({ id: c.id, name: c.name, short: c.short, unit: c.unit, desc: c.desc, x: c.x, y: c.y, state: c.state, dims: dimsFor(c), evidence: evidenceText(c), cta: active ? ctaFor(c) : course.runtime ? { label: "Study with the tutor", href: `/course/${course.id}/tutor` } : { label: c.state === "mastered" ? "Mastered" : "Not authored yet", href: null } })),
+    concepts: course.concepts.map((c) => ({
+      id: c.id, name: c.name, short: c.short, unit: c.unit, desc: c.desc, x: c.x, y: c.y,
+      state: c.state, dims: dimsFor(c), evidence: evidenceText(c), cta: ctaFor(course, c),
+    })),
     edges: course.edges,
     nextUp: next ? { id: next.id, name: next.name } : null,
   };
