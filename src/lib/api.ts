@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ApiError, AssessResult, AuditResult, CatalogAddResult, ConnectResult, CreateCourseResult, FileUploadResult, CatalogRemoveResult, ConverseResult, PracticeResult, QuizResult, QuizStartResult, ClarifyResult, CourseCompleteResult, CourseUploadResult, Ok, ReviewSubmitResult, TransferResult, UploadCheck, type AssessInput, type ConverseInput } from "./schemas";
+import { ApiError, AssessResult, AuditResult, CatalogAddResult, ConnectResult, CreateCourseResult, FileUploadResult, CatalogRemoveResult, ConverseResult, PracticeResult, QuizResult, QuizStartResult, ClarifyResult, CourseCompleteResult, CourseJobView, CourseUploadResult, Ok, ReviewSubmitResult, TransferResult, UploadCheck, type AssessInput, type ConverseInput } from "./schemas";
 
 /** Client side of the API. Components call these; the route handlers behind them are the backend seam. */
 async function post<T>(url: string, body: unknown, schema: z.ZodType<T>): Promise<T> {
@@ -48,9 +48,19 @@ async function uploadCourse(name: string, files: File[]) {
   return CourseUploadResult.parse(json);
 }
 
+async function courseJob(id: string) {
+  const res = await fetch(`/api/courses/jobs/${id}`, { cache: "no-store" }).catch(() => null);
+  if (!res) throw new Error("Can't reach the server. Check your connection and retry.");
+  const json: unknown = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(ApiError.safeParse(json).data?.error ?? "Couldn't check the build. Retry.");
+  return CourseJobView.parse(json);
+}
+
 export const api = {
   uploadFiles,
   uploadCourse,
+  courseJob,
+  cancelCourseJob: (id: string) => post(`/api/courses/jobs/${id}/cancel`, {}, z.object({ cancelled: z.boolean() })),
   connectApp: (provider: "granola" | "wispr", returnTo: string) => post(`/api/integrations/${provider}/connect`, { returnTo }, ConnectResult),
   disconnectApp: (provider: "granola" | "wispr") => post("/api/integrations/disconnect", { provider }, Ok),
   importFromApp: (provider: "granola" | "wispr", topic: string, name?: string) => post("/api/integrations/import", { provider, topic, name }, CreateCourseResult),

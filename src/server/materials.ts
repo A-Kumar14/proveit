@@ -3,6 +3,7 @@ import { generateText } from "ai";
 import { aiEnabled, model } from "./ai";
 import { AUTHORED } from "./content";
 import { loadJson, saveJson } from "./persistence";
+import { pdfText } from "./pdfText";
 import { courseSpec, getCourse } from "./store";
 
 export type Material = { id: string; courseId: string; name: string; mime: string; size: number; addedAt: number; text: string; words: number; readBy: "text" | "ai" };
@@ -13,6 +14,8 @@ export const MATERIAL_TYPES = ["text/markdown", "text/plain", "application/pdf",
 export const MAX_MATERIAL_BYTES = 10 * 1024 * 1024;
 export const MAX_MATERIAL_FILES = 5;
 const MAX_TEXT = 60_000;
+/** Reading one scanned file or image with the model. Past this it has stalled. */
+const READ_TIMEOUT_MS = 120_000;
 const KEY = "materials";
 
 type Held = { items: Material[]; seq: number };
@@ -34,7 +37,8 @@ export function materialKind(f: { name: string; type: string }): "text" | "pdf" 
 async function readWithAi(file: File): Promise<string> {
   if (!aiEnabled()) throw new MaterialError(`${file.name} needs the AI to read it, and no AI key is set. Add a markdown or text file instead.`);
   const { text } = await generateText({
-    model: model(),
+    model: model({ fast: true }),
+    abortSignal: AbortSignal.timeout(READ_TIMEOUT_MS),
     messages: [{
       role: "user",
       content: [
@@ -55,10 +59,18 @@ export async function readMaterial(file: File): Promise<{ text: string; readBy: 
   const kind = materialKind(file);
   if (!kind) throw new MaterialError(`${file.name} isn't supported. Use markdown, text, PDF or an image.`);
   if (file.size > MAX_MATERIAL_BYTES) throw new MaterialError(`${file.name} is over 10 MB.`);
-  const raw = kind === "text" ? await file.text() : await readWithAi(file);
+  let raw: string;
+  let readBy: Material["readBy"] = "text";
+  if (kind === "text") raw = await file.text();
+  else {
+    // Typeset PDFs have a text layer we can read here in milliseconds. Only scans and images need the model.
+    const local = kind === "pdf" ? await pdfText(new Uint8Array(await file.arrayBuffer())).catch(() => null) : null;
+    if (local?.usable) raw = local.text;
+    else { raw = await readWithAi(file); readBy = "ai"; }
+  }
   const text = raw.replace(/\u0000/g, "").trim().slice(0, MAX_TEXT);
   if (!text || text === "NO_CONTENT") throw new MaterialError(`I couldn't find any study text in ${file.name}.`);
-  return { text, readBy: kind === "text" ? "text" : "ai" };
+  return { text, readBy };
 }
 
 /** Stores text as a file of the course. */

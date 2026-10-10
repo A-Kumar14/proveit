@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const push = vi.fn();
 const refresh = vi.fn();
-const { api } = vi.hoisted(() => ({ api: { uploadCourse: vi.fn(), connectApp: vi.fn(), disconnectApp: vi.fn(), importFromApp: vi.fn() } }));
+const { api } = vi.hoisted(() => ({ api: { uploadCourse: vi.fn(), courseJob: vi.fn(), cancelCourseJob: vi.fn(), connectApp: vi.fn(), disconnectApp: vi.fn(), importFromApp: vi.fn() } }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ push, refresh }) }));
 vi.mock("@proveit/lib/api", () => ({ api }));
 
@@ -17,6 +17,12 @@ const apps = (granola = false): AppStatus[] => [
   { id: "wispr", name: "Wispr Flow", blurb: "Notetaker.", needs: "Needs MCP access.", connected: false },
 ];
 const assign = vi.fn();
+const STAGES = [["reading", "Reading your files"], ["outline", "Finding the topics"], ["building", "Building the concept map"], ["saving", "Saving your notes for the tutor"]] as const;
+/** A job as the server reports it, sitting in the given stage. */
+const job = (stage: string, over: object = {}) => {
+  const at = STAGES.findIndex(([id]) => id === stage);
+  return { id: "j1", name: "Biology", stage, elapsedMs: 4000, files: [{ name: "bio.md", state: "done", note: "120 words" }], stages: STAGES.map(([id, label], i) => ({ id, label, state: stage === "done" || i < at ? "done" : i === at ? "active" : "waiting" })), ...over };
+};
 
 beforeEach(() => {
   Object.values(api).forEach((m) => m.mockReset());
@@ -38,14 +44,59 @@ describe("AddCourseForm, starting from nothing", () => {
   });
 
   it("builds the course and opens it", async () => {
-    api.uploadCourse.mockResolvedValue({ courseId: "biology" });
+    api.uploadCourse.mockResolvedValue({ jobId: "j1" });
+    api.courseJob.mockResolvedValue(job("done", { courseId: "biology" }));
     render(<AddCourseForm apps={apps()} />);
     await userEvent.type(screen.getByLabelText("Course name"), "Biology");
     await userEvent.upload(screen.getByLabelText("Choose notes"), new File(["# Bio"], "bio.md", { type: "text/markdown" }));
     await userEvent.click(screen.getByRole("checkbox"));
     await userEvent.click(screen.getByRole("button", { name: "Build concept map" }));
     expect(api.uploadCourse).toHaveBeenCalledWith("Biology", [expect.objectContaining({ name: "bio.md" })]);
-    expect(push).toHaveBeenCalledWith("/course/biology");
+    await waitFor(() => expect(push).toHaveBeenCalledWith("/course/biology?built=1"));
+  });
+
+  it("shows which stage the build is in, each file, and the time so far, while it runs", async () => {
+    api.uploadCourse.mockResolvedValue({ jobId: "j1" });
+    api.courseJob.mockResolvedValue(job("outline", { files: [{ name: "bio.md", state: "done", note: "120 words" }, { name: "scan.pdf", state: "reading" }] }));
+    render(<AddCourseForm apps={apps()} />);
+    await userEvent.type(screen.getByLabelText("Course name"), "Biology");
+    await userEvent.upload(screen.getByLabelText("Choose notes"), new File(["# Bio"], "bio.md", { type: "text/markdown" }));
+    await userEvent.click(screen.getByRole("checkbox"));
+    await userEvent.click(screen.getByRole("button", { name: "Build concept map" }));
+    expect(await screen.findByText("Building Biology")).toBeTruthy();
+    const steps = screen.getAllByRole("listitem").filter((li) => li.hasAttribute("aria-current") || /Reading your files|Finding the topics|Building the concept map|Saving your notes/.test(li.textContent ?? ""));
+    expect(steps.find((li) => li.getAttribute("aria-current") === "step")!.textContent).toContain("Finding the topics");
+    expect(screen.getByText("120 words")).toBeTruthy();
+    expect(screen.getByText("Reading...")).toBeTruthy();
+    expect(screen.getByLabelText("Time so far").textContent).toBe("0:04");
+    expect(push).not.toHaveBeenCalled();
+  });
+
+  it("lets the student cancel a running build", async () => {
+    api.uploadCourse.mockResolvedValue({ jobId: "j1" });
+    api.courseJob.mockResolvedValue(job("reading"));
+    api.cancelCourseJob.mockResolvedValue({ cancelled: true });
+    render(<AddCourseForm apps={apps()} />);
+    await userEvent.type(screen.getByLabelText("Course name"), "Biology");
+    await userEvent.upload(screen.getByLabelText("Choose notes"), new File(["# Bio"], "bio.md", { type: "text/markdown" }));
+    await userEvent.click(screen.getByRole("checkbox"));
+    await userEvent.click(screen.getByRole("button", { name: "Build concept map" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Cancel" }));
+    expect(api.cancelCourseJob).toHaveBeenCalledWith("j1");
+  });
+
+  it("shows the reason and the stage a build stopped in, and lets the student try again", async () => {
+    api.uploadCourse.mockResolvedValue({ jobId: "j1" });
+    api.courseJob.mockResolvedValue(job("failed", { error: "That doesn't look like course material.", stages: STAGES.map(([id, label], i) => ({ id, label, state: i === 0 ? "done" : i === 1 ? "failed" : "waiting" })) }));
+    render(<AddCourseForm apps={apps()} />);
+    await userEvent.type(screen.getByLabelText("Course name"), "Biology");
+    await userEvent.upload(screen.getByLabelText("Choose notes"), new File(["# Bio"], "bio.md", { type: "text/markdown" }));
+    await userEvent.click(screen.getByRole("checkbox"));
+    await userEvent.click(screen.getByRole("button", { name: "Build concept map" }));
+    expect((await screen.findByRole("alert")).textContent).toContain("That doesn't look like course material.");
+    expect(screen.getByText("The build stopped")).toBeTruthy();
+    expect(screen.getByText(/stopped here/).textContent).toContain("stopped here");
+    expect((await screen.findByRole("button", { name: "Try again" }) as HTMLButtonElement).disabled).toBe(false);
   });
 
   it("shows why a build failed and lets the student fix it", async () => {
@@ -94,7 +145,7 @@ describe("AddCourseForm, with an app connected", () => {
     await userEvent.type(screen.getByLabelText("Topic to import from Granola"), "Organic chemistry");
     await userEvent.click(go);
     expect(api.importFromApp).toHaveBeenCalledWith("granola", "Organic chemistry", undefined);
-    expect(push).toHaveBeenCalledWith("/course/organic-chemistry");
+    expect(push).toHaveBeenCalledWith("/course/organic-chemistry?built=1");
   });
 
   it("disconnects", async () => {

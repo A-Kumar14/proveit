@@ -241,4 +241,13 @@ export const CourseOutline = z.object({
 });
 export type CourseOutline = z.infer<typeof CourseOutline>;
 
-export const CourseUploadResult = z.object({ courseId: z.string() });
+/** The upload starts a build and returns at once. The browser then polls the job for its stage. */
+export const CourseUploadResult = z.object({ jobId: z.string() });
+export const CourseJobView = z.object({
+  id: z.string(), name: z.string(),
+  stage: z.enum(["reading", "outline", "building", "saving", "done", "failed", "cancelled"]),
+  stages: z.array(z.object({ id: z.string(), label: z.string(), state: z.enum(["waiting", "active", "done", "failed"]) })),
+  files: z.array(z.object({ name: z.string(), state: z.enum(["waiting", "reading", "done", "failed"]), note: z.string().optional() })),
+  courseId: z.string().optional(), error: z.string().optional(), concepts: z.number().optional(), elapsedMs: z.number(),
+});
+export type CourseJobView = z.infer<typeof CourseJobView>;

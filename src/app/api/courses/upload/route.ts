@@ -1,17 +1,16 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
+import { createJob, runCourseJob, type JobInput } from "@proveit/server/courseJobs";
+import { kindOf, MAX_FILE_BYTES, MAX_FILES, MAX_TOTAL_BYTES } from "@proveit/server/courseUpload";
 import { aiEnabled } from "@proveit/server/ai";
-import { extractOutline, kindOf, MAX_FILE_BYTES, MAX_FILES, MAX_TOTAL_BYTES, NotCourseMaterialError, outlineFromText, type UploadFile } from "@proveit/server/courseUpload";
-import { saveUploadsAsMaterials } from "@proveit/server/materials";
-import { createCourse, EmptyOutlineError, type CourseFile } from "@proveit/server/store";
 
-export const maxDuration = 60;
+export const maxDuration = 300;
 
 const bad = (error: string, status = 400) => NextResponse.json({ error }, { status });
-const KIND_LABEL = { pdf: "PDF", text: "Notes", image: "Image" } as const;
 
 /**
- * Builds a new course from uploaded syllabus, slides or notes. With a model key Gemini reads every file.
- * Without one, only .txt and .md outlines work, parsed from their headings and bullets.
+ * Starts building a course from uploaded syllabus, slides or notes, and answers at once with a job id.
+ * The build runs after the response, and the browser follows it at /api/courses/jobs/[id].
+ * Typeset PDFs and text are read on this machine. The model only reads scans and images, and writes the outline.
  */
 export async function POST(req: Request) {
   const form = await req.formData().catch(() => null);
@@ -24,34 +23,16 @@ export async function POST(req: Request) {
   if (raw.length === 0) return bad("Add at least one file.");
   if (raw.length > MAX_FILES) return bad(`Add up to ${MAX_FILES} files.`);
 
-  const files: UploadFile[] = [];
   for (const f of raw) {
-    const kind = kindOf(f);
-    if (!kind) return bad(`${f.name}: use PDF, TXT, Markdown, PNG, JPEG or WebP.`);
+    if (!kindOf(f)) return bad(`${f.name}: use PDF, TXT, Markdown, PNG, JPEG or WebP.`);
     if (f.size > MAX_FILE_BYTES) return bad(`${f.name} is over 10 MB.`);
-    files.push({ name: f.name, kind, mediaType: kind === "text" ? "text/plain" : f.type || "application/pdf", data: new Uint8Array(await f.arrayBuffer()) });
   }
   if (raw.reduce((n, f) => n + f.size, 0) > MAX_TOTAL_BYTES) return bad("Files can be up to 20 MB together.");
+  // Scans and images need the model. Typeset PDFs do not, so they are still allowed with no key.
+  if (!aiEnabled() && raw.some((f) => kindOf(f) === "image")) return bad("Reading images needs an AI key on the server (OPENROUTER_API_KEY or GOOGLE_GENERATIVE_AI_API_KEY). Upload a PDF, TXT or Markdown file instead.", 501);
 
-  const ai = aiEnabled();
-  if (!ai && files.some((f) => f.kind !== "text")) return bad("Reading PDFs and images needs an AI key on the server (OPENROUTER_API_KEY or GOOGLE_GENERATIVE_AI_API_KEY). Upload a .txt or .md outline instead.", 501);
-
-  try {
-    const outline = ai
-      ? await extractOutline(name, files)
-      : outlineFromText(files.map((f) => new TextDecoder().decode(f.data)).join("\n\n"));
-    const record: CourseFile[] = files.map((f) => ({
-      name: f.name, kind: `${KIND_LABEL[f.kind]}, uploaded`,
-      detail: ai ? "Read by Gemini to build the concept map." : "Headings and bullets became the units and concepts.",
-    }));
-    const courseId = createCourse({ name, outline, files: record });
-    // Keep the notes as files of the course, so the tutor, notes, paper and quiz can use them.
-    await saveUploadsAsMaterials(courseId, raw);
-    return NextResponse.json({ courseId });
-  } catch (e) {
-    if (e instanceof NotCourseMaterialError) return bad(e.message, 422);
-    if (e instanceof EmptyOutlineError) return bad(ai ? "No concepts found in those files. Try the syllabus or lecture notes." : "No concepts found. Use headings for units and bullets for concepts.", 422);
-    console.error(e);
-    return bad("Building the concept map failed. Retry.", 500);
-  }
+  const inputs: JobInput[] = await Promise.all(raw.map(async (f) => ({ name: f.name, type: f.type || (kindOf(f) === "pdf" ? "application/pdf" : "text/plain"), size: f.size, bytes: new Uint8Array(await f.arrayBuffer()) })));
+  const jobId = createJob(name, inputs);
+  after(() => runCourseJob(jobId, inputs));
+  return NextResponse.json({ jobId }, { status: 202 });
 }
