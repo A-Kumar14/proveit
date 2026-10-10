@@ -1,9 +1,6 @@
-import Link from "next/link";
 import { FileText } from "lucide-react";
 import { cn } from "@proveit/lib/cn";
-import { LOOK } from "@proveit/lib/mastery";
-import type { ConceptView, CourseFile, CourseView, MisconceptionEntry, ReviewBase } from "@proveit/server/store";
-import { buttonStyles } from "../Button";
+import type { CourseFile, MisconceptionEntry, ReviewBase } from "@proveit/server/store";
 import { Widget } from "../dashboard/Widget";
 
 export function TutorPanel({ courseId, review }: { courseId: string; review: ReviewBase }) {
@@ -15,24 +12,11 @@ export function TutorPanel({ courseId, review }: { courseId: string; review: Rev
   );
 }
 
-export function PracticePanel({ course, next }: { course: CourseView; next: ConceptView | null }) {
-  const done = course.concepts.length > 0 && course.concepts.every((c) => c.state === "mastered");
+export function PracticePanel({ courseId }: { courseId: string }) {
   return (
-    <Widget title="Practice">
-      {next ? (
-        <div className="flex items-center gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-sm font-semibold">{next.name}</span>
-              <span className={cn("rounded-full px-1.5 py-px text-[10px] font-semibold", LOOK[next.state].pill)}>{LOOK[next.state].label}</span>
-            </div>
-            <p className="m-0 mt-0.5 text-xs text-ink-muted">{next.desc}</p>
-          </div>
-          {next.cta.href ? <Link href={next.cta.href} className={buttonStyles({ size: "sm" })}>Start</Link> : <span className="text-[11px] text-ink-faint">Not in demo</span>}
-        </div>
-      ) : (
-        <p className="m-0 text-[13px] text-ink-muted">{done ? "Every concept in this course is mastered." : "This course can't be practiced in the demo yet."}</p>
-      )}
+    <Widget title="Practice" action={{ label: "Open practice", href: `/course/${courseId}/practice` }}>
+      <p className="m-0 text-[13px]">Sample question paper, notes and a quiz built from what you keep getting wrong.</p>
+      <p className="m-0 text-xs text-ink-muted">To be tested on one concept, use Test this concept on the map above.</p>
     </Widget>
   );
 }

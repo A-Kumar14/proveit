@@ -147,3 +147,18 @@ export const AuditResult = z.object({
   missing: z.array(z.string()),
 });
 export type AuditResult = z.infer<typeof AuditResult>;
+
+// ---- practice documents ----
+
+export const PracticeInput = z.object({ courseId: z.string() });
+export const PracticeDoc = z.object({
+  label: z.string(),
+  /** File name without extension. */
+  name: z.string(),
+  tex: z.string(),
+  /** Base64 PDF, or null when the compile failed. The .tex is still usable. */
+  pdf: z.string().nullable(),
+});
+export const PracticeResult = z.object({ docs: z.array(PracticeDoc), pdfError: z.string().nullable() });
+export type PracticeDoc = z.infer<typeof PracticeDoc>;
+export type PracticeResult = z.infer<typeof PracticeResult>;

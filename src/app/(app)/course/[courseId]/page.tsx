@@ -15,7 +15,6 @@ export default async function CoursePage({ params }: PageProps<"/course/[courseI
     files: getFiles(courseId).files,
   }));
   const first = course.concepts[0];
-  const next = course.nextUp ? course.concepts.find((c) => c.id === course.nextUp!.id) ?? null : null;
   return (
     <AppShell active="map" courseId={courseId} crumbs={[{ label: course.name }]} right={course.deadline}>
       <div className="min-h-0 flex-1 overflow-y-auto px-7 py-6">
@@ -24,7 +23,7 @@ export default async function CoursePage({ params }: PageProps<"/course/[courseI
             <CourseMapCard course={course} initialId={course.nextUp?.id ?? first.id} />
             <div className="grid grid-cols-2 items-start gap-4">
               <TutorPanel courseId={courseId} review={review} />
-              <PracticePanel course={course} next={next} />
+              <PracticePanel courseId={courseId} />
               <MisconceptionPanel courseId={courseId} log={log} />
               <FilesPanel courseId={courseId} files={files} />
             </div>
