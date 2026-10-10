@@ -7,8 +7,10 @@ import { getAuthoredLearningSpec } from "./authoredLearningSpecs";
 import { closePersistenceForTests } from "./persistence";
 import { clearUserCachesForTests, runAsUser } from "./userScope";
 import {
+  getGeneratedLearningSpec,
   getGeneratedLearningSpecRecord,
   getLearningSpec,
+  listGeneratedLearningSpecs,
   removeGeneratedLearningSpecs,
   saveGeneratedLearningSpec,
 } from "./learningSpecStore";
@@ -87,6 +89,10 @@ describe("generated learning spec persistence", () => {
     latest.assessment.question = "mutated";
     expect(getLearningSpec("bio", "bio-1")!.assessment.question).not.toBe("mutated");
 
+    expect(getGeneratedLearningSpec("bio", "bio-1", 1)?.revision).toBe(1);
+    expect(getGeneratedLearningSpec("bio", "bio-1", 2)?.revision).toBe(2);
+    expect(listGeneratedLearningSpecs("bio").map((s) => s.revision)).toEqual([1, 2]);
+
     expect(removeGeneratedLearningSpecs("bio")).toBe(2);
     expect(getLearningSpec("bio", "bio-1")).toBeNull();
     expect(getLearningSpec("chem", "chem-1")).not.toBeNull();
@@ -97,9 +103,15 @@ describe("generated learning spec persistence", () => {
     expect(getLearningSpec("intro-stats", "cii")).toEqual(getAuthoredLearningSpec("intro-stats", "cii"));
   });
 
-  it("rejects authored content and blank fingerprints in generated storage", () => {
+  it("rejects authored content, blank fingerprints and mutation of an existing revision", () => {
     const authored = getAuthoredLearningSpec("intro-stats", "cii")!;
     expect(() => saveGeneratedLearningSpec(authored, "x")).toThrow(/Only generated/);
     expect(() => saveGeneratedLearningSpec(generated("bio", "bio-1"), "  ")).toThrow(/fingerprint/);
+
+    const first = generated("bio", "bio-1");
+    saveGeneratedLearningSpec(first, "one");
+    expect(() => saveGeneratedLearningSpec({ ...first, assessment: { ...first.assessment, question: "A different question?" } }, "one")).toThrow(/immutable/);
+    expect(() => saveGeneratedLearningSpec(first, "different-fingerprint")).toThrow(/immutable/);
+    expect(saveGeneratedLearningSpec(first, "one")).toEqual(first);
   });
 });
