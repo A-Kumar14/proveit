@@ -15,7 +15,7 @@ import { courseSpec, getCourse, NotFoundError } from "./store";
 export class LearningSpecGenerationError extends Error {}
 
 type SourceDocument = { materialId: string; title: string; locator: string | null; text: string };
-type ConceptContext = { courseName: string; conceptId: string; conceptName: string; unit: string; desc: string };
+type ConceptContext = { courseId: string; courseName: string; conceptId: string; conceptName: string; unit: string; desc: string };
 
 const DRAFT_TEXT = z.string().trim().min(1).max(2400);
 const DRAFT_IDS = z.array(z.string().trim().min(1).max(120)).min(1).max(4);
@@ -238,7 +238,7 @@ The rubric must state what visible evidence a response must demonstrate. Do not 
   const ids = misconceptionIds(draft.misconceptions.map((m) => m.name));
   const spec = {
     schemaVersion: 1 as const,
-    courseId: context.courseName ? context.courseName && context.conceptId.split("-").slice(0, -1).join("-") : "",
+    courseId: context.courseId,
     conceptId: context.conceptId,
     revision,
     provenance: { kind: "generated" as const, model: modelLabel(), generatedAt: new Date().toISOString() },
@@ -268,7 +268,11 @@ The rubric must state what visible evidence a response must demonstrate. Do not 
     },
   };
 
-  return ConceptLearningSpec.parse(spec);
+  try {
+    return ConceptLearningSpec.parse(spec);
+  } catch {
+    throw new LearningSpecGenerationError("The model produced learning content that failed the canonical spec contract.");
+  }
 }
 
 /**
@@ -290,6 +294,7 @@ export async function ensureConceptLearningSpec(courseId: string, conceptId: str
 
   const revision = (current?.spec.revision ?? 0) + 1;
   const context: ConceptContext = {
+    courseId,
     courseName: course.name,
     conceptId,
     conceptName: concept.name,
@@ -297,7 +302,5 @@ export async function ensureConceptLearningSpec(courseId: string, conceptId: str
     desc: concept.desc,
   };
   const generated = await generate(context, sources, revision);
-  // Never trust a model-derived course id. Bind identity to the requested course here.
-  const bound = ConceptLearningSpec.parse({ ...generated, courseId });
-  return saveGeneratedLearningSpec(bound, fingerprint);
+  return saveGeneratedLearningSpec(generated, fingerprint);
 }
