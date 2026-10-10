@@ -42,6 +42,15 @@ describe("diagnosis", () => {
 });
 
 describe("evidence lineage", () => {
+  it("history resumes an uncertain assessment on the same evidence chain", async () => {
+    const first = await run("Not sure yet");
+    expect(getHistory()[0]).toMatchObject({
+      title: "Answered CI interpretation",
+      tone: "warn",
+      href: `/course/intro-stats/practice/cii?clarify=${first.attemptId}`,
+    });
+  });
+
   it("records a clarification as a child of the response it clarifies", async () => {
     const first = await run("Not sure");
     const second = await assess({ courseId: "intro-stats", conceptId: "cii", answer: WRONG, followUpTo: first.attemptId });
@@ -184,7 +193,11 @@ describe("repair and transfer", () => {
     if (t.result !== "fail") throw new Error("expected a failed transfer");
     expect(getEvidenceAttempt(t.failedAttemptId)).toMatchObject({ kind: "transfer", outcome: "fail", parentAttemptId: attemptId, rootAttemptId: attemptId, evaluation: { verdict: "uncertain", errorType: "uncertain" } });
     expect(state("cii")).toBe("needs_work");
-    expect(getHistory()[0]).toMatchObject({ title: "Tried the new question on CI interpretation", tone: "warn" });
+    expect(getHistory()[0]).toMatchObject({
+      title: "Tried the new question on CI interpretation",
+      tone: "warn",
+      href: `/course/intro-stats/transfer/${attemptId}`,
+    });
     const pass = await submitTransfer(attemptId, RIGHT_TRANSFER);
     if (pass.result !== "pass") throw new Error("expected pass");
     expect(getResult(pass.resultAttemptId).transferText).toBe("Correct after 1 earlier miss");
