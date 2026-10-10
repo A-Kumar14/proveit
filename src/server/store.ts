@@ -218,6 +218,12 @@ const latestConfirmedIncorrect = (conceptId: string) =>
 const latestEvaluatedInRoot = (rootAttemptId: string) =>
   [...db().attempts].reverse().find((a) => a.rootAttemptId === rootAttemptId && a.evaluation) ?? null;
 
+const latestAttemptForConcept = (conceptId: string) =>
+  [...db().attempts].reverse().find((a) => a.conceptId === conceptId) ?? null;
+
+const rootIsCurrentForConcept = (conceptId: string, rootAttemptId: string) =>
+  latestAttemptForConcept(conceptId)?.rootAttemptId === rootAttemptId;
+
 const latestConclusiveForConcept = (conceptId: string) =>
   [...db().attempts].reverse().find((a) => a.conceptId === conceptId && a.evaluation && a.evaluation.verdict !== "uncertain") ?? null;
 
@@ -387,6 +393,7 @@ export async function assess(input: AssessInput): Promise<AssessResult> {
   }
   if (parent && !parent.evaluation) throw new InvalidAttemptLinkError("follow-up parent has no diagnosable response");
   if (parent && rootHasPassedTransfer(parent.rootAttemptId)) throw new InvalidAttemptLinkError("learning episode is already complete");
+  if (parent && !rootIsCurrentForConcept(parent.conceptId, parent.rootAttemptId)) throw new InvalidAttemptLinkError("follow-up episode is stale");
   if (parent && latestEvaluatedInRoot(parent.rootAttemptId)?.id !== parent.id) {
     throw new InvalidAttemptLinkError("follow-up parent is stale");
   }
@@ -395,7 +402,7 @@ export async function assess(input: AssessInput): Promise<AssessResult> {
   const judged = input.imageSummary ? `${input.answer}\n\n[Student's attached work, transcribed] ${input.imageSummary}` : input.answer;
   const j = await judgeAnswer(c.id, judged, parent ? answerContext(parent) : undefined);
   // Recheck after the async evaluator so two simultaneous follow-ups cannot both mutate the episode.
-  if (parent && latestEvaluatedInRoot(parent.rootAttemptId)?.id !== parent.id) {
+  if (parent && (!rootIsCurrentForConcept(parent.conceptId, parent.rootAttemptId) || latestEvaluatedInRoot(parent.rootAttemptId)?.id !== parent.id)) {
     throw new InvalidAttemptLinkError("follow-up parent became stale");
   }
   const base: Evaluation = {
@@ -466,6 +473,9 @@ export function clarify(attemptId: string) {
   const a = attempt(attemptId);
   if (!a.evaluation) throw new NotFoundError(`attempt ${attemptId} has no evaluation to clarify`);
   if (rootHasPassedTransfer(a.rootAttemptId)) throw new InvalidAttemptLinkError("learning episode is already complete");
+  if (!rootIsCurrentForConcept(a.conceptId, a.rootAttemptId) || latestEvaluatedInRoot(a.rootAttemptId)?.id !== a.id) {
+    throw new InvalidAttemptLinkError("clarification source is stale");
+  }
   return { courseId: a.courseId, conceptId: a.conceptId, followUp: clarificationPromptFor(a) };
 }
 
@@ -498,7 +508,9 @@ export function getTransferChallenge(attemptId: string): TransferChallengeView {
   const c = concept(source.conceptId);
   const au = AUTHORED[c.id];
   if (!au || source.evaluation?.verdict !== "correct") throw new NotFoundError(`no direct transfer challenge for ${attemptId}`);
-  if (latestConclusiveForConcept(c.id)?.id !== source.id) throw new NotFoundError(`stale transfer challenge ${attemptId}`);
+  if (!rootIsCurrentForConcept(c.id, source.rootAttemptId) || latestConclusiveForConcept(c.id)?.id !== source.id) {
+    throw new NotFoundError(`stale transfer challenge ${attemptId}`);
+  }
   if (rootHasPassedTransfer(source.rootAttemptId)) {
     throw new NotFoundError(`transfer already passed for ${attemptId}`);
   }
@@ -513,13 +525,17 @@ export async function submitTransfer(attemptId: string, answer: string): Promise
   const c = concept(parent.conceptId);
   const au = AUTHORED[c.id];
   if (!au) throw new NotFoundError(`no content for ${c.id}`);
-  if (latestConclusiveForConcept(c.id)?.id !== parent.id) throw new InvalidAttemptLinkError("transfer source is stale");
+  if (!rootIsCurrentForConcept(c.id, parent.rootAttemptId) || latestConclusiveForConcept(c.id)?.id !== parent.id) {
+    throw new InvalidAttemptLinkError("transfer source is stale");
+  }
   if (rootHasPassedTransfer(parent.rootAttemptId)) {
     throw new InvalidAttemptLinkError("this evidence chain already passed its transfer test");
   }
   const before = c.state;
   const judged = await judgeTransfer(c.id, answer);
-  if (latestConclusiveForConcept(c.id)?.id !== parent.id) throw new InvalidAttemptLinkError("transfer source became stale");
+  if (!rootIsCurrentForConcept(c.id, parent.rootAttemptId) || latestConclusiveForConcept(c.id)?.id !== parent.id) {
+    throw new InvalidAttemptLinkError("transfer source became stale");
+  }
   if (db().attempts.some((a) => a.rootAttemptId === parent.rootAttemptId && a.kind === "transfer" && a.outcome === "pass")) {
     throw new InvalidAttemptLinkError("this evidence chain already passed its transfer test");
   }
