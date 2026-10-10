@@ -82,5 +82,6 @@ Status as of the last push to `main`. Tick items as they land.
 - [x] Upload check with the "not your work" rejection path
 - [x] Voice mode with transcript review, Sketch, Camera and Add file
 - [x] Store, evaluator and upload route tests (23)
+- [x] Courses page with filters, row selection, batch and right-click "Mark as completed"
 - [x] Sidebar splits courses into In progress and Completed, with a sample completed course
 - [x] Repo on GitHub, `main` up to date

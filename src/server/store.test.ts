@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
+import { listCourses, setCoursesCompleted } from "./store";
 import { assess, getAttempt, getCourse, getDashboard, getQuestion, getRemediation, getFiles, getHistory, getMisconceptionLog, getResult, getReviewBase, getReviews, getSidebar, NotFoundError, submitTransfer } from "./store";
 
 const WRONG = "It means there's a 95% probability that the true population mean is inside our interval.";
@@ -171,5 +172,33 @@ describe("sample completed course", () => {
     expect(base.concepts).toHaveLength(8);
     expect(getMisconceptionLog("linear-algebra")).toEqual([]);
     expect(getFiles("linear-algebra").files[0]?.kind).toBe("Sample");
+  });
+});
+
+describe("marking courses completed", () => {
+  it("lets the student complete an unfinished course, and reopen it", () => {
+    expect(listCourses().find((c) => c.id === "intro-stats")).toMatchObject({ completed: false, manual: false });
+    setCoursesCompleted(["intro-stats"], true);
+    expect(listCourses().find((c) => c.id === "intro-stats")).toMatchObject({ completed: true, manual: true, pct: 42 });
+    expect(getSidebar().courses.find((c) => c.id === "intro-stats")?.completed).toBe(true);
+    setCoursesCompleted(["intro-stats"], false);
+    expect(getSidebar().courses.find((c) => c.id === "intro-stats")?.completed).toBe(false);
+  });
+
+  it("can reopen a course that finished on its own", () => {
+    expect(listCourses().find((c) => c.id === "linear-algebra")?.completed).toBe(true);
+    setCoursesCompleted(["linear-algebra"], false);
+    expect(listCourses().find((c) => c.id === "linear-algebra")).toMatchObject({ completed: false, manual: true });
+  });
+
+  it("applies a batch all or nothing", () => {
+    expect(() => setCoursesCompleted(["intro-stats", "nope"], true)).toThrow(NotFoundError);
+    expect(listCourses().find((c) => c.id === "intro-stats")?.completed).toBe(false);
+  });
+
+  it("never completes an empty course by itself", () => {
+    getSidebar();
+    (globalThis as unknown as { __proveit: { course: { concepts: unknown[] } } }).__proveit.course.concepts = [];
+    expect(getSidebar().courses.find((c) => c.id === "intro-stats")?.completed).toBe(false);
   });
 });

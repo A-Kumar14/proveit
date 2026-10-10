@@ -23,7 +23,8 @@ type Attempt = {
   answer: string; imageName?: string; evaluation: Evaluation | null; passed: boolean;
   previousState: MasteryState; failedTransfers: number; createdAt: number;
 };
-type Course = { id: string; name: string; deadline: string; concepts: Concept[]; edges: [string, string][]; files: CourseFile[] };
+/** `completedOverride` is the student's own call. null means derive it from the concepts. */
+type Course = { id: string; name: string; deadline: string; concepts: Concept[]; edges: [string, string][]; files: CourseFile[]; completedOverride: boolean | null };
 /** `course` is the one being worked on. `samples` are finished courses that only fill the sidebar and map views. */
 type Db = { course: Course; samples: Course[]; attempts: Attempt[]; provenDays: Set<string>; seq: number };
 
@@ -52,6 +53,7 @@ function seed(): Db {
         c("pv", "p-value", "p-value", U4, "How surprising your data would be if the null were true.", 420, 165, "not_started", null, app(0, 0)),
         c("err", "Type I / Type II errors", "Error types", U4, "The two ways a test can be wrong, and the trade-off between them.", 420, 258, "not_started", null, app(0, 0)),
       ],
+      completedOverride: null,
       files: [{ name: "OpenStax Introductory Statistics 2e", kind: "Textbook, CC BY 4.0", detail: "Source for all 12 concepts and the misconceptions they carry." }],
       edges: [["pop", "par"], ["par", "se"], ["var", "se"], ["var", "par"], ["se", "moe"], ["size", "moe"], ["clt", "cic"], ["moe", "cic"], ["cic", "cii"], ["cic", "pv"], ["nul", "pv"], ["pv", "err"]],
     },
@@ -81,6 +83,7 @@ function sampleCompletedCourse(): Course {
       done("la-dia", "Diagonalization", "Diagonalize", U4, "Rewrite a matrix in the basis of its eigenvectors.", 420, 165),
     ],
     edges: [["la-vec", "la-ind"], ["la-vec", "la-mat"], ["la-ind", "la-inv"], ["la-mat", "la-sys"], ["la-inv", "la-det"], ["la-sys", "la-eig"], ["la-det", "la-dia"], ["la-eig", "la-dia"]],
+    completedOverride: null,
     files: [{ name: "Sample syllabus.pdf", kind: "Sample", detail: "Placeholder so the completed-course sidebar group has data to show." }],
   };
 }
@@ -199,12 +202,15 @@ export function getCourse(courseId: string): CourseView {
   };
 }
 
-/** A course is completed once every concept is Mastered. Provisional does not count. */
+/** Completed when the student says so, otherwise when every concept is Mastered. Provisional does not count, and an empty course never completes by itself. */
+const isCompleted = (c: Course) => c.completedOverride ?? (c.concepts.length > 0 && c.concepts.every((x) => x.state === "mastered"));
+
+
 export type SidebarView = { courses: { id: string; name: string; pct: number; completed: boolean }[]; streak: number; practiceHref: string | null; reviewsDue: number };
 export function getSidebar(): SidebarView {
   const { course, samples } = db();
   const next = nextConcept();
-  const row = (c: Course) => ({ id: c.id, name: c.name, pct: coursePct(c.concepts), completed: c.concepts.every((x) => x.state === "mastered") });
+  const row = (c: Course) => ({ id: c.id, name: c.name, pct: coursePct(c.concepts), completed: isCompleted(c) });
   return { courses: [course, ...samples].map(row), streak: streak(), practiceHref: next ? practiceHref(next) : null, reviewsDue: dueConcepts().length };
 }
 
@@ -507,4 +513,34 @@ export type CourseFile = { name: string; kind: string; detail: string };
 export function getFiles(courseId: string): { courseName: string; files: CourseFile[] } {
   const course = courseFor(courseId);
   return { courseName: course.name, files: course.files };
+}
+
+// ---- courses list ----
+
+export type CourseRow = {
+  id: string; name: string; pct: number; proven: number; total: number; needsWork: number;
+  completed: boolean; /** true when the student set it, false when every concept got Mastered on its own */ manual: boolean;
+  openMisconception: string | null;
+};
+
+export function listCourses(): CourseRow[] {
+  const { course, samples, attempts } = db();
+  return [course, ...samples].map((c) => {
+    const bad = c.concepts.find((x) => x.state === "needs_work");
+    const last = bad && ([...attempts].reverse().find((a) => a.conceptId === bad.id && a.evaluation?.verdict === "incorrect")?.evaluation?.misconceptionName ?? AUTHORED[bad.id]?.misconception.name ?? null);
+    return {
+      id: c.id, name: c.name, pct: coursePct(c.concepts),
+      proven: c.concepts.filter((x) => x.state === "mastered").length, total: c.concepts.length,
+      needsWork: c.concepts.filter((x) => x.state === "needs_work").length,
+      completed: isCompleted(c), manual: c.completedOverride !== null,
+      openMisconception: last || null,
+    };
+  });
+}
+
+/** Marks courses completed or back in progress. Unknown ids reject the whole batch so nothing half-applies. */
+export function setCoursesCompleted(ids: string[], completed: boolean): string[] {
+  const found = ids.map((id) => courseFor(id));
+  for (const c of found) c.completedOverride = completed;
+  return found.map((c) => c.id);
 }

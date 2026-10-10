@@ -59,6 +59,15 @@ export type TransferResult = z.infer<typeof TransferResult>;
 
 export const ApiError = z.object({ error: z.string() });
 
+// ---- courses ----
+
+export const CourseCompleteInput = z.object({
+  ids: z.array(z.string()).min(1, "Select at least one course.").max(50),
+  completed: z.boolean(),
+});
+export type CourseCompleteInput = z.infer<typeof CourseCompleteInput>;
+export const CourseCompleteResult = z.object({ updated: z.array(z.string()) });
+
 // ---- mastery review (Tutor card) ----
 
 /** Only these fields come from the model. Numbers and statuses are computed in code and stay stable across runs. */

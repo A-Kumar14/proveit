@@ -1,9 +1,9 @@
 import Link from "next/link";
-import { BarChart3, CircleCheck, ChevronRight, Flame, FolderOpen, History, LayoutDashboard, MessageSquare, Mic, Plus, RotateCcw, Settings, TriangleAlert } from "lucide-react";
+import { BarChart3, BookOpen, CircleCheck, ChevronRight, Flame, FolderOpen, History, LayoutDashboard, MessageSquare, Mic, Plus, RotateCcw, Settings, TriangleAlert } from "lucide-react";
 import { cn } from "@proveit/lib/cn";
 import type { SidebarView } from "@proveit/server/store";
 
-export type NavKey = "dashboard" | "review" | "history" | "map" | "tutor" | "practice" | "misconceptions" | "files" | "settings";
+export type NavKey = "dashboard" | "courses" | "review" | "history" | "map" | "tutor" | "practice" | "misconceptions" | "files" | "settings";
 
 const item = (on: boolean) =>
   cn("flex items-center gap-2.5 rounded-md px-2.5 py-[7px] text-sm no-underline", on ? "bg-surface-active font-semibold text-ink" : "text-ink-muted hover:bg-surface-hover");
@@ -31,6 +31,7 @@ export function Sidebar({ data, active, courseId }: { data: SidebarView; active:
 
       <div className="flex flex-col gap-0.5">
         <NavLink href="/" on={active === "dashboard"}><LayoutDashboard {...icon} />Dashboard</NavLink>
+        <NavLink href="/courses" on={active === "courses"}><BookOpen {...icon} />Courses</NavLink>
         <NavLink href="/review" on={active === "review"}>
           <RotateCcw {...icon} /><span className="flex-1">Review queue</span>
           {data.reviewsDue > 0 && <span className="rounded-full bg-developing-bg px-[7px] py-px text-[11px] font-semibold text-developing">{data.reviewsDue}</span>}
