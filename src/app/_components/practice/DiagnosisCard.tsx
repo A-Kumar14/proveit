@@ -3,15 +3,16 @@ import { buttonStyles } from "../Button";
 import { AssistantCard, CalloutRow, Callout, CardFooter, CardTable, Cell, Row, Section } from "../chat/AssistantCard";
 import { MasteryBar } from "../mastery/MasteryBar";
 import { EvidenceHighlight } from "./EvidenceHighlight";
+import { EvidenceTrail } from "./EvidenceTrail";
 import { DiagnosisActions } from "./DiagnosisActions";
 import { TONE, toneForPct } from "@proveit/lib/mastery";
-import type { AttemptView } from "@proveit/server/store";
+import type { AttemptView, EvidenceAttemptView } from "@proveit/server/store";
 import { AlertTriangle } from "lucide-react";
 
 const ERROR_LABEL = { none: "", conceptual: "conceptual error", procedural: "procedural error", slip: "calculation slip", interpretation: "interpretation error", flawed_reasoning: "flawed-reasoning answer", uncertain: "" } as const;
 const STATUS = { good: "Mastered", warn: "Transfer pending", bad: "Reteaching", none: "No data" } as const;
 
-export function DiagnosisCard({ a }: { a: AttemptView }) {
+export function DiagnosisCard({ a, trail = [] }: { a: AttemptView; trail?: EvidenceAttemptView[] }) {
   const e = a.evaluation;
   const wrong = e.verdict === "incorrect";
   const meta = e.votes && (
@@ -62,7 +63,8 @@ export function DiagnosisCard({ a }: { a: AttemptView }) {
               <Link href={`/course/${a.courseId}`} className={buttonStyles({ variant: "secondary" })}>Back to course map</Link>
             </div>}
       </Section>
-      <CardFooter left="Levels come from your attempts." />
+      <EvidenceTrail rows={trail} />
+      <CardFooter left="Levels come from your attempts. Open the trail above to see the evidence behind this diagnosis." />
       {wrong && !e.evidenceQuote && (
         <div className="flex items-center gap-1.5 px-[18px] pb-3.5 text-[11px] text-ink-faint"><AlertTriangle size={12} aria-hidden />No single phrase stood out, so nothing is highlighted.</div>
       )}
