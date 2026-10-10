@@ -3,7 +3,6 @@ import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
-type Json = null | boolean | number | string | Json[] | { [key: string]: Json };
 type HeldDb = { path: string; db: DatabaseSync };
 
 const globalDb = globalThis as unknown as { __proveitSqlite?: HeldDb };
@@ -53,7 +52,7 @@ export function loadJson<T>(key: string): T | null {
   }
 }
 
-export function saveJson(key: string, value: Json): void {
+export function saveJson(key: string, value: unknown): void {
   const db = database();
   if (!db) return;
   db.prepare(`
