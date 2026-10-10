@@ -197,9 +197,13 @@ function groundingSources(courseId: string, conceptName: string, desc: string): 
     if (!selected.includes(chunk)) selected.push(chunk);
   }
 
-  const sources = selected.map(({ score: _score, materialOrder: _materialOrder, start: _start, ...chunk }, i) => ({
-    ...chunk,
+  const sources = selected.map((chunk, i) => ({
     id: `source-${i + 1}`,
+    kind: chunk.kind,
+    materialId: chunk.materialId,
+    title: chunk.title,
+    locator: chunk.locator,
+    excerpt: chunk.excerpt,
   }));
 
   const fingerprint = createHash("sha256").update(JSON.stringify({
