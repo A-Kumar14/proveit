@@ -20,7 +20,7 @@ describe("calendar routes", () => {
     expect(getCalendarState().mode).toBe("ics");
     expect((await post(refresh, {})).status).toBe(200);
     expect((await post(disconnect, {})).status).toBe(200);
-    expect(getCalendarState().mode).toBe("sample");
+    expect(getCalendarState().mode).toBe("none");
     vi.unstubAllGlobals();
   });
 
@@ -30,7 +30,7 @@ describe("calendar routes", () => {
     expect((await bad.json()).error).toContain("https");
     const none = await post(refresh, {});
     expect(none.status).toBe(400);
-    expect((await none.json()).error).toContain("sample calendar");
+    expect((await none.json()).error).toContain("No calendar is connected");
     expect((await post(connect, {})).status).toBe(400);
   });
 });
