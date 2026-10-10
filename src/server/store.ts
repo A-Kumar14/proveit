@@ -919,13 +919,15 @@ export function getReviews(now = new Date()): { due: ReviewItem[]; upcoming: Rev
 
 export type ReviewChallengeView = {
   courseId: string; conceptId: string; conceptName: string; state: MasteryState; dueDay: string;
+  learningSpecRevision: number;
   review: { question: string; hint: string };
 };
 
 const reviewIsDue = (c: Concept, now: Date) =>
   !!c.nextReview && (c.state === "provisional" || c.state === "mastered") && c.nextReview <= isoDay(now);
 
-const reviewSpecFor = (courseId: string, conceptId: string): ConceptLearningSpec => {
+const reviewSpecFor = (courseId: string, conceptId: string, revision?: number): ConceptLearningSpec => {
+  if (revision !== undefined) return specFor(courseId, conceptId, revision);
   const proof = [...db().attempts].reverse().find((a) =>
     a.courseId === courseId &&
     a.conceptId === conceptId &&
@@ -941,13 +943,20 @@ export function getReviewChallenge(courseId: string, conceptId: string, now = ne
   if (!reviewIsDue(c, now)) throw new NotFoundError(`no due review for ${conceptId}`);
   return {
     courseId, conceptId: c.id, conceptName: c.name, state: c.state, dueDay: c.nextReview!,
+    learningSpecRevision: spec.revision,
     review: { question: spec.review.question, hint: spec.review.hint },
   };
 }
 
-export async function submitReview(courseId: string, conceptId: string, answer: string, now = new Date()): Promise<ReviewSubmitResult> {
+export async function submitReview(
+  courseId: string,
+  conceptId: string,
+  answer: string,
+  now = new Date(),
+  learningSpecRevision?: number,
+): Promise<ReviewSubmitResult> {
   const c = conceptFor(courseId, conceptId);
-  const spec = reviewSpecFor(courseId, conceptId);
+  const spec = reviewSpecFor(courseId, conceptId, learningSpecRevision);
   if (!reviewIsDue(c, now)) throw new ReviewNotDueError("That review isn't due yet.");
   const previousState = c.state;
   const expectedDay = c.nextReview;
