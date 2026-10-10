@@ -159,6 +159,7 @@ function snapshotLearning(current: Db): StoredLearning {
 function restoreLearning(): Db {
   const stored = loadJson<StoredLearning>("learning");
   if (!stored) {
+    if (process.env.PROVEIT_DEMO_SEED === "0") return initialState();
     const seeded = demoRuntimeState();
     saveJson("learning", snapshotLearning(seeded));
     return seeded;
