@@ -1,3 +1,4 @@
+import { withUserRoute } from "@proveit/server/userBoundary";
 import { generateText, Output } from "ai";
 import { NextResponse } from "next/server";
 import { UploadCheck } from "@proveit/lib/schemas";
@@ -13,7 +14,7 @@ const MAX = 5 * 1024 * 1024;
  * Decides whether an upload is the student's own relevant work. Only a pass is ever sent to evaluate.
  * Anything else, including a failure to check, keeps the file out.
  */
-export async function POST(req: Request) {
+async function POSTForUser(req: Request) {
   const form = await req.formData().catch(() => null);
   const file = form?.get("file");
   const conceptId = form?.get("conceptId");
@@ -50,3 +51,5 @@ Decide:
     return NextResponse.json({ error: "The upload check failed. Retry." }, { status: 500 });
   }
 }
+
+export const POST = withUserRoute(POSTForUser);

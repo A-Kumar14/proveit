@@ -1,3 +1,4 @@
+import { withUserPage } from "@proveit/server/userBoundary";
 import { notFound } from "next/navigation";
 import { AppShell } from "@proveit/app/_components/shell/AppShell";
 import { ReviewFlow } from "@proveit/app/_components/practice/ReviewFlow";
@@ -6,7 +7,7 @@ import { getCourse, getReviewChallenge } from "@proveit/server/store";
 
 export const dynamic = "force-dynamic";
 
-export default async function ReviewConceptPage({ params }: PageProps<"/course/[courseId]/review/[conceptId]">) {
+async function ReviewConceptPage({ params }: PageProps<"/course/[courseId]/review/[conceptId]">) {
   const { courseId, conceptId } = await params;
   const { r, courseName } = orNotFound(() => ({ r: getReviewChallenge(courseId, conceptId), courseName: getCourse(courseId).name }));
   if (r.courseId !== courseId) notFound();
@@ -16,3 +17,5 @@ export default async function ReviewConceptPage({ params }: PageProps<"/course/[
     </AppShell>
   );
 }
+
+export default withUserPage(ReviewConceptPage);

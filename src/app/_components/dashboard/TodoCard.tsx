@@ -19,7 +19,8 @@ const when = (iso: string) => new Date(iso).toLocaleString("en-US", { weekday: "
  * Read-only to-do list. Tasks finish by themselves when your answers prove the concept, or you can tick one by hand.
  * Ticking never changes mastery: only evidence does.
  */
-export function TodoCard({ groups }: { groups: ScheduledGroup[] }) {
+export function TodoCard({ groups, userId = "local" }: { groups: ScheduledGroup[]; userId?: string }) {
+  const storageKey = userId === "local" ? SEEN : `${SEEN}:${JSON.stringify(userId)}`;
   const router = useRouter();
   const confetti = useConfetti();
   const card = useRef<HTMLDivElement>(null);
@@ -31,11 +32,11 @@ export function TodoCard({ groups }: { groups: ScheduledGroup[] }) {
   useEffect(() => {
     const ids = finishedByWork ? finishedByWork.split(",") : [];
     try {
-      const raw = localStorage.getItem(SEEN);
+      const raw = localStorage.getItem(storageKey);
       if (raw !== null && ids.some((id) => !(JSON.parse(raw) as string[]).includes(id)) && card.current) confetti({ x: card.current.getBoundingClientRect().right - 40, y: card.current.getBoundingClientRect().top + 30 });
-      localStorage.setItem(SEEN, JSON.stringify(ids));
+      localStorage.setItem(storageKey, JSON.stringify(ids));
     } catch { /* storage unavailable: no celebration */ }
-  }, [finishedByWork, confetti]);
+  }, [finishedByWork, confetti, storageKey]);
 
   async function tick(t: ScheduledTask | ScheduledGroup["done"][number], done: boolean, el: Element) {
     setBusy(true);

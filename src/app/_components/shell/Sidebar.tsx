@@ -1,9 +1,10 @@
 import Link from "next/link";
-import { BarChart3, BookOpen, CalendarDays, CircleCheck, ChevronRight, Flame, History, LayoutDashboard, Plus, RotateCcw, Settings } from "lucide-react";
+import { BarChart3, BookOpen, CalendarDays, CircleCheck, ChevronRight, Flame, History, LayoutDashboard, Plus, RotateCcw, Settings, UserRound } from "lucide-react";
 import { cn } from "@proveit/lib/cn";
 import type { SidebarView } from "@proveit/server/store";
+import type { Profile } from "@proveit/server/auth";
 
-export type NavKey = "dashboard" | "courses" | "review" | "history" | "calendar" | "map" | "tutor" | "practice" | "misconceptions" | "files" | "settings";
+export type NavKey = "dashboard" | "courses" | "review" | "history" | "calendar" | "map" | "tutor" | "practice" | "misconceptions" | "files" | "settings" | "account";
 
 const item = (on: boolean) =>
   cn("flex items-center gap-2.5 rounded-md px-2.5 py-[7px] text-sm no-underline", on ? "bg-surface-active font-semibold text-ink" : "text-ink-muted hover:bg-surface-hover");
@@ -15,7 +16,7 @@ function NavLink({ href, on, children }: { href: string; on: boolean; children: 
   return <Link href={href} aria-current={on ? "page" : undefined} className={item(on)}>{children}</Link>;
 }
 
-export function Sidebar({ data, active, courseId }: { data: SidebarView; active: NavKey; courseId?: string }) {
+export function Sidebar({ data, active, courseId, profile = null }: { data: SidebarView; active: NavKey; courseId?: string; profile?: Profile | null }) {
   const inProgress = data.courses.filter((c) => !c.completed);
   const completed = data.courses.filter((c) => c.completed);
   return (
@@ -77,7 +78,14 @@ export function Sidebar({ data, active, courseId }: { data: SidebarView; active:
             </div>
           </div>
         )}
-        <div className="border-t border-line pt-2">
+        <div className="flex flex-col gap-0.5 border-t border-line pt-2">
+          <NavLink href="/account" on={active === "account"}>
+            {profile?.imageUrl
+              // eslint-disable-next-line @next/next/no-img-element -- small avatar from Clerk's CDN
+              ? <img src={profile.imageUrl} alt="" width={20} height={20} className="size-5 rounded-full object-cover" />
+              : <UserRound {...icon} />}
+            <span className="min-w-0 flex-1 truncate">{profile ? profile.name : "Account"}</span>
+          </NavLink>
           <NavLink href="/settings" on={active === "settings"}><Settings {...icon} />Settings</NavLink>
         </div>
       </div>

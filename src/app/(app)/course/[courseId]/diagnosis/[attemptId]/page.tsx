@@ -1,3 +1,4 @@
+import { withUserPage } from "@proveit/server/userBoundary";
 import { notFound, redirect } from "next/navigation";
 import { Paperclip } from "lucide-react";
 import { AppShell } from "@proveit/app/_components/shell/AppShell";
@@ -10,7 +11,7 @@ import { getAttempt, getCourse, getEvidenceTrail } from "@proveit/server/store";
 
 export const dynamic = "force-dynamic";
 
-export default async function DiagnosisPage({ params }: PageProps<"/course/[courseId]/diagnosis/[attemptId]">) {
+async function DiagnosisPage({ params }: PageProps<"/course/[courseId]/diagnosis/[attemptId]">) {
   const { courseId, attemptId } = await params;
   const { a, courseName, trail } = orNotFound(() => ({ a: getAttempt(attemptId), courseName: getCourse(courseId).name, trail: getEvidenceTrail(attemptId) }));
   if (a.courseId !== courseId) notFound();
@@ -29,3 +30,5 @@ export default async function DiagnosisPage({ params }: PageProps<"/course/[cour
     </AppShell>
   );
 }
+
+export default withUserPage(DiagnosisPage);

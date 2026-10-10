@@ -183,3 +183,62 @@ export type PracticeResult = z.infer<typeof PracticeResult>;
 export const TutorMessage = z.object({ role: z.enum(["user", "assistant"]), text: z.string().trim().min(1).max(8000) });
 export type TutorMessage = z.infer<typeof TutorMessage>;
 export const TutorMessages = z.array(TutorMessage).min(1).max(40);
+
+// ---- course catalog ----
+
+export const CatalogAddInput = z.object({ id: z.string().min(1).max(80) });
+export const CatalogAddResult = z.object({ id: z.string(), added: z.boolean() });
+export const CatalogRemoveResult = z.object({ removed: z.boolean() });
+
+// ---- course files ----
+
+export const FileRemoveInput = z.object({ courseId: z.string(), id: z.string() });
+export const FileUploadResult = z.object({
+  added: z.array(z.object({ id: z.string(), name: z.string(), words: z.number(), readBy: z.enum(["text", "ai"]) })),
+  failed: z.array(z.object({ name: z.string(), reason: z.string() })),
+});
+export type FileUploadResult = z.infer<typeof FileUploadResult>;
+
+// ---- quiz ----
+
+export const QuizStartInput = z.object({ courseId: z.string(), count: z.number().int().min(3).max(15).optional() });
+/** A question as the student sees it. The answer stays on the server until the quiz is submitted. */
+export const QuizQuestion = z.object({ id: z.string(), concept: z.string(), prompt: z.string(), options: z.array(z.string()).length(4) });
+export const QuizStartResult = z.object({ quizId: z.string(), courseName: z.string(), questions: z.array(QuizQuestion), aiWritten: z.boolean() });
+export type QuizQuestion = z.infer<typeof QuizQuestion>;
+export type QuizStartResult = z.infer<typeof QuizStartResult>;
+
+export const QuizSubmitInput = z.object({ quizId: z.string(), answers: z.array(z.number().int().min(0).max(3).nullable()).max(30) });
+export const QuizResult = z.object({
+  score: z.number(), total: z.number(), pct: z.number(),
+  items: z.array(QuizQuestion.extend({ picked: z.number().nullable(), correct: z.number(), explanation: z.string() })),
+  byConcept: z.array(z.object({ concept: z.string(), right: z.number(), total: z.number() })),
+});
+export type QuizResult = z.infer<typeof QuizResult>;
+
+// ---- connected apps and course creation ----
+
+export const ProviderInput = z.object({ provider: z.enum(["granola", "wispr"]) });
+export const ConnectInput = ProviderInput.extend({ returnTo: z.string().max(300).optional() });
+export const ConnectResult = z.union([z.object({ url: z.string() }), z.object({ connected: z.literal(true) })]);
+export const ImportInput = ProviderInput.extend({ topic: z.string().trim().min(2, "Say what the course is about.").max(120), name: z.string().trim().max(80).optional() });
+export const CreateCourseResult = z.object({ id: z.string(), concepts: z.number(), documents: z.number().optional(), failed: z.array(z.object({ name: z.string(), reason: z.string() })).optional() });
+export type CreateCourseResult = z.infer<typeof CreateCourseResult>;
+
+// ---- course upload ----
+
+/** What the model (or the outline parser) pulls out of uploaded course files. The store trims it to fit the map. */
+export const CourseOutline = z.object({
+  units: z.array(z.object({
+    name: z.string().describe("Short unit name, 1 to 3 words."),
+    concepts: z.array(z.object({
+      name: z.string().describe("Concept name, at most 5 words."),
+      short: z.string().describe("1 or 2 word label for the map node."),
+      desc: z.string().describe("One sentence saying what the student must be able to do."),
+    })),
+  })),
+  prerequisites: z.array(z.object({ from: z.string(), to: z.string() })).describe("Concept names. `from` must be understood before `to`. Only real logical dependencies."),
+});
+export type CourseOutline = z.infer<typeof CourseOutline>;
+
+export const CourseUploadResult = z.object({ courseId: z.string() });

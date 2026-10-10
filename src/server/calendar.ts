@@ -1,6 +1,7 @@
+import { dropUserCache, userCache } from "./userScope";
 import "server-only";
 import { lookup } from "node:dns/promises";
-import { deleteJson, loadJson, saveJson } from "./persistence";
+import { deleteUserJson, loadUserJson, saveUserJson } from "./persistence";
 import { isIP } from "node:net";
 import ical, { type VEvent } from "node-ical";
 
@@ -45,20 +46,20 @@ function demoCalendar(): Held {
 }
 
 function restoreCalendar(): Held {
-  const saved = loadJson<Held>("calendar");
+  const saved = loadUserJson<Held>("calendar");
   if (!saved) {
     if (process.env.PROVEIT_DEMO_SEED === "0") return { mode: "none", provider: null, syncedAt: null, events: [], url: null };
     const seeded = demoCalendar();
-    saveJson("calendar", seeded);
+    saveUserJson("calendar", seeded);
     return seeded;
   }
   if (saved.mode !== "ics" && saved.mode !== "none") return { mode: "none", provider: null, syncedAt: null, events: [], url: null };
   return { mode: saved.mode, provider: saved.provider ?? null, syncedAt: saved.syncedAt ?? null, events: Array.isArray(saved.events) ? saved.events : [], url: saved.url ?? null };
 }
-const held = (): Held => (g.__proveitCal ??= restoreCalendar());
+const held = (): Held => userCache("calendar", () => (g.__proveitCal ??= restoreCalendar()), restoreCalendar);
 const persistCalendar = () => {
   const h = held();
-  saveJson("calendar", { mode: h.mode, provider: h.provider, syncedAt: h.syncedAt, events: h.events, url: h.url });
+  saveUserJson("calendar", { mode: h.mode, provider: h.provider, syncedAt: h.syncedAt, events: h.events, url: h.url });
 };
 
 export class CalendarError extends Error {}
@@ -176,7 +177,9 @@ export function disconnectCalendar(): CalendarState {
 }
 
 export function resetDemoCalendar(): void {
-  deleteJson("calendar");
+  deleteUserJson("calendar");
+  g.__proveitCal = undefined;
+  dropUserCache("calendar");
   delete g.__proveitCal;
 }
 

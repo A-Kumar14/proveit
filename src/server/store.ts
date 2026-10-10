@@ -1,9 +1,11 @@
+import { dropUserCache, userCache } from "./userScope";
 import "server-only";
-import { cardStatus, type AssessInput, type AssessResult, type AttemptKind, type AttemptOutcome, type Evaluation, type MasteryState, type ReviewSubmitResult, type ReviewText, type TransferResult } from "@proveit/lib/schemas";
+import { cardStatus, type AssessInput, type AssessResult, type AttemptKind, type AttemptOutcome, type CourseOutline, type Evaluation, type MasteryState, type ReviewSubmitResult, type ReviewText, type TransferResult } from "@proveit/lib/schemas";
 import { toneForPct, type Tone } from "@proveit/lib/mastery";
 import { AUTHORED } from "./content";
 import { judgeAnswer, judgeReview, judgeTransfer, type AnswerContext } from "./evaluator";
-import { deleteJson, loadJson, saveJson } from "./persistence";
+import { deleteUserJson, loadUserJson, saveUserJson } from "./persistence";
+import type { CourseSpec } from "@proveit/lib/courseSpec";
 import type { CalEvent } from "./calendar";
 import { POINTS, STREAK_CAP, standing, TIERS, type Standing } from "@proveit/lib/rewards";
 import { demoStateForTests } from "../test/demo-state";
@@ -30,9 +32,9 @@ type Attempt = {
   previousState: MasteryState; createdAt: number;
 };
 /** `completedOverride` is the student's own call. null means derive it from the concepts. */
-type Course = { id: string; name: string; deadline: string; concepts: Concept[]; edges: [string, string][]; files: CourseFile[]; completedOverride: boolean | null; /** ISO date of the next quiz, if any. */ examDate: string | null };
-/** `course` is the one being worked on. `samples` are finished courses that only fill the sidebar and map views. */
-type Db = { course: Course; samples: Course[]; attempts: Attempt[]; provenDays: Set<string>; /** Tasks the student ticked off by hand. */ taskDone: Set<string>; /** Highest point total ever shown. Rank never drops when a concept slips. */ peakPoints: number; seq: number };
+type Course = { id: string; name: string; deadline: string; concepts: Concept[]; edges: [string, string][]; files: CourseFile[]; completedOverride: boolean | null; /** ISO date of the next quiz, if any. */ examDate: string | null; /** True for courses added at runtime (uploads, imports, the curated catalog). They have a map, but no authored questions, so no diagnose loop yet. */ runtime?: boolean; /** The notes a curated course was built from. */ spec?: CourseSpec };
+/** `course` is the one being worked on. `samples` are every other course (added at runtime, plus placeholders in tests): viewable, not practicable yet. */
+type Db = { course: Course; samples: Course[]; attempts: Attempt[]; provenDays: Set<string>; /** Tasks the student ticked off by hand. */ taskDone: Set<string>; /** Highest point total ever shown. Rank never drops when a concept slips. */ peakPoints: number; /** Same rule per course, so a course's rank never drops either. */ peakByCourse: Record<string, number>; seq: number };
 
 const app = (answers: number, sound: number, transferPassed = false) => ({ answers, sound, transferPassed });
 
@@ -67,23 +69,28 @@ function initialState(): Db {
     provenDays: new Set(),
     taskDone: new Set(),
     peakPoints: 0,
+    peakByCourse: {},
     seq: 0,
   };
 }
 
 type StoredLearning = {
   concepts: Record<string, Pick<Concept, "state" | "skills" | "evidence" | "nextReview">>;
-  samples: Course[];
+  /** Older snapshots stored the extra courses under this name. */
+  samples?: Course[];
   attempts: Attempt[];
   provenDays: string[];
   taskDone: string[];
   peakPoints: number;
+  peakByCourse?: Record<string, number>;
   seq: number;
   completedOverride: boolean | null;
+  /** Courses built from uploads. Optional so snapshots saved before uploads existed still load. */
+  courses?: Course[];
 };
 
 function demoRuntimeState(): Db {
-  const data = demoStateForTests() as Db;
+  const data = { peakByCourse: {}, ...(demoStateForTests() as object) } as Db;
   const now = new Date();
   const day = (offset: number) => {
     const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset);
@@ -169,7 +176,8 @@ function demoRuntimeState(): Db {
 function snapshotLearning(current: Db): StoredLearning {
   return {
     concepts: Object.fromEntries(current.course.concepts.map((c) => [c.id, { state: c.state, skills: c.skills, evidence: c.evidence, nextReview: c.nextReview }])),
-    samples: current.samples,
+    peakByCourse: current.peakByCourse,
+    courses: current.samples,
     attempts: current.attempts,
     provenDays: [...current.provenDays],
     taskDone: [...current.taskDone],
@@ -180,11 +188,11 @@ function snapshotLearning(current: Db): StoredLearning {
 }
 
 function restoreLearning(): Db {
-  const stored = loadJson<StoredLearning>("learning");
+  const stored = loadUserJson<StoredLearning>("learning");
   if (!stored) {
     if (process.env.PROVEIT_DEMO_SEED === "0") return initialState();
     const seeded = demoRuntimeState();
-    saveJson("learning", snapshotLearning(seeded));
+    saveUserJson("learning", snapshotLearning(seeded));
     return seeded;
   }
   const data = initialState();
@@ -193,27 +201,85 @@ function restoreLearning(): Db {
     const saved = stored.concepts?.[concept.id];
     if (saved) Object.assign(concept, saved);
   }
-  if (Array.isArray(stored.samples)) data.samples = stored.samples;
+  if (Array.isArray(stored.samples)) data.samples = stored.samples; // snapshots from before extra courses were saved as `courses`
   if (Array.isArray(stored.attempts)) data.attempts = stored.attempts;
   if (Array.isArray(stored.provenDays)) data.provenDays = new Set(stored.provenDays);
   if (Array.isArray(stored.taskDone)) data.taskDone = new Set(stored.taskDone);
   if (Number.isFinite(stored.peakPoints)) data.peakPoints = stored.peakPoints;
+  if (stored.peakByCourse && typeof stored.peakByCourse === "object") data.peakByCourse = { ...stored.peakByCourse };
   if (Number.isFinite(stored.seq)) data.seq = stored.seq;
   if (stored.completedOverride === null || typeof stored.completedOverride === "boolean") data.course.completedOverride = stored.completedOverride;
+  if (Array.isArray(stored.courses)) data.samples = stored.courses;
   return data;
 }
 
 type StoreGlobal = { __proveit?: Db; __proveitTestSeedFactory?: () => Db };
 const g = globalThis as unknown as StoreGlobal;
-const db = (): Db => (g.__proveit ??= process.env.NODE_ENV === "test" && g.__proveitTestSeedFactory ? g.__proveitTestSeedFactory() : restoreLearning());
+const db = (): Db => userCache("learning", () => (g.__proveit ??= process.env.NODE_ENV === "test" && g.__proveitTestSeedFactory ? g.__proveitTestSeedFactory() : restoreLearning()), restoreLearning);
 
 function persistLearning(): void {
-  saveJson("learning", snapshotLearning(db()));
+  const current = db();
+  const snapshot: StoredLearning = {
+    concepts: Object.fromEntries(current.course.concepts.map((c) => [c.id, { state: c.state, skills: c.skills, evidence: c.evidence, nextReview: c.nextReview }])),
+    attempts: current.attempts,
+    provenDays: [...current.provenDays],
+    taskDone: [...current.taskDone],
+    peakPoints: current.peakPoints,
+    peakByCourse: current.peakByCourse,
+    seq: current.seq,
+    completedOverride: current.course.completedOverride,
+    courses: current.samples,
+  };
+  saveUserJson("learning", snapshot);
 }
 
+// ---- courses added at runtime ----
+
+const unitLabel = (name: string, i: number) => `${String(i + 1).padStart(2, "0")} ${name.toUpperCase()}`;
+
+function courseFromSpec(spec: CourseSpec): Course {
+  let n = 0;
+  const concepts = spec.units.flatMap((u, ui): Concept[] => u.concepts.map((c) => {
+    n++;
+    return { id: `${spec.id}-${n}`, name: c.name, short: c.name.length > 14 ? `${c.name.slice(0, 13).trimEnd()}.` : c.name, unit: unitLabel(u.name, ui), desc: c.desc, x: 0, y: 0, state: "not_started", skills: null, evidence: { answers: 0, sound: 0, transferPassed: false }, nextReview: null };
+  }));
+  return {
+    id: spec.id, name: spec.name, deadline: "No quiz scheduled", concepts, edges: [], completedOverride: null, examDate: null, runtime: true, spec,
+    files: [{ name: `${spec.name} course notes`, kind: spec.source === "catalog" ? "Curated course" : "Your course", detail: spec.summary }],
+  };
+}
+
+/** Adds a course built from notes. Adding the same id twice changes nothing. */
+export function addCourseSpec(spec: CourseSpec): { id: string; added: boolean } {
+  const data = db();
+  if (data.course.id === spec.id || data.samples.some((c) => c.id === spec.id)) return { id: spec.id, added: false };
+  data.samples.push(courseFromSpec(spec));
+  persistLearning();
+  return { id: spec.id, added: true };
+}
+
+/** Removes a course added at runtime. The demo course and test placeholders can't be removed. */
+export function removeAddedCourse(id: string): boolean {
+  const data = db();
+  const i = data.samples.findIndex((c) => c.id === id && c.runtime);
+  if (i < 0) return false;
+  data.samples.splice(i, 1);
+  persistLearning();
+  return true;
+}
+
+export const addedCourseIds = (): string[] => db().samples.flatMap((c) => (c.spec ? [c.id] : []));
+
+/** The notes a course was built from, or null for a course with authored content only. */
+export function courseSpec(courseId: string): CourseSpec | null {
+  return courseFor(courseId).spec ?? null;
+}
+
+/** Clears this account's learning state, so the next read loads the demo seed again. */
 export function resetDemoLearning(): void {
-  deleteJson("learning");
+  deleteUserJson("learning");
   g.__proveit = undefined;
+  dropUserCache("learning");
 }
 
 // ---- helpers ----
@@ -428,7 +494,7 @@ export function getCourse(courseId: string): CourseView {
     provisional: course.concepts.filter((c) => c.state === "provisional").length,
     total: course.concepts.length,
     needsWork: course.concepts.filter((c) => c.state === "needs_work").length,
-    concepts: course.concepts.map((c) => ({ id: c.id, name: c.name, short: c.short, unit: c.unit, desc: c.desc, x: c.x, y: c.y, state: c.state, dims: dimsFor(c), evidence: evidenceText(c), cta: active ? ctaFor(c) : { label: c.state === "mastered" ? "Mastered" : "Not authored yet", href: null } })),
+    concepts: course.concepts.map((c) => ({ id: c.id, name: c.name, short: c.short, unit: c.unit, desc: c.desc, x: c.x, y: c.y, state: c.state, dims: dimsFor(c), evidence: evidenceText(c), cta: active ? ctaFor(c) : course.runtime ? { label: "Study with the tutor", href: `/course/${course.id}/tutor` } : { label: c.state === "mastered" ? "Mastered" : "Not authored yet", href: null } })),
     edges: course.edges,
     nextUp: next ? { id: next.id, name: next.name } : null,
   };
@@ -955,7 +1021,7 @@ export function getHistory(): HistoryEvent[] {
   });
 }
 
-export type MisconceptionEntry = { key: string; name: string; concept: string; quote: string | null; open: boolean; note: string; href: string };
+export type MisconceptionEntry = { key: string; name: string; concept: string; quote: string | null; /** What the misconception gets wrong, in one sentence. */ gap: string; open: boolean; note: string; href: string };
 export function getMisconceptionLog(courseId: string): MisconceptionEntry[] {
   const course = courseFor(courseId);
   const { attempts } = db();
@@ -973,7 +1039,7 @@ export function getMisconceptionLog(courseId: string): MisconceptionEntry[] {
       if (!last && !seededOpen) return [];
       const repaired = c.evidence.transferPassed && c.state !== "needs_work";
       return [{
-        key: `${c.id}:${m.id}`, name: m.name, concept: c.name, quote: last?.evaluation?.evidenceQuote ?? null, open: !repaired,
+        key: `${c.id}:${m.id}`, name: m.name, concept: c.name, gap: m.gap, quote: last?.evaluation?.evidenceQuote ?? null, open: !repaired,
         note: repaired ? "Fixed with a lesson and a new question" : last ? "Open until you pass a new question" : "From your earlier attempts",
         href: last && !repaired ? `/course/${courseId}/lesson/${last.id}` : practiceHref(c),
       }];
@@ -985,6 +1051,65 @@ export type CourseFile = { name: string; kind: string; detail: string };
 export function getFiles(courseId: string): { courseName: string; files: CourseFile[] } {
   const course = courseFor(courseId);
   return { courseName: course.name, files: course.files };
+}
+
+// ---- course upload ----
+
+/** The map is a 4-column by 3-row canvas (480 by 336), so an uploaded course is trimmed to fit it. */
+export const MAX_UNITS = 4;
+export const MAX_PER_UNIT = 3;
+const ROWS = [72, 165, 258];
+
+export class EmptyOutlineError extends Error {}
+
+const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40);
+const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s);
+
+/**
+ * Turns an extracted outline into a viewable course. Every concept starts not_started, so a new course adds no rank points.
+ * Prerequisites are kept only when both ends exist and `from` sits in the same or an earlier unit, which is also what the graph can draw.
+ */
+export function createCourse(input: { name: string; outline: CourseOutline; files: CourseFile[] }): string {
+  const units = input.outline.units
+    .map((u) => ({ name: u.name.trim(), concepts: u.concepts.filter((c) => c.name.trim()).slice(0, MAX_PER_UNIT) }))
+    .filter((u) => u.name && u.concepts.length > 0)
+    .slice(0, MAX_UNITS);
+  if (units.length === 0) throw new EmptyOutlineError("No concepts found in those files.");
+
+  const { course, samples } = db();
+  const taken = new Set([course, ...samples].map((c) => c.id));
+  const base = slug(input.name) || "course";
+  let id = base;
+  for (let n = 2; taken.has(id); n++) id = `${base}-${n}`;
+
+  const concepts: Concept[] = [];
+  const unitOf = new Map<string, number>();
+  const byName = new Map<string, string>();
+  units.forEach((u, ui) => {
+    const unit = `${String(ui + 1).padStart(2, "0")} ${clip(u.name, 24).toUpperCase()}`;
+    u.concepts.forEach((c, row) => {
+      const cid = `${id}-${concepts.length + 1}`;
+      const name = clip(c.name.trim(), 48);
+      concepts.push({
+        id: cid, name, short: clip(c.short.trim() || name.split(/\s+/).slice(0, 2).join(" "), 16), unit, desc: clip(c.desc.trim(), 160),
+        x: Math.round((480 / units.length) * (ui + 0.5)), y: ROWS[row]!,
+        state: "not_started", skills: null, evidence: app(0, 0), nextReview: null,
+      });
+      unitOf.set(cid, ui);
+      if (!byName.has(name.toLowerCase())) byName.set(name.toLowerCase(), cid);
+    });
+  });
+
+  const edges: [string, string][] = [];
+  for (const p of input.outline.prerequisites) {
+    const from = byName.get(clip(p.from.trim(), 48).toLowerCase()), to = byName.get(clip(p.to.trim(), 48).toLowerCase());
+    if (!from || !to || from === to || unitOf.get(from)! > unitOf.get(to)!) continue;
+    if (!edges.some(([a, b]) => a === from && b === to)) edges.push([from, to]);
+  }
+
+  samples.push({ id, name: clip(input.name.trim(), 60), deadline: "No quiz date set", examDate: null, concepts, edges, files: input.files, completedOverride: null, runtime: true });
+  persistLearning();
+  return id;
 }
 
 // ---- courses list ----
@@ -1038,6 +1163,7 @@ export class TaskLockedError extends Error {}
 export const taskRank = (t: Task) => (t.kind === "review" ? 1 : t.state === "needs_work" ? 0 : t.state === "developing" ? 2 : 3);
 
 function tasksFor(c: Course, active: boolean): Task[] {
+  if (c.runtime) return [];
   const today = isoDay(new Date());
   return c.concepts.flatMap((x): Task[] => {
     const provedByWork = x.state === "provisional" || x.state === "mastered";
@@ -1056,7 +1182,7 @@ function tasksFor(c: Course, active: boolean): Task[] {
 /** Tasks grouped by course, open ones first by urgency. Completed courses drop out. */
 export function getTodos(): TodoGroup[] {
   const { course, samples } = db();
-  return [course, ...samples].filter((c) => !isCompleted(c)).map((c) => {
+  return [course, ...samples].filter((c) => !isCompleted(c) && !c.runtime).map((c) => {
     const all = tasksFor(c, c === course);
     const open = all.filter((t) => !t.done).sort((a, b) => taskRank(a) - taskRank(b));
     return { courseId: c.id, courseName: c.name, open, done: all.filter((t) => t.done), total: all.length, doneCount: all.filter((t) => t.done).length };
@@ -1103,10 +1229,15 @@ export type Rewards = Standing & {
  * bonuses count once per concept so a deliberate wrong answer can't be cycled for points. Rank keeps the
  * highest total ever shown: a concept slipping back doesn't take a tier away.
  */
-export function getRewards(): Rewards {
+/**
+ * Points for one course, or for every course when `courseId` is left out. The overall rank is not the sum of
+ * the course ranks, because the streak counts once, for the student, and not per course.
+ */
+export function getRewards(courseId?: string): Rewards {
   const { course, samples, attempts } = db();
-  const concepts = [course, ...samples].flatMap((c) => c.concepts);
-  const passed = attempts.filter((a) => a.kind === "transfer" && a.outcome === "pass");
+  const scope = courseId ? [courseFor(courseId)] : [course, ...samples];
+  const concepts = scope.flatMap((c) => c.concepts);
+  const passed = attempts.filter((a) => a.kind === "transfer" && a.outcome === "pass" && (!courseId || a.courseId === courseId));
   const repairedConcepts = new Set(
     passed.filter((a) => confirmedIncorrectForRoot(a.rootAttemptId)).map((a) => a.conceptId),
   );
@@ -1118,13 +1249,27 @@ export function getRewards(): Rewards {
     { label: "Concepts proved with a new question", count: concepts.filter((c) => c.state === "provisional").length, each: POINTS.proved },
     { label: "Misconceptions repaired", count: repairedConcepts.size, each: POINTS.repaired },
     { label: "Passed a new question first try", count: firstTryConcepts.size, each: POINTS.firstTry },
-    { label: "Courses mastered end to end", count: [course, ...samples].filter((c) => c.completedOverride === null && c.concepts.length > 0 && c.concepts.every((x) => x.state === "mastered")).length, each: POINTS.course },
-    { label: "Streak days, up to 7", count: Math.min(streak(), STREAK_CAP), each: POINTS.streakDay },
+    { label: "Courses mastered end to end", count: scope.filter((c) => c.completedOverride === null && c.concepts.length > 0 && c.concepts.every((x) => x.state === "mastered")).length, each: POINTS.course },
+    ...(courseId ? [] : [{ label: "Streak days, up to 7", count: Math.min(streak(), STREAK_CAP), each: POINTS.streakDay }]),
   ].map((r) => ({ ...r, points: r.count * r.each }));
   const earned = rows.reduce((n, r) => n + r.points, 0);
-  const previousPeak = db().peakPoints;
-  db().peakPoints = Math.max(previousPeak, earned);
-  if (db().peakPoints !== previousPeak) persistLearning();
-  const s = standing(db().peakPoints);
+  const peaks = (db().peakByCourse ??= {});
+  const previousPeak = courseId ? peaks[courseId] ?? 0 : db().peakPoints;
+  const peak = Math.max(previousPeak, earned);
+  if (peak !== previousPeak) {
+    if (courseId) peaks[courseId] = peak; else db().peakPoints = peak;
+    persistLearning();
+  }
+  const s = standing(peak);
   return { ...s, breakdown: rows, ladder: TIERS.map((t, i) => ({ id: t.id, name: t.name, min: t.min, reached: i <= s.tierIndex, current: i === s.tierIndex })) };
+}
+
+export type CourseRank = { courseId: string; name: string } & Standing;
+/** Each course's own rank, using the same tiers. */
+export function getCourseRanks(): CourseRank[] {
+  const { course, samples } = db();
+  return [course, ...samples].map((c) => {
+    const { points, tierIndex, tier, next, toNext, pct } = getRewards(c.id);
+    return { courseId: c.id, name: c.name, points, tierIndex, tier, next, toNext, pct };
+  });
 }

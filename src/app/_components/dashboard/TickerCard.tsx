@@ -1,11 +1,12 @@
 import Link from "next/link";
 import { CircleCheck } from "lucide-react";
 import { cn } from "@proveit/lib/cn";
-import type { CourseRow } from "@proveit/server/store";
+import type { CourseRank, CourseRow } from "@proveit/server/store";
+import { TierBadge } from "./TierBadge";
 import { MasteryBar } from "../mastery/MasteryBar";
 
 /** One course in the ticker: name, progress, and a four-line table of what's done and what isn't. */
-export function TickerCard({ c }: { c: CourseRow }) {
+export function TickerCard({ c, rank }: { c: CourseRow; rank?: CourseRank }) {
   const rows: [string, number, string][] = [
     ["Completed", c.proven, "text-mastered-text"],
     ["In progress", c.inProgress, "text-developing-text"],
@@ -24,6 +25,14 @@ export function TickerCard({ c }: { c: CourseRow }) {
         <MasteryBar pct={c.pct} barClass={c.pct >= 40 ? "bg-mastered" : "bg-developing"} label={`${c.name} mastery ${c.pct}%`} />
         <span className="w-8 text-right text-xs">{c.pct}%</span>
       </div>
+      {rank && (
+        <div className="flex items-center gap-2 text-xs" aria-label={`Course rank ${rank.tier.name}, ${rank.points.toLocaleString("en-US")} points`}>
+          <TierBadge id={rank.tier.id} size={20} />
+          <span className="font-semibold">{rank.tier.name}</span>
+          <span className="text-ink-muted">course rank</span>
+          <span className="ml-auto tabular-nums text-ink-muted">{rank.points.toLocaleString("en-US")}</span>
+        </div>
+      )}
       <table className="w-full border-collapse text-xs">
         <caption className="sr-only">{c.name} concepts by status</caption>
         <tbody>

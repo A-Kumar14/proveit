@@ -1,3 +1,4 @@
+import { userStorageKey } from "./userScope";
 import "server-only";
 import { mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -74,4 +75,16 @@ export function persistenceEnabled(): boolean {
 export function closePersistenceForTests(): void {
   globalDb.__proveitSqlite?.db.close();
   delete globalDb.__proveitSqlite;
+}
+
+export function loadUserJson<T>(key: string): T | null {
+  return loadJson<T>(userStorageKey(key));
+}
+
+export function saveUserJson(key: string, value: unknown): void {
+  saveJson(userStorageKey(key), value);
+}
+
+export function deleteUserJson(key: string): void {
+  deleteJson(userStorageKey(key));
 }

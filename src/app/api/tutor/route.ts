@@ -1,13 +1,15 @@
+import { withUserRoute } from "@proveit/server/userBoundary";
 import { createTextStreamResponse, streamText, toTextStream, type ModelMessage } from "ai";
 import { NextResponse } from "next/server";
 import { aiEnabled, model } from "@proveit/server/ai";
+import { modelErrorMessage } from "@proveit/server/modelError";
 import { NotFoundError } from "@proveit/server/store";
 import { parseTutorForm, tutorSystem } from "@proveit/server/tutor";
 
 export const maxDuration = 60;
 
 /** Streams the tutor's reply as plain text. Files go with the last message only. */
-export async function POST(req: Request) {
+async function POSTForUser(req: Request) {
   const form = await req.formData().catch(() => null);
   if (!form) return NextResponse.json({ error: "Write a message first." }, { status: 400 });
   const parsed = parseTutorForm(form);
@@ -28,11 +30,12 @@ export async function POST(req: Request) {
     const files = await Promise.all(parsed.files.map(async (f) => ({ type: "file" as const, data: new Uint8Array(await f.arrayBuffer()), mediaType: f.type })));
     return { role: "user", content: [{ type: "text", text: m.text }, ...files] };
   }));
-  const result = streamText({ model: model(), system, messages, abortSignal: req.signal, onError: ({ error }) => console.error(error) });
+  let failure: unknown = null;
+  const result = streamText({ model: model(), system, messages, abortSignal: req.signal, onError: ({ error }) => { failure = error; console.error(error); } });
   const reader = toTextStream({ stream: result.stream }).getReader();
   // The model reports quota and overload by ending the stream with nothing. Catch that before sending a 200.
   const first = await reader.read().catch(() => ({ done: true as const, value: undefined }));
-  if (first.done || !first.value) return NextResponse.json({ error: "The tutor couldn't answer right now. The model may be busy or rate limited. Retry in a moment." }, { status: 502 });
+  if (first.done || !first.value) return NextResponse.json({ error: modelErrorMessage(failure, "The tutor couldn't answer right now. The model may be busy or rate limited. Retry in a moment.") }, { status: 502 });
   const stream = new ReadableStream<string>({
     start: (c) => c.enqueue(first.value),
     pull: async (c) => { const r = await reader.read(); if (r.done) c.close(); else c.enqueue(r.value); },
@@ -40,3 +43,5 @@ export async function POST(req: Request) {
   });
   return createTextStreamResponse({ stream });
 }
+
+export const POST = withUserRoute(POSTForUser);

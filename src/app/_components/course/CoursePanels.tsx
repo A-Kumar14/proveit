@@ -1,5 +1,4 @@
 import { FileText } from "lucide-react";
-import { cn } from "@proveit/lib/cn";
 import type { CourseFile, MisconceptionEntry, ReviewBase } from "@proveit/server/store";
 import { Widget } from "../dashboard/Widget";
 
@@ -25,16 +24,13 @@ export function MisconceptionPanel({ courseId, log }: { courseId: string; log: M
   return (
     <Widget title="Misconception log" action={log.length > 0 ? { label: "Open log", href: `/course/${courseId}/misconceptions` } : undefined}>
       {log.length === 0 ? (
-        <p className="m-0 text-[13px] text-ink-muted">Nothing caught yet. A specific mistake in an answer shows up here until a new question clears it.</p>
+        <p className="m-0 text-[13px] text-ink-muted">Nothing caught yet. A specific mistake in an answer is listed here.</p>
       ) : (
         <ul className="m-0 flex list-none flex-col gap-2 p-0">
           {log.map((m) => (
-            <li key={m.key} className="flex items-start gap-2">
-              <div className="min-w-0 flex-1">
-                <div className="text-[13px] font-medium">{m.name}</div>
-                <div className="text-[11px] text-ink-muted">{m.concept} · {m.note}</div>
-              </div>
-              <span className={cn("shrink-0 rounded-full px-1.5 py-px text-[10px] font-semibold", m.open ? "bg-needswork-bg text-needswork-text" : "bg-mastered-bg text-mastered-text")}>{m.open ? "Open" : "Repaired"}</span>
+            <li key={m.key} className="min-w-0">
+              <div className="text-[13px] font-medium">{m.name}</div>
+              <div className="text-[11px] text-ink-muted">{m.concept}</div>
             </li>
           ))}
         </ul>
