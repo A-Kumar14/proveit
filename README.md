@@ -72,7 +72,10 @@ An incomplete or ambiguous answer creates an `uncertain` evidence event and does
 | --- | --- |
 | `src/server/store.ts` | Learner-state/model seam, mastery transitions, evidence history, review lifecycle |
 | `src/server/persistence.ts` | SQLite persistence adapter |
-| `src/server/content.ts` | Authored questions, misconceptions, lessons, transfer and delayed-review rubrics |
+| `src/lib/conceptLearningSpec.ts` | Validated JSON contract shared by authored and future generated concept content |
+| `src/server/authoredLearningSpecs.ts` | Canonical authored questions, misconceptions, lessons, transfer and review content |
+| `src/server/content.ts` | Compatibility view of canonical specs for the current mastery engine |
+| `src/server/authoredJudges.ts` | Authored-only deterministic offline graders |
 | `src/server/evaluator.ts` | Assessment/transfer/review evaluators and model voting |
 | `src/server/calendar.ts` | Real iCal connection and persisted calendar state |
 | `src/server/schedule.ts` | Review queue, course events and suggested study slots |
@@ -91,3 +94,5 @@ Still intentionally incomplete: course ingestion/concept extraction, broader aut
 With Clerk enabled, server pages and every API route resolve authenticated identity before reading or writing learner data. Learning progress, evidence, runtime courses, rank/tasks, calendar, materials and quiz sessions are isolated per user in memory. Durable learner/calendar/material records use user-namespaced SQLite keys. OAuth connection keys retain their existing per-user format. Anonymous requests do not fall back to the local user while Clerk is enabled.
 
 Auth-disabled local mode retains the original unscoped keys and local data. Existing global records are treated as local-owned; they are not copied into signed-in accounts without known ownership. Quiz sessions remain ephemeral, with their existing two-hour lifetime. Browser tier/task celebration memories are also keyed by account; nonsensitive answer-mode/hint preferences remain device preferences. This does not add a hosted database, multi-process write coordination or dynamic-course mastery support.
+
+The learning-content architecture and remaining generation/evaluation milestones are documented in [`docs/concept-learning-spec.md`](docs/concept-learning-spec.md).
