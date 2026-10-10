@@ -113,13 +113,6 @@ export function saveGeneratedLearningSpec(
   return cloneSpec(spec);
 }
 
-export function listGeneratedLearningSpecs(courseId?: string): ConceptLearningSpecType[] {
-  return held().records
-    .filter((r) => !courseId || r.spec.courseId === courseId)
-    .map((r) => cloneSpec(r.spec))
-    .sort((a, b) => a.courseId.localeCompare(b.courseId) || a.conceptId.localeCompare(b.conceptId) || a.revision - b.revision);
-}
-
 export function removeGeneratedLearningSpecs(courseId: string): number {
   const h = held();
   const before = h.records.length;
