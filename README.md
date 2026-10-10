@@ -1,36 +1,35 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Mastery
 
-## Getting Started
+Know what you actually know. The app finds the specific misconception behind a wrong answer, teaches only that gap, then tests it again with a different question before it raises mastery.
 
-First, run the development server:
+Loop: explain, diagnose, reteach, transfer test, update mastery.
+
+## Run it
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+pnpm install
+cp .env.example .env.local   # optional, see below
+pnpm dev                     # http://localhost:3000
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Checks: `pnpm typecheck`, `pnpm lint`, `pnpm test`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Model calls
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Set `GOOGLE_GENERATIVE_AI_API_KEY` to use Gemini for grading (3 independent checks vote), the upload check and the streamed mastery review. With no key, regex judges in `src/server/content.ts` cover the CI interpretation and standard error concepts so the demo path is repeatable. Uploads stay hidden without a key unless `NEXT_PUBLIC_DEMO_MODE=1`.
 
-## Learn More
+## Where things live
 
-To learn more about Next.js, take a look at the following resources:
+| Path | What |
+| --- | --- |
+| `src/server/store.ts` | In-memory data layer. The backend swap point: every exported function is what pages and routes call. Resets on restart. |
+| `src/server/content.ts` | Hand-authored questions, misconceptions, lessons and transfer rubrics. |
+| `src/server/evaluator.ts` | Gemini voting judges, with the heuristic fallback. |
+| `src/lib/schemas.ts` | Zod contracts shared by routes and the client. |
+| `src/app/api/*` | Route handlers: assess, clarify, transfer, mastery-review, upload/check. |
+| `src/app/_components/*` | UI, grouped by shell, chat, mastery, practice, upload, voice, settings. |
+| `design-handoff` source | `mastery-ui-handoff.zip` holds the approved reference screens. |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Not built yet
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Review queue, History, Misconception log, Course files, Add a course, sketch and camera in voice mode. Anything unfinished is hidden, not stubbed.
