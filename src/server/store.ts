@@ -919,7 +919,7 @@ export function getReviews(now = new Date()): { due: ReviewItem[]; upcoming: Rev
 
 export type ReviewChallengeView = {
   courseId: string; conceptId: string; conceptName: string; state: MasteryState; dueDay: string;
-  learningSpecRevision: number;
+  learningSpecRevision?: number;
   review: { question: string; hint: string };
 };
 
