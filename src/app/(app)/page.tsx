@@ -9,6 +9,7 @@ import { CourseTicker } from "@proveit/app/_components/dashboard/CourseTicker";
 import { TickerCard } from "@proveit/app/_components/dashboard/TickerCard";
 import { TodoCard } from "@proveit/app/_components/dashboard/TodoCard";
 import { RankCard } from "@proveit/app/_components/dashboard/RankCard";
+import { DemoResetButton } from "@proveit/app/_components/dashboard/DemoResetButton";
 import { RankChip } from "@proveit/app/_components/dashboard/RankChip";
 import { getScheduledTodos, getSchedule } from "@proveit/server/schedule";
 import { getCourse, getDashboard, getRewards, listCourses } from "@proveit/server/store";
@@ -25,7 +26,7 @@ export default async function Dashboard({ searchParams }: PageProps<"/">) {
     <AppShell
       active="dashboard"
       crumbs={[{ label: head.greeting }, { label: head.dateLabel }]}
-      right={<div className="flex items-center gap-3"><RankChip r={rewards} /><Link href="/?add=1" className={buttonStyles({ size: "md" })}><Plus size={13} strokeWidth={2.4} aria-hidden />Add a course</Link></div>}
+      right={<div className="flex items-center gap-3"><RankChip r={rewards} /><DemoResetButton /><Link href="/?add=1" className={buttonStyles({ size: "md" })}><Plus size={13} strokeWidth={2.4} aria-hidden />Add a course</Link></div>}
     >
       <div className="min-h-0 flex-1 overflow-y-auto px-7 py-6">
         <div className="flex flex-col gap-8">
