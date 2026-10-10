@@ -162,3 +162,9 @@ export const PracticeDoc = z.object({
 export const PracticeResult = z.object({ docs: z.array(PracticeDoc), pdfError: z.string().nullable() });
 export type PracticeDoc = z.infer<typeof PracticeDoc>;
 export type PracticeResult = z.infer<typeof PracticeResult>;
+
+// ---- tutor chat ----
+
+export const TutorMessage = z.object({ role: z.enum(["user", "assistant"]), text: z.string().trim().min(1).max(8000) });
+export type TutorMessage = z.infer<typeof TutorMessage>;
+export const TutorMessages = z.array(TutorMessage).min(1).max(40);

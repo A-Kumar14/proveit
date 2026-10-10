@@ -33,3 +33,12 @@ export function speak(text: string, onStart: () => void, onDone: () => void) {
   u.onerror = onDone;
   speechSynthesis.speak(u);
 }
+
+/** Speaks `text`, then calls `next`. If speech never starts (blocked or unsupported) `next` still runs. */
+export function speakThen(text: string, next: () => void) {
+  let started = false;
+  let finished = false;
+  const go = () => { if (!finished) { finished = true; next(); } };
+  const guard = setTimeout(() => { if (!started) { speechSynthesis?.cancel(); go(); } }, 1500);
+  speak(text, () => { started = true; clearTimeout(guard); }, () => { clearTimeout(guard); go(); });
+}

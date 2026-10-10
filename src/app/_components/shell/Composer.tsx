@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { ArrowUp, LoaderCircle } from "lucide-react";
+import { ArrowUp, LoaderCircle, Square } from "lucide-react";
 import { cn } from "@proveit/lib/cn";
 
 export type Status = "idle" | "evaluating" | "error";
@@ -17,7 +17,7 @@ function TalkPill({ onClick, unavailable }: { onClick: () => void; unavailable: 
 }
 
 /** ResponseBox. Pinned answer input. Only controls that work are rendered. */
-export function Composer({ value, onChange, onSubmit, status, error, placeholder, submitLabel = "Submit", loadingText = "Checking your reasoning...", hint, leading, chip, onTalk, talkUnavailable }: {
+export function Composer({ value, onChange, onSubmit, status, error, placeholder, submitLabel = "Submit", loadingText = "Checking your reasoning...", hint, leading, chip, onTalk, talkUnavailable, onStop }: {
   value: string; onChange: (v: string) => void; onSubmit: () => void; status: Status; error?: string | null;
   placeholder: string; submitLabel?: string; loadingText?: string; hint?: string;
   /** Controls shown left of the status line. Only pass ones that work. */
@@ -28,6 +28,8 @@ export function Composer({ value, onChange, onSubmit, status, error, placeholder
   onTalk?: () => void;
   /** Show the pill disabled when the browser can't transcribe speech, instead of hiding it. */
   talkUnavailable?: boolean;
+  /** While busy, the send button becomes a stop button that calls this. */
+  onStop?: () => void;
 }) {
   const busy = status === "evaluating";
   const box = useRef<HTMLTextAreaElement>(null);
@@ -64,15 +66,21 @@ export function Composer({ value, onChange, onSubmit, status, error, placeholder
                 : <span className="text-ink-faint">{hint ?? "Cmd + Enter to send"}</span>}
             </div>
             {onTalk && !busy && <TalkPill onClick={onTalk} unavailable={!!talkUnavailable} />}
-            <button
-              type="button" onClick={onSubmit} disabled={!canSend}
-              aria-label={status === "error" ? "Retry" : submitLabel}
-              title={status === "error" ? "Retry" : submitLabel}
-              className={cn("flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 transition-colors disabled:cursor-not-allowed",
-                canSend ? "bg-ink text-white hover:bg-ink-3" : "bg-surface-strong text-ink-faint")}
-            >
-              {busy ? <LoaderCircle size={16} strokeWidth={2.2} className="animate-spin" aria-hidden /> : <ArrowUp size={16} strokeWidth={2.4} aria-hidden />}
-            </button>
+            {busy && onStop ? (
+              <button type="button" onClick={onStop} aria-label="Stop" title="Stop" className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 bg-ink text-white hover:bg-ink-3">
+                <Square size={13} fill="currentColor" aria-hidden />
+              </button>
+            ) : (
+              <button
+                type="button" onClick={onSubmit} disabled={!canSend}
+                aria-label={status === "error" ? "Retry" : submitLabel}
+                title={status === "error" ? "Retry" : submitLabel}
+                className={cn("flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 transition-colors disabled:cursor-not-allowed",
+                  canSend ? "bg-ink text-white hover:bg-ink-3" : "bg-surface-strong text-ink-faint")}
+              >
+                {busy ? <LoaderCircle size={16} strokeWidth={2.2} className="animate-spin" aria-hidden /> : <ArrowUp size={16} strokeWidth={2.4} aria-hidden />}
+              </button>
+            )}
           </div>
         </div>
       </div>

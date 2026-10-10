@@ -66,7 +66,7 @@ Pattern: server components call `store`/`schedule` functions directly for reads.
 ## What is built
 
 - Course map (graph, units view, detail panel), practice, diagnosis (highlighted evidence), lesson, new-question transfer step, mastery-updated result with rank points.
-- Tutor page with the mastery review card (numbers computed in code, AI text streams in with skeletons).
+- Tutor page is a general course chat (`/api/tutor`, streamed, images and PDFs, dictation, spoken mode, stop). "How am I doing?" drops in the mastery review card (numbers computed in code, AI text streams in). Chat history lives in the page only. Chatting never changes mastery.
 - Upload check (rejects non-student work, never reaches grading). Voice mode (speech recognition, editable transcript, Sketch, Camera, Add file).
 - Review queue, history, misconception log, course files, settings (answer mode, hints, read-aloud).
 - Courses page: filters, row select, batch and right-click "Mark as completed", undo. Sidebar splits In progress and Completed.
