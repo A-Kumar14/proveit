@@ -1,6 +1,6 @@
 import "server-only";
 import { lookup } from "node:dns/promises";
-import { loadJson, saveJson } from "./persistence";
+import { deleteJson, loadJson, saveJson } from "./persistence";
 import { isIP } from "node:net";
 import ical, { type VEvent } from "node-ical";
 
@@ -173,6 +173,11 @@ export function disconnectCalendar(): CalendarState {
   Object.assign(held(), { mode: "none", url: null, provider: null, syncedAt: null, events: [] });
   persistCalendar();
   return getCalendarState();
+}
+
+export function resetDemoCalendar(): void {
+  deleteJson("calendar");
+  delete g.__proveitCal;
 }
 
 // ---- reading ----
