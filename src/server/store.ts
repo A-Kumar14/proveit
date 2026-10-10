@@ -312,7 +312,7 @@ const evidenceText = (c: Concept) =>
   c.evidence.answers === 0 ? "none yet" : c.evidence.transferPassed ? "new question passed" : `${c.evidence.sound} of ${c.evidence.answers} answers sound`;
 
 const ctaFor = (c: Concept): ConceptView["cta"] => {
-  if (!testable(c)) return { label: "Not in the demo yet", href: null };
+  if (!testable(c)) return { label: "Not authored yet", href: null };
   const label = c.state === "mastered" || c.state === "provisional" ? "Review anyway" : c.state === "not_started" ? "Start this concept" : "Test this concept";
   return { label, href: practiceHref(c) };
 };
@@ -328,7 +328,7 @@ export function getCourse(courseId: string): CourseView {
     provisional: course.concepts.filter((c) => c.state === "provisional").length,
     total: course.concepts.length,
     needsWork: course.concepts.filter((c) => c.state === "needs_work").length,
-    concepts: course.concepts.map((c) => ({ id: c.id, name: c.name, short: c.short, unit: c.unit, desc: c.desc, x: c.x, y: c.y, state: c.state, dims: dimsFor(c), evidence: evidenceText(c), cta: active ? ctaFor(c) : { label: c.state === "mastered" ? "Mastered" : "Not in the demo yet", href: null } })),
+    concepts: course.concepts.map((c) => ({ id: c.id, name: c.name, short: c.short, unit: c.unit, desc: c.desc, x: c.x, y: c.y, state: c.state, dims: dimsFor(c), evidence: evidenceText(c), cta: active ? ctaFor(c) : { label: c.state === "mastered" ? "Mastered" : "Not authored yet", href: null } })),
     edges: course.edges,
     nextUp: next ? { id: next.id, name: next.name } : null,
   };
@@ -383,7 +383,7 @@ export function getDashboard(): DashboardView {
     counts: { proven: cs.filter((c) => c.state === "mastered").length, due, needsWork: cs.filter((c) => c.state === "needs_work").length, courses: 1 },
     courses: [{ id: course.id, name: course.name, pct: coursePct(cs), proven: cs.filter((c) => c.state === "mastered").length, total: cs.length, openMisconception: bad ? lastBad(bad.id) : null }],
     risk: bad ? { concept: `${bad.name} in ${course.name}`, reason: `${lastBad(bad.id) ?? "An open misconception"} is still open. Fix it before ${course.deadline.replace("Quiz ", "the quiz on ")}.` } : null,
-    recommendation: next ? `${bad ? "Fix" : "Work on"} ${next.name} next${due > 0 ? ", then clear your reviews" : ""}.` : "Nothing left to test in this demo course.",
+    recommendation: next ? `${bad ? "Fix" : "Work on"} ${next.name} next${due > 0 ? ", then clear your reviews" : ""}.` : "Nothing left to test in the currently authored course content.",
     nextActions: next ? [{ label: `Test ${next.name} · ${course.name}`, href: practiceHref(next) }] : [],
     recentlyCaught,
   };
@@ -648,7 +648,7 @@ export function getResult(attemptId: string): ResultView {
     intervention: diagnosed ? "1 short lesson" : hadOverturnedDiagnosis ? "Clarified the diagnosis" : "No remediation needed",
     transferText: earlierMisses === 0 ? "Correct on first try" : `Correct after ${earlierMisses} earlier ${earlierMisses === 1 ? "miss" : "misses"}`,
     nextReview: c.nextReview ? `${c.nextReview === isoDay(addDays(new Date(), 1)) ? "Tomorrow, " : ""}${shortDate(new Date(`${c.nextReview}T00:00:00`))}` : "Not scheduled",
-    recommendation: nxt ? `${nxt.name} is next. You're one new question away from proving it.` : "You've covered everything in this demo course.",
+    recommendation: nxt ? `${nxt.name} is next. You're one new question away from proving it.` : "You've covered everything currently authored for this course.",
     nextConcept: nxt ? { name: nxt.name, href: practiceHref(nxt) } : null,
     segments: [...course.concepts].map((x) => x.state).sort((p, q) => RANK.indexOf(p) - RANK.indexOf(q)),
     coursePct: coursePct(course.concepts),
@@ -702,8 +702,8 @@ export function getReviewBase(courseId: string): ReviewBase {
     facts,
     fallback: {
       misconceptions: facts.map((f) => ({ concept: f.concept, misconception: f.misconception })),
-      biggestRisk: { reason: active ? d.risk?.reason ?? "No open misconceptions right now." : "No open misconceptions in this sample course." },
-      recommendation: active ? d.recommendation : isCompleted(course) ? "This course is complete. Come back for reviews when they are due." : "This sample course can't be practiced in the demo yet.",
+      biggestRisk: { reason: active ? d.risk?.reason ?? "No open misconceptions right now." : "No open misconceptions in this course." },
+      recommendation: active ? d.recommendation : isCompleted(course) ? "This course is complete. Come back for reviews when they are due." : "This course does not have authored practice content yet.",
       nextActions: active ? d.nextActions.map((a) => a.label) : [],
     },
   };
