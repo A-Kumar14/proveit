@@ -1,10 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const generateText = vi.fn();
+const mocked = vi.hoisted(() => ({ generateText: vi.fn(), enabled: true }));
+const generateText = mocked.generateText;
 vi.mock("ai", () => ({ generateText: (...a: unknown[]) => generateText(...a), Output: { object: (o: unknown) => o } }));
-vi.mock("./ai", () => ({ aiEnabled: () => true, model: () => "mock-model" }));
+vi.mock("./ai", () => ({ aiEnabled: () => mocked.enabled, model: () => "mock-model" }));
 
-import { judgeAnswer, judgeReview, judgeTransfer } from "./evaluator";
+import { getAuthoredLearningSpec } from "./authoredLearningSpecs";
+import {
+  judgeAnswer,
+  judgeReview,
+  judgeAnswerForSpec,
+  judgeReviewForSpec,
+  judgeTransferForSpec,
+  judgeTransfer,
+  EvaluationRequiresAIError,
+} from "./evaluator";
 
 const ANSWER = "It means there's a 95% probability that the true population mean is inside our interval.";
 const reply = (...outputs: object[]) => outputs.forEach((output) => generateText.mockResolvedValueOnce({ output }));
@@ -13,7 +23,10 @@ const transferPass = { verdict: "pass", misconceptionId: null, evidenceQuote: nu
 const transferUncertain = { verdict: "uncertain", misconceptionId: null, evidenceQuote: null, feedback: "Address both parts." };
 const transferBad = { verdict: "fail", misconceptionId: "parameter_probability_trap", evidenceQuote: "95% chance", feedback: "Don't assign probability to one realized interval." };
 
-beforeEach(() => generateText.mockReset());
+beforeEach(() => {
+  mocked.enabled = true;
+  generateText.mockReset();
+});
 
 describe("judgeAnswer with Gemini", () => {
   it("returns the majority verdict, diagnosis vote count and an exact quote", async () => {
@@ -114,5 +127,95 @@ describe("judgeReview with Gemini", () => {
     const invented = { verdict: "fail", misconceptionId: "invented", evidenceQuote: "95% chance", feedback: "Nope." };
     reply(invented, invented, transferUncertain);
     expect(await judgeReview("cii", "95% chance")).toMatchObject({ verdict: "fail", misconceptionId: null, quote: null });
+  });
+});
+
+
+describe("canonical ConceptLearningSpec evaluation", () => {
+  const generatedSpec = () => {
+    const spec = getAuthoredLearningSpec("intro-stats", "cii")!;
+    const sourceId = "source-1";
+    spec.courseId = "private-stats";
+    spec.conceptId = "private-ci";
+    spec.provenance = { kind: "generated", model: "test-generator", generatedAt: "2026-10-10T00:00:00Z" };
+    spec.sources = [{
+      id: sourceId,
+      kind: "material_excerpt",
+      materialId: "notes-1",
+      title: "Week 4 notes",
+      locator: "characters 1-200",
+      excerpt: "Across repeated samples, about 95% of intervals made by the method contain the fixed population mean.",
+    }];
+    spec.assessment.sourceIds = [sourceId];
+    spec.misconceptions.forEach((m) => { m.sourceIds = [sourceId]; });
+    spec.remediations.forEach((r) => { r.sourceIds = [sourceId]; r.figure = null; });
+    spec.transfer.sourceIds = [sourceId];
+    spec.review.sourceIds = [sourceId];
+    return spec;
+  };
+
+  it("grades a generated assessment from its spec and exact source excerpt", async () => {
+    const correct = { verdict: "correct", misconceptionId: null, evidenceQuote: null };
+    reply(correct, correct, { verdict: "uncertain", misconceptionId: null, evidenceQuote: null });
+
+    const spec = generatedSpec();
+    const result = await judgeAnswerForSpec(spec, "The 95% is long-run coverage across repeated samples.");
+
+    expect(result).toMatchObject({ verdict: "correct", votes: { agree: 2, of: 3 } });
+    const prompt = generateText.mock.calls[0]?.[0]?.prompt as string;
+    expect(prompt).toContain(spec.assessment.rubric);
+    expect(prompt).toContain("Week 4 notes");
+    expect(prompt).toContain("Across repeated samples, about 95% of intervals");
+    expect(prompt).toContain("private-ci");
+  });
+
+  it("accepts only misconception ids declared by a generated spec", async () => {
+    const invented = {
+      verdict: "incorrect",
+      misconceptionId: "invented",
+      evidenceQuote: "95% probability",
+    };
+    reply(invented, invented, { verdict: "uncertain", misconceptionId: null, evidenceQuote: null });
+
+    expect(await judgeAnswerForSpec(generatedSpec(), "It is a 95% probability.")).toMatchObject({
+      verdict: "uncertain",
+      misconceptionId: null,
+      quote: null,
+    });
+  });
+
+  it("uses the generated transfer and delayed-review rubrics", async () => {
+    reply(transferPass, transferPass, transferUncertain);
+    const spec = generatedSpec();
+    await judgeTransferForSpec(spec, "About 95 of 100; one realized interval either contains the mean or not.");
+    const transferPrompt = generateText.mock.calls[0]?.[0]?.prompt as string;
+    expect(transferPrompt).toContain(spec.transfer.rubric);
+    expect(transferPrompt).toContain("Transfer question");
+
+    generateText.mockReset();
+    reply(transferPass, transferPass, transferUncertain);
+    await judgeReviewForSpec(spec, "The claim is invalid; 95% refers to repeated-method coverage.");
+    const reviewPrompt = generateText.mock.calls[0]?.[0]?.prompt as string;
+    expect(reviewPrompt).toContain(spec.review.rubric);
+    expect(reviewPrompt).toContain("Delayed review question");
+  });
+
+  it("fails closed for generated content when no AI evaluator is configured", async () => {
+    mocked.enabled = false;
+    const spec = generatedSpec();
+
+    await expect(judgeAnswerForSpec(spec, "answer")).rejects.toBeInstanceOf(EvaluationRequiresAIError);
+    await expect(judgeTransferForSpec(spec, "answer")).rejects.toThrow(/requires an AI key/i);
+    await expect(judgeReviewForSpec(spec, "answer")).rejects.toThrow(/requires an AI key/i);
+    expect(generateText).not.toHaveBeenCalled();
+  });
+
+  it("preserves deterministic offline graders for authored gold fixtures", async () => {
+    mocked.enabled = false;
+    const spec = getAuthoredLearningSpec("intro-stats", "cii")!;
+
+    expect(await judgeAnswerForSpec(spec, "Across repeated samples about 95% of intervals from the method contain the mean."))
+      .toMatchObject({ verdict: "correct", votes: null });
+    expect(generateText).not.toHaveBeenCalled();
   });
 });
