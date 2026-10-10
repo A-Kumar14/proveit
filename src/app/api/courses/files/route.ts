@@ -1,3 +1,4 @@
+import { withUserRoute } from "@proveit/server/userBoundary";
 import { NextResponse } from "next/server";
 import { modelErrorMessage } from "@proveit/server/modelError";
 import { addMaterial, MAX_MATERIAL_FILES, MaterialError } from "@proveit/server/materials";
@@ -7,7 +8,7 @@ import type { FileUploadResult } from "@proveit/lib/schemas";
 export const maxDuration = 120;
 
 /** Adds files to a course as study context. Each file succeeds or fails on its own. */
-export async function POST(req: Request) {
+async function POSTForUser(req: Request) {
   const form = await req.formData().catch(() => null);
   const courseId = form?.get("courseId");
   const files = (form?.getAll("files") ?? []).filter((f): f is File => f instanceof File && f.size > 0);
@@ -28,3 +29,5 @@ export async function POST(req: Request) {
   }
   return NextResponse.json(result);
 }
+
+export const POST = withUserRoute(POSTForUser);

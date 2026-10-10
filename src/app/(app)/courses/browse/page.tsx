@@ -1,3 +1,4 @@
+import { withUserPage } from "@proveit/server/userBoundary";
 import Link from "next/link";
 import { AppShell } from "@proveit/app/_components/shell/AppShell";
 import { ListPage } from "@proveit/app/_components/shell/ListPage";
@@ -6,7 +7,7 @@ import { browseCatalog } from "@proveit/server/courses";
 
 export const dynamic = "force-dynamic";
 
-export default function BrowseCoursesPage() {
+function BrowseCoursesPage() {
   const items = browseCatalog();
   return (
     <AppShell active="courses" crumbs={[{ label: "Courses", href: "/courses" }, { label: "Browse" }]}>
@@ -19,3 +20,5 @@ export default function BrowseCoursesPage() {
     </AppShell>
   );
 }
+
+export default withUserPage(BrowseCoursesPage);

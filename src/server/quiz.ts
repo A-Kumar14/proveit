@@ -1,3 +1,4 @@
+import { userCache } from "./userScope";
 import "server-only";
 import { randomUUID } from "node:crypto";
 import { generateText, Output } from "ai";
@@ -14,7 +15,7 @@ type Keyed = QuizQuestion & { correct: number; explanation: string };
 type Held = { id: string; courseName: string; questions: Keyed[]; at: number; result: QuizResult | null };
 
 const g = globalThis as unknown as { __proveitQuizzes?: Map<string, Held> };
-const quizzes = () => (g.__proveitQuizzes ??= new Map<string, Held>());
+const quizzes = (): Map<string, Held> => userCache("quizzes", () => (g.__proveitQuizzes ??= new Map<string, Held>()), () => new Map<string, Held>());
 const TTL = 2 * 60 * 60 * 1000;
 const MAX_HELD = 50;
 

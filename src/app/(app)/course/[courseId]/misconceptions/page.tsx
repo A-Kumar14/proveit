@@ -1,3 +1,4 @@
+import { withUserPage } from "@proveit/server/userBoundary";
 import { AppShell } from "@proveit/app/_components/shell/AppShell";
 import { EmptyState } from "@proveit/app/_components/shell/EmptyState";
 import { ListPage, RowItem, Rows } from "@proveit/app/_components/shell/ListPage";
@@ -6,7 +7,7 @@ import { getCourse, getMisconceptionLog } from "@proveit/server/store";
 
 export const dynamic = "force-dynamic";
 
-export default async function MisconceptionLogPage({ params }: PageProps<"/course/[courseId]/misconceptions">) {
+async function MisconceptionLogPage({ params }: PageProps<"/course/[courseId]/misconceptions">) {
   const { courseId } = await params;
   const { course, log } = orNotFound(() => ({ course: getCourse(courseId), log: getMisconceptionLog(courseId) }));
   return (
@@ -31,3 +32,5 @@ export default async function MisconceptionLogPage({ params }: PageProps<"/cours
     </AppShell>
   );
 }
+
+export default withUserPage(MisconceptionLogPage);

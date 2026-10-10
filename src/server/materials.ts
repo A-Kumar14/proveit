@@ -1,8 +1,9 @@
+import { userCache } from "./userScope";
 import "server-only";
 import { generateText } from "ai";
 import { aiEnabled, model } from "./ai";
 import { AUTHORED } from "./content";
-import { loadJson, saveJson } from "./persistence";
+import { loadUserJson, saveUserJson } from "./persistence";
 import { courseSpec, getCourse } from "./store";
 
 export type Material = { id: string; courseId: string; name: string; mime: string; size: number; addedAt: number; text: string; words: number; readBy: "text" | "ai" };
@@ -17,8 +18,9 @@ const KEY = "materials";
 
 type Held = { items: Material[]; seq: number };
 const g = globalThis as unknown as { __proveitMaterials?: Held };
-const held = (): Held => (g.__proveitMaterials ??= { items: loadJson<Material[]>(KEY) ?? [], seq: 0 });
-const save = () => saveJson(KEY, held().items);
+const restore = (): Held => ({ items: loadUserJson<Material[]>(KEY) ?? [], seq: 0 });
+const held = (): Held => userCache("materials", () => (g.__proveitMaterials ??= restore()), restore);
+const save = () => saveUserJson(KEY, held().items);
 
 const words = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;
 const isText = (f: { name: string; type: string }) => f.type === "text/markdown" || f.type === "text/plain" || /\.(md|markdown|txt)$/i.test(f.name);

@@ -84,4 +84,10 @@ An incomplete or ambiguous answer creates an `uncertain` evidence event and does
 
 Built: dashboard, course map, practice, misconception diagnosis, dispute/clarification, focused remediation, transfer proof, delayed review, retained mastery, history/evidence trail, review queue, tutor chat, upload validation, voice/dictation, rank, to-dos, and iCal integration.
 
-Still intentionally incomplete: course ingestion/concept extraction, broader authored course coverage (only CI interpretation and Standard Error run fully end-to-end), source retrieval/citations, dynamic validated transfer generation, multi-user auth, and durable hosted persistence.
+Still intentionally incomplete: course ingestion/concept extraction, broader authored course coverage (only CI interpretation and Standard Error run fully end-to-end), source retrieval/citations, dynamic validated transfer generation, durable hosted persistence.
+
+## Account isolation
+
+With Clerk enabled, server pages and every API route resolve authenticated identity before reading or writing learner data. Learning progress, evidence, runtime courses, rank/tasks, calendar, materials and quiz sessions are isolated per user in memory. Durable learner/calendar/material records use user-namespaced SQLite keys. OAuth connection keys retain their existing per-user format. Anonymous requests do not fall back to the local user while Clerk is enabled.
+
+Auth-disabled local mode retains the original unscoped keys and local data. Existing global records are treated as local-owned; they are not copied into signed-in accounts without known ownership. Quiz sessions remain ephemeral, with their existing two-hour lifetime. Browser tier/task celebration memories are also keyed by account; nonsensitive answer-mode/hint preferences remain device preferences. This does not add a hosted database, multi-process write coordination or dynamic-course mastery support.

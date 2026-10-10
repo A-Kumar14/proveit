@@ -1,3 +1,4 @@
+import { withUserPage } from "@proveit/server/userBoundary";
 import { AppShell } from "@proveit/app/_components/shell/AppShell";
 import { ListPage } from "@proveit/app/_components/shell/ListPage";
 import { PracticeHub } from "@proveit/app/_components/practice/PracticeHub";
@@ -6,7 +7,7 @@ import { getCourse } from "@proveit/server/store";
 
 export const dynamic = "force-dynamic";
 
-export default async function PracticeHubPage({ params }: PageProps<"/course/[courseId]/practice">) {
+async function PracticeHubPage({ params }: PageProps<"/course/[courseId]/practice">) {
   const { courseId } = await params;
   const course = orNotFound(() => getCourse(courseId));
   return (
@@ -18,3 +19,5 @@ export default async function PracticeHubPage({ params }: PageProps<"/course/[co
     </AppShell>
   );
 }
+
+export default withUserPage(PracticeHubPage);

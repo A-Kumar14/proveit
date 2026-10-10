@@ -1,3 +1,4 @@
+import { withUserPage } from "@proveit/server/userBoundary";
 import { notFound } from "next/navigation";
 import { AppShell } from "@proveit/app/_components/shell/AppShell";
 import { TransferFlow } from "@proveit/app/_components/practice/TransferFlow";
@@ -6,7 +7,7 @@ import { getCourse, getTransferChallenge } from "@proveit/server/store";
 
 export const dynamic = "force-dynamic";
 
-export default async function TransferPage({ params }: PageProps<"/course/[courseId]/transfer/[attemptId]">) {
+async function TransferPage({ params }: PageProps<"/course/[courseId]/transfer/[attemptId]">) {
   const { courseId, attemptId } = await params;
   const { r, courseName } = orNotFound(() => ({ r: getTransferChallenge(attemptId), courseName: getCourse(courseId).name }));
   if (r.courseId !== courseId) notFound();
@@ -16,3 +17,5 @@ export default async function TransferPage({ params }: PageProps<"/course/[cours
     </AppShell>
   );
 }
+
+export default withUserPage(TransferPage);

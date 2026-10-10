@@ -1,3 +1,4 @@
+import { withUserRoute } from "@proveit/server/userBoundary";
 import { NextResponse } from "next/server";
 import { aiEnabled } from "@proveit/server/ai";
 import { extractOutline, kindOf, MAX_FILE_BYTES, MAX_FILES, MAX_TOTAL_BYTES, NotCourseMaterialError, outlineFromText, type UploadFile } from "@proveit/server/courseUpload";
@@ -13,7 +14,7 @@ const KIND_LABEL = { pdf: "PDF", text: "Notes", image: "Image" } as const;
  * Builds a new course from uploaded syllabus, slides or notes. With a model key Gemini reads every file.
  * Without one, only .txt and .md outlines work, parsed from their headings and bullets.
  */
-export async function POST(req: Request) {
+async function POSTForUser(req: Request) {
   const form = await req.formData().catch(() => null);
   if (!form) return bad("Invalid request.");
   const name = String(form.get("name") ?? "").trim();
@@ -55,3 +56,5 @@ export async function POST(req: Request) {
     return bad("Building the concept map failed. Retry.", 500);
   }
 }
+
+export const POST = withUserRoute(POSTForUser);

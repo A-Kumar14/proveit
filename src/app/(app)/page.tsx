@@ -1,3 +1,4 @@
+import { withUserPage } from "@proveit/server/userBoundary";
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { AppShell } from "@proveit/app/_components/shell/AppShell";
@@ -17,8 +18,9 @@ import { getCourseRanks, getDashboard, getRewards, listCourses } from "@proveit/
 
 export const dynamic = "force-dynamic";
 
-export default async function Dashboard({ searchParams }: PageProps<"/">) {
+async function Dashboard({ searchParams }: PageProps<"/">) {
   const { add, connect, connected, integration_error: integrationError } = await searchParams;
+  const userId = await currentUserId();
   const head = getDashboard();
   const courses = listCourses();
   const rewards = getRewards();
@@ -31,7 +33,7 @@ export default async function Dashboard({ searchParams }: PageProps<"/">) {
     >
       <div className="min-h-0 flex-1 overflow-y-auto px-7 py-6">
         <div className="flex flex-col gap-8">
-          <RankCard r={rewards} courses={ranks} previewable={false} />
+          <RankCard key={userId} userId={userId} r={rewards} courses={ranks} previewable={false} />
 
           <section aria-labelledby="courses-heading" className="flex flex-col gap-3">
             <div className="flex items-baseline justify-between">
@@ -42,7 +44,7 @@ export default async function Dashboard({ searchParams }: PageProps<"/">) {
           </section>
 
           <div className="grid grid-cols-2 items-start gap-4">
-            <TodoCard groups={getScheduledTodos()} />
+            <TodoCard key={userId} userId={userId} groups={getScheduledTodos()} />
             <CalendarCard schedule={getSchedule()} />
           </div>
 
@@ -53,3 +55,5 @@ export default async function Dashboard({ searchParams }: PageProps<"/">) {
     </AppShell>
   );
 }
+
+export default withUserPage(Dashboard);

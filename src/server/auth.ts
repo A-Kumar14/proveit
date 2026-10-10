@@ -7,12 +7,17 @@ export type Profile = { id: string; name: string; email: string | null; imageUrl
 
 export const LOCAL_USER = "local";
 
-/** The signed-in user's id, or "local" when accounts are off. Per-user storage keys use this. */
+export class UnauthorizedError extends Error {
+  constructor() { super("Sign in to continue."); }
+}
+
+/** Trusted signed-in identity. Only auth-disabled mode may use the local namespace. */
 export async function currentUserId(): Promise<string> {
   if (!authEnabled()) return LOCAL_USER;
   const { auth } = await import("@clerk/nextjs/server");
   const { userId } = await auth();
-  return userId ?? LOCAL_USER;
+  if (!userId) throw new UnauthorizedError();
+  return userId;
 }
 
 /** Name, email and avatar for the account page and the sidebar, or null when signed out or accounts are off. */
