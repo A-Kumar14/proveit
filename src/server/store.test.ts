@@ -373,7 +373,19 @@ describe("rank points", () => {
     expect(getResult(pass.resultAttemptId).points.reduce((n, p) => n + p.points, 0)).toBe(350);
   });
 
-  it("earns nothing for ticking a task or marking a course done by hand", () => {
+  it("does not award a repair bonus when a sound first answer proves transfer directly", async () => {
+    const first = await run("Over repeated samples, about 95% of intervals made by the method contain the true mean.");
+    const pass = await submitTransfer(first.attemptId, RIGHT_TRANSFER);
+    if (pass.result !== "pass") throw new Error("expected pass");
+    expect(getRewards().points).toBe(6000 + 200 + 50 + 25);
+    const resultPoints = getResult(pass.resultAttemptId).points;
+    expect(resultPoints).toEqual([
+      { label: "Proved the concept", points: 200 },
+      { label: "Passed on the first try", points: 50 },
+    ]);
+  });
+
+    it("earns nothing for ticking a task or marking a course done by hand", () => {
     setTaskDone("pv", true);
     setCoursesCompleted(["intro-stats", "personal-finance"], true);
     expect(getRewards().points).toBe(6000);
