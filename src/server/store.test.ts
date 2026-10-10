@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { getDashboardWidgets, listCourses, setCoursesCompleted } from "./store";
+import { getDashboardWidgets, getRewards, listCourses, setCoursesCompleted, setTaskDone } from "./store";
 import { assess, getAttempt, getCourse, getDashboard, getQuestion, getRemediation, getFiles, getHistory, getMisconceptionLog, getResult, getReviewBase, getReviews, getSidebar, NotFoundError, submitTransfer } from "./store";
 
 const WRONG = "It means there's a 95% probability that the true population mean is inside our interval.";
@@ -225,5 +225,54 @@ describe("dashboard widgets and ticker rows", () => {
     await submitTransfer(attemptId, RIGHT_TRANSFER);
     expect(getDashboardWidgets().week.days.at(-1)).toMatchObject({ today: true, active: true });
     expect(getDashboardWidgets().recent[0]?.tone).toBe("good");
+  });
+});
+
+describe("rank points", () => {
+  it("starts from the seeded evidence and explains every point", () => {
+    const r = getRewards();
+    expect(r.points).toBe(6000);
+    expect(r.tier.name).toBe("Platinum");
+    expect(r.breakdown.reduce((n, b) => n + b.points, 0)).toBe(6000);
+    expect(r.breakdown.find((b) => b.label === "Concepts mastered")).toMatchObject({ count: 16, points: 4800 });
+    expect(r.breakdown.find((b) => b.label === "Courses mastered end to end")).toMatchObject({ count: 1, points: 1000 });
+    expect(getRewards()).toEqual(r);
+  });
+
+  it("adds exactly the proved, repaired, first-try and streak points when a transfer question is passed", async () => {
+    const { attemptId } = await run(WRONG);
+    const pass = await submitTransfer(attemptId, RIGHT_TRANSFER);
+    if (pass.result !== "pass") throw new Error("expected pass");
+    expect(getRewards().points).toBe(6000 + 200 + 100 + 50 + 25);
+    expect(getResult(pass.resultAttemptId).points.reduce((n, p) => n + p.points, 0)).toBe(350);
+  });
+
+  it("earns nothing for ticking a task or marking a course done by hand", () => {
+    setTaskDone("pv", true);
+    setCoursesCompleted(["intro-stats", "personal-finance"], true);
+    expect(getRewards().points).toBe(6000);
+  });
+
+  it("does not pay a second time for the same concept, so a wrong answer can't be cycled for points", async () => {
+    const first = await run(WRONG);
+    await submitTransfer(first.attemptId, RIGHT_TRANSFER);
+    const after = getRewards().points;
+    const again = await run(WRONG);
+    await submitTransfer(again.attemptId, RIGHT_TRANSFER);
+    expect(getRewards().points).toBe(after);
+  });
+
+  it("never lets rank drop when a concept slips back", async () => {
+    const { attemptId } = await run(WRONG);
+    await submitTransfer(attemptId, RIGHT_TRANSFER);
+    const high = getRewards().points;
+    await run(WRONG);
+    expect(getRewards().points).toBe(high);
+  });
+
+  it("pays the course bonus only when concepts earned it, not for a hand-marked course", () => {
+    setCoursesCompleted(["linear-algebra"], false);
+    setCoursesCompleted(["linear-algebra"], true);
+    expect(getRewards().breakdown.find((b) => b.label === "Courses mastered end to end")?.count).toBe(0);
   });
 });

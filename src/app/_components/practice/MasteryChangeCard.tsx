@@ -29,6 +29,10 @@ export function MasteryChangeCard({ r }: { r: ResultView }) {
         <Row><Cell className="text-ink-3">Fixed with</Cell><Cell className="font-semibold">{r.intervention}</Cell></Row>
         <Row><Cell className="text-ink-3">New question, different setup</Cell><Cell className="font-semibold text-mastered-text">{r.transferText}</Cell></Row>
         <Row>
+          <Cell className="text-ink-3">Rank points earned</Cell>
+          <Cell><span className="font-semibold tabular-nums">+{r.points.reduce((n, p) => n + p.points, 0)}</span> <span className="text-xs text-ink-faint">{r.points.map((p) => `${p.label} +${p.points}`).join(", ")}</span></Cell>
+        </Row>
+        <Row>
           <Cell className="text-ink-3">{r.courseName}</Cell>
           <Cell>
             <div className="flex items-center gap-2.5">

@@ -4,6 +4,7 @@ import { toneForPct, type Tone } from "@proveit/lib/mastery";
 import { AUTHORED } from "./content";
 import { judgeAnswer, judgeTransfer } from "./evaluator";
 import type { CalEvent } from "./calendar";
+import { POINTS, STREAK_CAP, standing, TIERS, type Standing } from "@proveit/lib/rewards";
 
 /**
  * In-memory stand-in for the real data layer. Every exported function is the seam the backend
@@ -27,7 +28,7 @@ type Attempt = {
 /** `completedOverride` is the student's own call. null means derive it from the concepts. */
 type Course = { id: string; name: string; deadline: string; concepts: Concept[]; edges: [string, string][]; files: CourseFile[]; completedOverride: boolean | null; /** ISO date of the next quiz, if any. */ examDate: string | null };
 /** `course` is the one being worked on. `samples` are finished courses that only fill the sidebar and map views. */
-type Db = { course: Course; samples: Course[]; attempts: Attempt[]; provenDays: Set<string>; /** Tasks the student ticked off by hand. */ taskDone: Set<string>; seq: number };
+type Db = { course: Course; samples: Course[]; attempts: Attempt[]; provenDays: Set<string>; /** Tasks the student ticked off by hand. */ taskDone: Set<string>; /** Highest point total ever shown. Rank never drops when a concept slips. */ peakPoints: number; seq: number };
 
 const app = (answers: number, sound: number, transferPassed = false) => ({ answers, sound, transferPassed });
 const M: Skill[] = [{ label: "Application", pct: 90 }, { label: "New-question test", pct: 85 }];
@@ -63,6 +64,7 @@ function seed(): Db {
     attempts: [],
     provenDays: new Set(),
     taskDone: new Set(),
+    peakPoints: 0,
     seq: 0,
   };
 }
@@ -404,6 +406,7 @@ export type ResultView = {
   nextReview: string; recommendation: string;
   nextConcept: { name: string; href: string } | null;
   segments: MasteryState[]; coursePct: number; provenLabel: string;
+  points: { label: string; points: number }[];
 };
 const RANK: MasteryState[] = ["mastered", "provisional", "developing", "needs_work", "not_started"];
 
@@ -427,6 +430,11 @@ export function getResult(attemptId: string): ResultView {
     segments: [...course.concepts].map((x) => x.state).sort((p, q) => RANK.indexOf(p) - RANK.indexOf(q)),
     coursePct: coursePct(course.concepts),
     provenLabel: `${proven} proven + ${prov} provisional`,
+    points: [
+      { label: "Proved the concept", points: POINTS.proved },
+      { label: "Repaired a misconception", points: POINTS.repaired },
+      ...(a.failedTransfers === 0 ? [{ label: "Passed on the first try", points: POINTS.firstTry }] : []),
+    ],
   };
 }
 
@@ -654,4 +662,36 @@ export function getCourseEvents(): CalEvent[] {
     }
   }
   return out;
+}
+
+// ---- rank ----
+
+export type Rewards = Standing & {
+  breakdown: { label: string; count: number; each: number; points: number }[];
+  ladder: { id: string; name: string; min: number; reached: boolean; current: boolean }[];
+};
+
+/**
+ * Points derived from current evidence, so the same data always gives the same number. Repaired and first-try
+ * bonuses count once per concept so a deliberate wrong answer can't be cycled for points. Rank keeps the
+ * highest total ever shown: a concept slipping back doesn't take a tier away.
+ */
+export function getRewards(): Rewards {
+  const { course, samples, attempts } = db();
+  const concepts = [course, ...samples].flatMap((c) => c.concepts);
+  const passed = attempts.filter((a) => a.kind === "transfer" && a.passed);
+  const repairedConcepts = new Set(passed.map((a) => a.conceptId));
+  const firstTryConcepts = new Set(passed.filter((a) => a.failedTransfers === 0).map((a) => a.conceptId));
+  const rows = [
+    { label: "Concepts mastered", count: concepts.filter((c) => c.state === "mastered").length, each: POINTS.mastered },
+    { label: "Concepts proved with a new question", count: concepts.filter((c) => c.state === "provisional").length, each: POINTS.proved },
+    { label: "Misconceptions repaired", count: repairedConcepts.size, each: POINTS.repaired },
+    { label: "Passed a new question first try", count: firstTryConcepts.size, each: POINTS.firstTry },
+    { label: "Courses mastered end to end", count: [course, ...samples].filter((c) => c.completedOverride === null && c.concepts.length > 0 && c.concepts.every((x) => x.state === "mastered")).length, each: POINTS.course },
+    { label: "Streak days, up to 7", count: Math.min(streak(), STREAK_CAP), each: POINTS.streakDay },
+  ].map((r) => ({ ...r, points: r.count * r.each }));
+  const earned = rows.reduce((n, r) => n + r.points, 0);
+  db().peakPoints = Math.max(db().peakPoints, earned);
+  const s = standing(db().peakPoints);
+  return { ...s, breakdown: rows, ladder: TIERS.map((t, i) => ({ id: t.id, name: t.name, min: t.min, reached: i <= s.tierIndex, current: i === s.tierIndex })) };
 }

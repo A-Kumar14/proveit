@@ -8,9 +8,11 @@ import { CalendarCard } from "@proveit/app/_components/dashboard/CalendarCard";
 import { CourseTicker } from "@proveit/app/_components/dashboard/CourseTicker";
 import { TickerCard } from "@proveit/app/_components/dashboard/TickerCard";
 import { TodoCard } from "@proveit/app/_components/dashboard/TodoCard";
+import { RankCard } from "@proveit/app/_components/dashboard/RankCard";
+import { RankChip } from "@proveit/app/_components/dashboard/RankChip";
 import { MasteryOverview, RecentActivity, StudyWeek } from "@proveit/app/_components/dashboard/Widgets";
 import { getScheduledTodos, getSchedule } from "@proveit/server/schedule";
-import { getCourse, getDashboard, getDashboardWidgets, listCourses } from "@proveit/server/store";
+import { getCourse, getDashboard, getDashboardWidgets, getRewards, listCourses } from "@proveit/server/store";
 
 export const dynamic = "force-dynamic";
 
@@ -19,12 +21,13 @@ export default async function Dashboard({ searchParams }: PageProps<"/">) {
   const head = getDashboard();
   const courses = listCourses();
   const widgets = getDashboardWidgets();
+  const rewards = getRewards();
   const demo = courses[0];
   return (
     <AppShell
       active="dashboard"
       crumbs={[{ label: head.greeting }, { label: head.dateLabel }]}
-      right={<Link href="/?add=1" className={buttonStyles({ size: "md" })}><Plus size={13} strokeWidth={2.4} aria-hidden />Add a course</Link>}
+      right={<div className="flex items-center gap-3"><RankChip r={rewards} /><Link href="/?add=1" className={buttonStyles({ size: "md" })}><Plus size={13} strokeWidth={2.4} aria-hidden />Add a course</Link></div>}
     >
       <div className="min-h-0 flex-1 overflow-y-auto px-7 py-6">
         <div className="flex flex-col gap-8">
@@ -42,6 +45,7 @@ export default async function Dashboard({ searchParams }: PageProps<"/">) {
           </div>
 
           <div className="grid grid-cols-2 gap-4">
+            <RankCard r={rewards} previewable={process.env.NEXT_PUBLIC_DEMO_MODE === "1"} />
             <MasteryOverview d={widgets} />
             <StudyWeek d={widgets} />
             <RecentActivity d={widgets} />

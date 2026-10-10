@@ -79,6 +79,11 @@ body {
 .wv { animation: wave 1s ease-in-out infinite; transform-origin: center; }
 .br { animation: breathe 1.6s ease-in-out infinite; }
 
+@keyframes tier-pop { 0% { transform: scale(0.6); opacity: 0; } 60% { transform: scale(1.08); opacity: 1; } 100% { transform: scale(1); } }
+@keyframes tier-ring { 0% { transform: scale(0.9); opacity: 0.5; } 100% { transform: scale(1.7); opacity: 0; } }
+.tier-pop { animation: tier-pop 520ms cubic-bezier(.2,.8,.3,1) both; }
+.tier-ring { animation: tier-ring 1100ms ease-out 200ms both; }
+
 /* Course ticker: three identical copies, shifted by exactly one copy so the loop has no seam. */
 @keyframes ticker-right { from { transform: translateX(-33.3333%); } to { transform: translateX(0); } }
 .ticker-track { animation: ticker-right var(--ticker-duration, 45s) linear infinite; }

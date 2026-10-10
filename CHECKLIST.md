@@ -66,6 +66,14 @@ Status as of the last push to `main`. Tick items as they land.
 - [ ] Let a passed review mark its review task done and promote Provisional to Mastered
 - [ ] Decide what happens to hand-ticked tasks when the same concept is later proved by answers
 
+## Rank
+
+- [ ] Tune the point values and tier thresholds against real use (they are first guesses)
+- [ ] Exclude sample and seeded courses from points once real courses exist (they inflate the starting rank today)
+- [ ] Store peak points and the celebrated tier per user in the database (peak is server memory, celebrated tier is browser storage)
+- [ ] Show points earned on the review result once a passed review can promote to Mastered
+- [ ] Decide whether to add a leaderboard or sharing for bragging rights
+
 ## Hardening
 
 - [ ] Add an end-to-end test of the demo path
@@ -96,6 +104,7 @@ Status as of the last push to `main`. Tick items as they land.
 - [x] Dashboard to-do list that finishes by itself, hand ticking with confetti, and a calendar card
 - [x] Calendar page with a month view, iCal connect and refresh, and suggested study slots
 - [x] Review queue suggests times from free gaps in the calendar
+- [x] Rank tiers (Bronze to Legend) with a header chip, a rank card, evidence-only points and a tier-up celebration
 - [x] Courses page with filters, row selection, batch and right-click "Mark as completed"
 - [x] Sidebar splits courses into In progress and Completed, with a sample completed course
 - [x] Repo on GitHub, `main` up to date
