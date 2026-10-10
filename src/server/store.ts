@@ -162,6 +162,8 @@ export function removeAddedCourse(id: string): boolean {
   const i = data.samples.findIndex((c) => c.id === id && c.runtime);
   if (i < 0) return false;
   data.samples.splice(i, 1);
+  data.attempts = data.attempts.filter((attempt) => attempt.courseId !== id);
+  delete data.peakByCourse[id];
   persistLearning();
   return true;
 }
@@ -216,8 +218,10 @@ const specForAttempt = (a: Attempt): ConceptLearningSpec =>
   specFor(a.courseId, a.conceptId, a.learningSpecRevision);
 const misconceptionForSpec = (spec: ConceptLearningSpec, misconceptionId: string | null) =>
   misconceptionId ? spec.misconceptions.find((m) => m.id === misconceptionId) ?? null : null;
+const primaryMisconceptionFor = (courseId: string, conceptId: string) =>
+  getLearningSpec(courseId, conceptId)?.misconceptions[0] ?? null;
 const primaryMisconception = (conceptId: string) =>
-  getLearningSpec(db().course.id, conceptId)?.misconceptions[0] ?? null;
+  primaryMisconceptionFor(db().course.id, conceptId);
 
 function clarificationPromptFor(a: Attempt): string {
   if (a.evaluation?.followUp) return a.evaluation.followUp;
@@ -353,9 +357,15 @@ const upsertSkill = (c: Concept, s: Skill) => {
   c.skills = skills.some((x) => x.label === s.label) ? skills.map((x) => (x.label === s.label ? s : x)) : [...skills, s];
 };
 
+function nextConceptFor(course: Course): Concept | null {
+  const cs = course.concepts.filter((c) => testableIn(course.id, c));
+  return cs.find((c) => c.state === "needs_work") ??
+    cs.find((c) => c.state === "developing") ??
+    cs.find((c) => c.state === "not_started") ??
+    null;
+}
 function nextConcept(): Concept | null {
-  const cs = db().course.concepts.filter(testable);
-  return cs.find((c) => c.state === "needs_work") ?? cs.find((c) => c.state === "developing") ?? cs.find((c) => c.state === "not_started") ?? null;
+  return nextConceptFor(db().course);
 }
 const practiceHrefFor = (courseId: string, c: Concept) => `/course/${courseId}/practice/${c.id}`;
 const practiceHref = (c: Concept) => practiceHrefFor(db().course.id, c);
@@ -398,7 +408,7 @@ const ctaFor = (c: Concept): ConceptView["cta"] => {
 export function getCourse(courseId: string): CourseView {
   const course = courseFor(courseId);
   const active = course === db().course;
-  const next = active ? nextConcept() : null;
+  const next = nextConceptFor(course);
   return {
     id: course.id, name: course.name, deadline: course.deadline,
     pct: coursePct(course.concepts),
@@ -824,25 +834,30 @@ const RANK: MasteryState[] = ["mastered", "provisional", "developing", "needs_wo
 export function getResult(attemptId: string): ResultView {
   const a = attempt(attemptId);
   if (a.kind !== "transfer" || a.outcome !== "pass") throw new NotFoundError(`no result for ${attemptId}`);
-  const c = concept(a.conceptId);
-  const { course, attempts } = db();
+  const course = courseFor(a.courseId);
+  const c = conceptFor(a.courseId, a.conceptId);
+  const { attempts } = db();
   const diagnoses = attempts.filter((x) => x.rootAttemptId === a.rootAttemptId && x.evaluation?.verdict === "incorrect");
   const confirmed = confirmedIncorrectForRoot(a.rootAttemptId);
   const hadOverturnedDiagnosis = diagnoses.length > 0 && !confirmed;
   const diagnosed = confirmed?.evaluation?.misconceptionName ?? null;
   const earlierMisses = transferMissesFor(a.rootAttemptId, a.createdAt);
-  const nxt = nextConcept();
+  const nxt = nextConceptFor(course);
   const proven = course.concepts.filter((x) => x.state === "mastered").length;
   const prov = course.concepts.filter((x) => x.state === "provisional").length;
   return {
-    courseId: a.courseId, courseName: course.name, conceptName: c.name, previous: a.previousState, next: "provisional",
+    courseId: a.courseId,
+    courseName: course.name,
+    conceptName: c.name,
+    previous: a.previousState,
+    next: "provisional",
     diagnosisLabel: diagnosed ? "Misconception found" : "Diagnosis",
     misconception: diagnosed ?? (hadOverturnedDiagnosis ? "Not confirmed after clarification" : "None detected"),
     intervention: diagnosed ? "1 short lesson" : hadOverturnedDiagnosis ? "Clarified the diagnosis" : "No remediation needed",
     transferText: earlierMisses === 0 ? "Correct on first try" : `Correct after ${earlierMisses} earlier ${earlierMisses === 1 ? "miss" : "misses"}`,
     nextReview: c.nextReview ? `${c.nextReview === isoDay(addDays(new Date(), 1)) ? "Tomorrow, " : ""}${shortDate(new Date(`${c.nextReview}T00:00:00`))}` : "Not scheduled",
-    recommendation: nxt ? `${nxt.name} is next. You're one new question away from proving it.` : "You've covered everything currently authored for this course.",
-    nextConcept: nxt ? { name: nxt.name, href: practiceHref(nxt) } : null,
+    recommendation: nxt ? `${nxt.name} is next. You're one new question away from proving it.` : "You've covered every concept that currently has mastery content.",
+    nextConcept: nxt ? { name: nxt.name, href: practiceHrefFor(course.id, nxt) } : null,
     segments: [...course.concepts].map((x) => x.state).sort((p, q) => RANK.indexOf(p) - RANK.indexOf(q)),
     coursePct: coursePct(course.concepts),
     provenLabel: `${proven} proven + ${prov} provisional`,
@@ -882,8 +897,8 @@ export function getReviewBase(courseId: string): ReviewBase {
   const d = getDashboard();
   const next = active ? nextConcept() : null;
   const facts = course.concepts.filter((c) => c.state === "needs_work" || c.state === "developing").map((c) => {
-    const last = latestConfirmedIncorrect(c.id);
-    return { concept: c.name, misconception: last?.evaluation?.misconceptionName ?? (c.state === "needs_work" ? primaryMisconception(c.id)?.name ?? null : null), quote: last?.evaluation?.evidenceQuote ?? null };
+    const last = latestConfirmedIncorrect(c.id, course.id);
+    return { concept: c.name, misconception: last?.evaluation?.misconceptionName ?? (c.state === "needs_work" ? primaryMisconceptionFor(course.id, c.id)?.name ?? null : null), quote: last?.evaluation?.evidenceQuote ?? null };
   });
   return {
     attemptCount: course.concepts.reduce((n, c) => n + c.evidence.answers, 0),
@@ -891,13 +906,13 @@ export function getReviewBase(courseId: string): ReviewBase {
     concepts,
     riskConcept: active ? d.risk?.concept ?? null : null,
     riskName: course.concepts.find((c) => c.state === "needs_work")?.name ?? null,
-    nextHref: next ? practiceHref(next) : null,
+    nextHref: next ? practiceHrefFor(course.id, next) : null,
     facts,
     fallback: {
       misconceptions: facts.map((f) => ({ concept: f.concept, misconception: f.misconception })),
       biggestRisk: { reason: active ? d.risk?.reason ?? "No open misconceptions right now." : "No open misconceptions in this course." },
-      recommendation: active ? d.recommendation : isCompleted(course) ? "This course is complete. Come back for reviews when they are due." : "This course does not have authored practice content yet.",
-      nextActions: active ? d.nextActions.map((a) => a.label) : [],
+      recommendation: active ? d.recommendation : isCompleted(course) ? "This course is complete. Come back for reviews when they are due." : next ? `Work on ${next.name} next.` : "Generate mastery content for a concept to start practicing this course.",
+      nextActions: next ? [`Test ${next.name} · ${course.name}`] : [],
     },
   };
 }
@@ -906,16 +921,24 @@ export function getReviewBase(courseId: string): ReviewBase {
 
 export type ReviewItem = { id: string; name: string; courseName: string; when: string; /** ISO day the review lands. */ day: string; due: boolean; href: string | null };
 export function getReviews(now = new Date()): { due: ReviewItem[]; upcoming: ReviewItem[] } {
-  const { course } = db();
+  const { course, samples } = db();
   const today = isoDay(now);
-  const items = course.concepts.filter((c) => c.nextReview && (c.state === "provisional" || c.state === "mastered")).map((c) => {
-    const due = c.nextReview! <= today;
-    return {
-      id: c.id, name: c.name, courseName: course.name, day: c.nextReview!, due,
-      href: due && testable(c) ? `/course/${course.id}/review/${c.id}` : null,
-      when: due ? "Due now" : shortDate(new Date(`${c.nextReview}T00:00:00`)),
-    };
-  });
+  const items = [course, ...samples].flatMap((owner) =>
+    owner.concepts
+      .filter((c) => c.nextReview && (c.state === "provisional" || c.state === "mastered"))
+      .map((c) => {
+        const due = c.nextReview! <= today;
+        return {
+          id: c.id,
+          name: c.name,
+          courseName: owner.name,
+          day: c.nextReview!,
+          due,
+          href: due && testableIn(owner.id, c) ? `/course/${owner.id}/review/${c.id}` : null,
+          when: due ? "Due now" : shortDate(new Date(`${c.nextReview}T00:00:00`)),
+        };
+      })
+  );
   return { due: items.filter((i) => i.due), upcoming: items.filter((i) => !i.due) };
 }
 
