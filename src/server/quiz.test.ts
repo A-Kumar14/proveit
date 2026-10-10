@@ -7,7 +7,7 @@ vi.mock("./ai", () => ({ aiEnabled: () => ai, model: () => "mock-model" }));
 
 import { startQuiz, submitQuiz } from "./quiz";
 import { addCatalogCourse } from "./courses";
-import { getCourse, getRewards, NotFoundError } from "./store";
+import { assess, getCourse, getHistory, getMisconceptionLog, getQuizSignal, getRewards, NotFoundError, recordQuizEvidence, submitTransfer } from "./store";
 
 beforeEach(() => {
   ai = false;
@@ -28,7 +28,7 @@ describe("startQuiz offline", () => {
     for (const x of q.questions) {
       expect(x.options).toHaveLength(4);
       expect(new Set(x.options).size).toBe(4);
-      expect(JSON.stringify(x)).not.toMatch(/correct|answerIndex/);
+      expect(JSON.stringify(x)).not.toMatch(/correct|answerIndex|conceptId/);
     }
   });
 
@@ -69,11 +69,48 @@ describe("submitQuiz", () => {
     expect(submitQuiz(q.quizId, [1, 1, 1])).toEqual(first);
   });
 
-  it("never changes mastery or rank", async () => {
-    const before = [getRewards().points, JSON.stringify(getCourse("intro-stats").concepts.map((c) => c.state))];
-    const q = await startQuiz("intro-stats", 4);
-    submitQuiz(q.quizId, q.questions.map(() => 0));
-    expect([getRewards().points, JSON.stringify(getCourse("intro-stats").concepts.map((c) => c.state))]).toEqual(before);
+  it("records answered items as low-stakes evidence without granting proof, rank or a misconception", async () => {
+    addCatalogCourse("accounting-101");
+    const course = getCourse("accounting-101");
+    const beforeRank = getRewards("accounting-101").points;
+    const q = await startQuiz("accounting-101", 4);
+    const first = q.questions[0]!;
+    const concept = course.concepts.find((c) => c.name === first.concept)!;
+    const correct = first.options.findIndex((o) => o === concept.desc);
+    const wrong = (correct + 1) % 4;
+
+    const result = submitQuiz(q.quizId, [wrong, null, null, null]);
+    expect(result.total).toBe(4);
+    expect(getCourse("accounting-101").concepts.find((c) => c.id === concept.id)?.state).toBe("developing");
+    expect(getQuizSignal("accounting-101", concept.id)).toMatchObject({ right: 0, total: 1, pct: 0 });
+    expect(getRewards("accounting-101").points).toBe(beforeRank);
+    expect(getCourse("accounting-101").concepts.every((c) => c.state !== "provisional" && c.state !== "mastered")).toBe(true);
+    expect(getMisconceptionLog("accounting-101")).toEqual([]);
+    expect(getHistory()[0]).toMatchObject({ title: `Quiz check on ${concept.name}`, tone: "warn" });
+
+    const historyCount = getHistory().length;
+    submitQuiz(q.quizId, q.questions.map(() => correct));
+    expect(getHistory()).toHaveLength(historyCount);
+    expect(getQuizSignal("accounting-101", concept.id)?.total).toBe(1);
+  });
+
+  it("does not let a quiz signal stale an in-flight transfer proof", async () => {
+    const first = await assess({
+      courseId: "intro-stats",
+      conceptId: "cii",
+      answer: "Across repeated samples, about 95% of intervals built by this method contain the true mean.",
+    });
+    recordQuizEvidence("intro-stats", [{
+      conceptId: "cii",
+      prompt: "A low-stakes check",
+      selected: "A distractor",
+      correct: false,
+    }]);
+    const transfer = await submitTransfer(
+      first.attemptId,
+      "About 95 of 100 intervals contain the true mean. One realized interval either contains it or does not; 95% describes the method.",
+    );
+    expect(transfer.result).toBe("pass");
   });
 
   it("rejects an unknown quiz", () => {
