@@ -13,8 +13,8 @@ const DEMO: { label: string; name: string; check: UploadCheck }[] = [
 ];
 
 /** Opens the file picker and posts the image to the upload check. The demo items only render in DEMO_MODE. */
-export function AddFileMenu({ conceptId, demo, disabled, onChecked, onError, buttonClassName }: {
-  conceptId: string; demo: boolean; disabled?: boolean; onChecked: (c: Checked) => void; onError: (message: string) => void; buttonClassName?: string;
+export function AddFileMenu({ conceptId, demo, disabled, onChecked, onError, buttonClassName, iconOnly }: {
+  conceptId: string; demo: boolean; disabled?: boolean; onChecked: (c: Checked) => void; onError: (message: string) => void; buttonClassName?: string; /** Icon-only round button for the composer. */ iconOnly?: boolean;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
@@ -39,9 +39,10 @@ export function AddFileMenu({ conceptId, demo, disabled, onChecked, onError, but
       <button
         type="button" aria-haspopup="menu" aria-expanded={open} disabled={disabled || busy}
         onClick={() => (demo ? setOpen((o) => !o) : input.current?.click())}
-        className={buttonClassName ?? "flex cursor-pointer items-center gap-1.5 rounded-sm border border-line bg-surface px-2.5 py-[7px] text-xs font-semibold text-ink-2 hover:bg-surface-hover disabled:opacity-50"}
+        aria-label={iconOnly ? "Add file" : undefined} title={iconOnly ? "Add a photo of your work" : undefined}
+        className={buttonClassName ?? (iconOnly ? "flex size-9 cursor-pointer items-center justify-center rounded-full border border-line bg-surface text-ink-3 hover:bg-surface-hover disabled:opacity-50" : "flex cursor-pointer items-center gap-1.5 rounded-sm border border-line bg-surface px-2.5 py-[7px] text-xs font-semibold text-ink-2 hover:bg-surface-hover disabled:opacity-50")}
       >
-        <Paperclip size={14} strokeWidth={2} aria-hidden />{busy ? "Checking..." : "Add file"}
+        <Paperclip size={14} strokeWidth={2} aria-hidden />{iconOnly ? (busy ? <span className="sr-only">Checking...</span> : null) : busy ? "Checking..." : "Add file"}
       </button>
       {open && (
         <div role="menu" className="absolute bottom-full left-0 z-10 mb-1.5 w-60 rounded-md border border-line bg-surface p-1 shadow-[0_8px_24px_rgba(0,0,0,0.10)]">

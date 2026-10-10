@@ -1,12 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useSettings } from "@proveit/lib/settings";
 import { useVoiceSupport } from "../voice/speech";
-import { buttonStyles } from "../Button";
-import { cn } from "@proveit/lib/cn";
+import { TalkSession } from "../voice/TalkSession";
+import { Typing } from "../chat/Typing";
 import { Log } from "../shell/Log";
 import { Composer, type Status } from "../shell/Composer";
 import { AssistantMessage } from "../chat/AssistantMessage";
@@ -14,7 +13,7 @@ import { UserBubble } from "../chat/UserBubble";
 import { ClarificationCard, QuestionCard } from "./QuestionCard";
 import { AddFileMenu } from "../upload/AddFileMenu";
 import { UploadReply, type UploadState } from "../upload/UploadReply";
-import { Mic, Paperclip, X } from "lucide-react";
+import { Paperclip, X } from "lucide-react";
 import { api } from "@proveit/lib/api";
 import type { QuestionView } from "@proveit/server/store";
 
@@ -33,6 +32,7 @@ export function PracticeFlow({ courseId, question, resume, uploads, modeParam }:
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
   const [upload, setUpload] = useState<UploadState | null>(null);
+  const [talking, setTalking] = useState(false);
 
   // "Answer by: Talk" in Settings opens voice mode first, unless the student just chose typing.
   useEffect(() => {
@@ -67,6 +67,8 @@ export function PracticeFlow({ courseId, question, resume, uploads, modeParam }:
     }
   }
 
+  if (talking) return <TalkSession courseId={courseId} question={question} onExit={() => setTalking(false)} />;
+
   return (
     <>
       <Log>
@@ -77,23 +79,22 @@ export function PracticeFlow({ courseId, question, resume, uploads, modeParam }:
             <AssistantMessage><ClarificationCard text={t.followUp} /></AssistantMessage>
           </div>
         ))}
+        {status === "evaluating" && <AssistantMessage><Typing /></AssistantMessage>}
         {upload && <UploadReply upload={upload} onRetry={() => { setUpload(null); document.querySelector<HTMLInputElement>("input[type=file]")?.click(); }} onDismiss={() => setUpload(null)} />}
       </Log>
       <Composer
         value={answer} onChange={setAnswer} onSubmit={submit} status={status} error={error}
         placeholder={turns.length ? "Your next answer" : "Explain it in your own words"}
+        onTalk={() => setTalking(true)} talkUnavailable={!canTalk}
         leading={(
-          <div className="flex gap-1.5">
-            {canTalk && (
-              <Link href={`${pathname}?mode=speak`} className={cn(buttonStyles({ variant: "secondary", size: "sm" }), "gap-1.5 py-[7px] font-semibold")}><Mic size={14} strokeWidth={2} aria-hidden />Talk it through</Link>
-            )}
-            <button type="button" onClick={dontKnow} disabled={status === "evaluating"} className={cn(buttonStyles({ variant: "secondary", size: "sm" }), "py-[7px] font-semibold")}>I don&apos;t know yet</button>
+          <>
             {uploads.enabled && <AddFileMenu
-            conceptId={question.conceptId} demo={uploads.demo} disabled={status === "evaluating"}
-            onError={(m) => { setError(m); }}
-            onChecked={({ name, check }) => { setError(null); setUpload({ name, ok: check.is_student_work && check.relevant, summary: check.summary, reason: check.reason || "That upload doesn't look like your own work on this question." }); }}
-          />}
-          </div>
+              iconOnly conceptId={question.conceptId} demo={uploads.demo} disabled={status === "evaluating"}
+              onError={(m) => { setError(m); }}
+              onChecked={({ name, check }) => { setError(null); setUpload({ name, ok: check.is_student_work && check.relevant, summary: check.summary, reason: check.reason || "That upload doesn't look like your own work on this question." }); }}
+            />}
+            <button type="button" onClick={dontKnow} disabled={status === "evaluating"} className="h-9 cursor-pointer rounded-full border border-line bg-surface px-3.5 text-xs font-medium text-ink-3 transition-colors hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-50">I don&apos;t know yet</button>
+          </>
         )}
         chip={upload?.ok && (
           <span className="flex w-fit items-center gap-1.5 rounded-full border border-mastered-line bg-mastered-bg px-2.5 py-0.5 text-[11px] text-mastered-text">

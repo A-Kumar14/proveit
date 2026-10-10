@@ -1,5 +1,5 @@
 import type { z } from "zod";
-import { ApiError, AssessResult, ClarifyResult, CourseCompleteResult, Ok, TransferResult, UploadCheck, type AssessInput } from "./schemas";
+import { ApiError, AssessResult, AuditResult, ConverseResult, ClarifyResult, CourseCompleteResult, Ok, TransferResult, UploadCheck, type AssessInput, type ConverseInput } from "./schemas";
 
 /** Client side of the API. Components call these; the route handlers behind them are the backend seam. */
 async function post<T>(url: string, body: unknown, schema: z.ZodType<T>): Promise<T> {
@@ -33,6 +33,8 @@ export const api = {
   disconnectCalendar: () => post("/api/calendar/disconnect", {}, Ok),
   setCoursesCompleted: (ids: string[], completed: boolean) => post("/api/courses/complete", { ids, completed }, CourseCompleteResult),
   assess: (input: AssessInput) => post("/api/assess", input, AssessResult),
+  converse: (input: ConverseInput) => post("/api/converse", input, ConverseResult),
+  audit: (input: ConverseInput) => post("/api/audit", input, AuditResult),
   clarify: (attemptId: string) => post("/api/clarify", { attemptId }, ClarifyResult),
   transfer: (attemptId: string, answer: string) => post("/api/transfer", { attemptId, answer }, TransferResult),
 };

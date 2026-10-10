@@ -111,3 +111,31 @@ export const UploadCheck = z.object({
   reason: z.string(),
 });
 export type UploadCheck = z.infer<typeof UploadCheck>;
+
+// ---- spoken conversation ----
+
+export const Turn = z.object({ role: z.enum(["ai", "student"]), text: z.string().trim().min(1).max(2000) });
+export type Turn = z.infer<typeof Turn>;
+
+/** The first turn is the question the AI asked. Student and AI turns then alternate. */
+export const ConverseInput = z.object({
+  courseId: z.string(),
+  conceptId: z.string(),
+  turns: z.array(Turn).min(2).max(20),
+});
+export type ConverseInput = z.infer<typeof ConverseInput>;
+export const ConverseResult = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("ask"), text: z.string() }),
+  z.object({ kind: z.literal("done") }),
+]);
+export type ConverseResult = z.infer<typeof ConverseResult>;
+
+export const AuditResult = z.object({
+  attemptId: z.string(),
+  verdict: z.enum(["correct", "incorrect", "uncertain"]),
+  /** Every quote is an exact phrase from what the student said. */
+  right: z.array(z.object({ quote: z.string(), note: z.string() })),
+  off: z.array(z.object({ quote: z.string(), note: z.string(), fix: z.string() })),
+  missing: z.array(z.string()),
+});
+export type AuditResult = z.infer<typeof AuditResult>;
