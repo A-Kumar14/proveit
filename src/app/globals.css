@@ -79,6 +79,17 @@ body {
 .wv { animation: wave 1s ease-in-out infinite; transform-origin: center; }
 .br { animation: breathe 1.6s ease-in-out infinite; }
 
+/* Course ticker: three identical copies, shifted by exactly one copy so the loop has no seam. */
+@keyframes ticker-right { from { transform: translateX(-33.3333%); } to { transform: translateX(0); } }
+.ticker-track { animation: ticker-right var(--ticker-duration, 45s) linear infinite; }
+.ticker:hover .ticker-track, .ticker:focus-within .ticker-track, .ticker[data-paused="true"] .ticker-track { animation-play-state: paused; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ticker { overflow-x: auto; }
+  .ticker-track { animation: none; transform: none; }
+  .ticker [data-copy="dup"] { display: none; }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
     animation: none !important;

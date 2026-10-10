@@ -11,7 +11,7 @@ vi.mock("@proveit/lib/api", () => ({ api: { setCoursesCompleted: (...a: unknown[
 
 import { CoursesTable } from "./CoursesTable";
 
-const row = (over: Partial<CourseRow>): CourseRow => ({ id: "x", name: "X", pct: 10, proven: 1, total: 10, needsWork: 0, completed: false, manual: false, openMisconception: null, ...over });
+const row = (over: Partial<CourseRow>): CourseRow => ({ id: "x", name: "X", pct: 10, proven: 1, total: 10, needsWork: 0, inProgress: 0, notStarted: 0, next: null, completed: false, manual: false, openMisconception: null, ...over });
 const stats = row({ id: "stats", name: "Intro Statistics", pct: 42 });
 const algebra = row({ id: "algebra", name: "Linear Algebra", pct: 100, proven: 8, total: 8, completed: true });
 

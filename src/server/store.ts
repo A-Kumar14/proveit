@@ -24,7 +24,7 @@ type Attempt = {
   previousState: MasteryState; failedTransfers: number; createdAt: number;
 };
 /** `completedOverride` is the student's own call. null means derive it from the concepts. */
-type Course = { id: string; name: string; deadline: string; concepts: Concept[]; edges: [string, string][]; files: CourseFile[]; completedOverride: boolean | null };
+type Course = { id: string; name: string; deadline: string; concepts: Concept[]; edges: [string, string][]; files: CourseFile[]; completedOverride: boolean | null; /** ISO date of the next quiz, if any. */ examDate: string | null };
 /** `course` is the one being worked on. `samples` are finished courses that only fill the sidebar and map views. */
 type Db = { course: Course; samples: Course[]; attempts: Attempt[]; provenDays: Set<string>; seq: number };
 
@@ -54,39 +54,53 @@ function seed(): Db {
         c("err", "Type I / Type II errors", "Error types", U4, "The two ways a test can be wrong, and the trade-off between them.", 420, 258, "not_started", null, app(0, 0)),
       ],
       completedOverride: null,
+      examDate: "2026-10-15",
       files: [{ name: "OpenStax Introductory Statistics 2e", kind: "Textbook, CC BY 4.0", detail: "Source for all 12 concepts and the misconceptions they carry." }],
       edges: [["pop", "par"], ["par", "se"], ["var", "se"], ["var", "par"], ["se", "moe"], ["size", "moe"], ["clt", "cic"], ["moe", "cic"], ["cic", "cii"], ["cic", "pv"], ["nul", "pv"], ["pv", "err"]],
     },
-    samples: [sampleCompletedCourse()],
+    samples: [sampleLinearAlgebra(), samplePersonalFinance()],
     attempts: [],
     provenDays: new Set(),
     seq: 0,
   };
 }
 
-/** Sample data so the Completed group has something in it. Every concept is Mastered, so it never needs practice. */
-function sampleCompletedCourse(): Course {
-  const done = (id: string, name: string, short: string, unit: string, desc: string, x: number, y: number): Concept => ({
-    id, name, short, unit, desc, x, y, state: "mastered", skills: M, evidence: app(3, 3, true), nextReview: null,
-  });
-  const U1 = "01 VECTORS", U2 = "02 MATRICES", U3 = "03 SYSTEMS", U4 = "04 EIGEN";
-  return {
-    id: "linear-algebra", name: "Linear Algebra", deadline: "Completed Aug 14",
-    concepts: [
-      done("la-vec", "Vectors and span", "Vectors", U1, "Combine vectors and describe everything they can reach.", 60, 72),
-      done("la-ind", "Linear independence", "Independence", U1, "Tell when a set of vectors adds no new direction.", 60, 165),
-      done("la-mat", "Matrix operations", "Matrices", U2, "Add, scale and multiply matrices, and know when each is defined.", 180, 72),
-      done("la-inv", "Inverses", "Inverses", U2, "Undo a matrix, and know when that is impossible.", 180, 165),
-      done("la-sys", "Solving systems", "Systems", U3, "Row reduce to find every solution of a linear system.", 300, 72),
-      done("la-det", "Determinants", "Determinants", U3, "Read invertibility and area scaling from one number.", 300, 165),
-      done("la-eig", "Eigenvalues", "Eigenvalues", U4, "Find the directions a matrix only stretches.", 420, 72),
-      done("la-dia", "Diagonalization", "Diagonalize", U4, "Rewrite a matrix in the basis of its eigenvectors.", 420, 165),
-    ],
-    edges: [["la-vec", "la-ind"], ["la-vec", "la-mat"], ["la-ind", "la-inv"], ["la-mat", "la-sys"], ["la-inv", "la-det"], ["la-sys", "la-eig"], ["la-det", "la-dia"], ["la-eig", "la-dia"]],
-    completedOverride: null,
-    files: [{ name: "Sample syllabus.pdf", kind: "Sample", detail: "Placeholder so the completed-course sidebar group has data to show." }],
-  };
+/** Sample courses so the sidebar, Courses page and dashboard have more than one course. They can be opened but not practiced. */
+type SampleSpec = [id: string, name: string, short: string, unit: string, desc: string, state: MasteryState];
+function sampleCourse(id: string, name: string, deadline: string, examDate: string | null, units: string[], spec: SampleSpec[], file: CourseFile): Course {
+  const concepts = spec.map(([cid, cname, short, unit, desc, state], i): Concept => ({
+    id: cid, name: cname, short, unit, desc, state, x: 60 + 120 * units.indexOf(unit), y: i % 2 === 0 ? 72 : 165,
+    skills: state === "mastered" ? M : state === "developing" || state === "provisional" ? D : null,
+    evidence: state === "mastered" ? app(3, 3, true) : state === "not_started" ? app(0, 0) : app(1, 1), nextReview: null,
+  }));
+  return { id, name, deadline, examDate, concepts, edges: concepts.slice(1).map((c, i) => [concepts[i]!.id, c.id] as [string, string]), files: [file], completedOverride: null };
 }
+
+const sampleFile = (what: string): CourseFile => ({ name: "Sample syllabus.pdf", kind: "Sample", detail: `Placeholder so ${what} has data to show.` });
+
+const sampleLinearAlgebra = () => sampleCourse("linear-algebra", "Linear Algebra", "Completed Aug 14", null,
+  ["01 VECTORS", "02 MATRICES", "03 SYSTEMS", "04 EIGEN"], [
+    ["la-vec", "Vectors and span", "Vectors", "01 VECTORS", "Combine vectors and describe everything they can reach.", "mastered"],
+    ["la-ind", "Linear independence", "Independence", "01 VECTORS", "Tell when a set of vectors adds no new direction.", "mastered"],
+    ["la-mat", "Matrix operations", "Matrices", "02 MATRICES", "Add, scale and multiply matrices, and know when each is defined.", "mastered"],
+    ["la-inv", "Inverses", "Inverses", "02 MATRICES", "Undo a matrix, and know when that is impossible.", "mastered"],
+    ["la-sys", "Solving systems", "Systems", "03 SYSTEMS", "Row reduce to find every solution of a linear system.", "mastered"],
+    ["la-det", "Determinants", "Determinants", "03 SYSTEMS", "Read invertibility and area scaling from one number.", "mastered"],
+    ["la-eig", "Eigenvalues", "Eigenvalues", "04 EIGEN", "Find the directions a matrix only stretches.", "mastered"],
+    ["la-dia", "Diagonalization", "Diagonalize", "04 EIGEN", "Rewrite a matrix in the basis of its eigenvectors.", "mastered"],
+  ], sampleFile("the completed-course group"));
+
+const samplePersonalFinance = () => sampleCourse("personal-finance", "Personal Finance 101", "Quiz Friday, Oct 23", "2026-10-23",
+  ["01 BASICS", "02 CREDIT", "03 GROWTH", "04 PLANNING"], [
+    ["pf-bud", "Budgeting basics", "Budgeting", "01 BASICS", "Track income and spending against a plan.", "mastered"],
+    ["pf-emg", "Emergency fund", "Emergency", "01 BASICS", "Size a cash buffer and decide where to keep it.", "mastered"],
+    ["pf-crs", "Credit scores", "Credit", "02 CREDIT", "What moves a score, and what a lender reads from it.", "mastered"],
+    ["pf-dbt", "Debt payoff", "Debt", "02 CREDIT", "Compare avalanche and snowball payoff orders.", "developing"],
+    ["pf-cmp", "Compound interest", "Compound", "03 GROWTH", "How interest on interest grows a balance over time.", "provisional"],
+    ["pf-idx", "Index funds", "Index funds", "03 GROWTH", "Why low-fee broad funds beat most stock picking.", "developing"],
+    ["pf-tax", "Taxes 101", "Taxes", "04 PLANNING", "Marginal rates, deductions and what a paycheck withholds.", "not_started"],
+    ["pf-ret", "Retirement accounts", "Retirement", "04 PLANNING", "401(k), IRA and Roth: who gets which tax break.", "not_started"],
+  ], sampleFile("an in-progress sample course"));
 
 const g = globalThis as unknown as { __proveit?: Db };
 const db = (): Db => (g.__proveit ??= seed());
@@ -196,7 +210,7 @@ export function getCourse(courseId: string): CourseView {
     provisional: course.concepts.filter((c) => c.state === "provisional").length,
     total: course.concepts.length,
     needsWork: course.concepts.filter((c) => c.state === "needs_work").length,
-    concepts: course.concepts.map((c) => ({ id: c.id, name: c.name, short: c.short, unit: c.unit, desc: c.desc, x: c.x, y: c.y, state: c.state, dims: dimsFor(c), evidence: evidenceText(c), cta: active ? ctaFor(c) : { label: "Course completed", href: null } })),
+    concepts: course.concepts.map((c) => ({ id: c.id, name: c.name, short: c.short, unit: c.unit, desc: c.desc, x: c.x, y: c.y, state: c.state, dims: dimsFor(c), evidence: evidenceText(c), cta: active ? ctaFor(c) : { label: c.state === "mastered" ? "Mastered" : "Not in the demo yet", href: null } })),
     edges: course.edges,
     nextUp: next ? { id: next.id, name: next.name } : null,
   };
@@ -456,8 +470,8 @@ export function getReviewBase(courseId: string): ReviewBase {
     facts,
     fallback: {
       misconceptions: facts.map((f) => ({ concept: f.concept, misconception: f.misconception })),
-      biggestRisk: { reason: active ? d.risk?.reason ?? "No open misconceptions right now." : "No open misconceptions. Every concept is mastered." },
-      recommendation: active ? d.recommendation : "This course is complete. Come back for reviews when they are due.",
+      biggestRisk: { reason: active ? d.risk?.reason ?? "No open misconceptions right now." : "No open misconceptions in this sample course." },
+      recommendation: active ? d.recommendation : isCompleted(course) ? "This course is complete. Come back for reviews when they are due." : "This sample course can't be practiced in the demo yet.",
       nextActions: active ? d.nextActions.map((a) => a.label) : [],
     },
   };
@@ -519,6 +533,7 @@ export function getFiles(courseId: string): { courseName: string; files: CourseF
 
 export type CourseRow = {
   id: string; name: string; pct: number; proven: number; total: number; needsWork: number;
+  /** Developing or provisional: started, not yet mastered. */ inProgress: number; notStarted: number; next: string | null;
   completed: boolean; /** true when the student set it, false when every concept got Mastered on its own */ manual: boolean;
   openMisconception: string | null;
 };
@@ -532,6 +547,9 @@ export function listCourses(): CourseRow[] {
       id: c.id, name: c.name, pct: coursePct(c.concepts),
       proven: c.concepts.filter((x) => x.state === "mastered").length, total: c.concepts.length,
       needsWork: c.concepts.filter((x) => x.state === "needs_work").length,
+      inProgress: c.concepts.filter((x) => x.state === "developing" || x.state === "provisional").length,
+      notStarted: c.concepts.filter((x) => x.state === "not_started").length,
+      next: (c === course ? nextConcept() : null)?.name ?? c.concepts.find((x) => x.state !== "mastered")?.name ?? null,
       completed: isCompleted(c), manual: c.completedOverride !== null,
       openMisconception: last || null,
     };
@@ -543,4 +561,47 @@ export function setCoursesCompleted(ids: string[], completed: boolean): string[]
   const found = ids.map((id) => courseFor(id));
   for (const c of found) c.completedOverride = completed;
   return found.map((c) => c.id);
+}
+
+// ---- dashboard widgets ----
+
+export type DashboardWidgets = {
+  activeCourseId: string;
+  upNext: { concept: string; course: string; state: MasteryState; why: string; href: string } | null;
+  attention: MisconceptionEntry[];
+  reviews: { due: number; upcoming: number; nextWhen: string | null };
+  mastery: { state: MasteryState; count: number }[];
+  week: { streak: number; days: { label: string; iso: string; active: boolean; today: boolean }[] };
+  quizzes: { course: string; href: string; label: string; daysLeft: number }[];
+  recent: HistoryEvent[];
+};
+
+export function getDashboardWidgets(): DashboardWidgets {
+  const { course, samples, provenDays } = db();
+  const next = nextConcept();
+  const reviews = getReviews();
+  const now = new Date();
+  const todayIso = isoDay(now);
+  const upNext = next ? { concept: next.name, course: course.name, state: next.state, why: getQuestion(course.id, next.id).why, href: practiceHref(next) } : null;
+  const all = [course, ...samples].flatMap((c) => c.concepts);
+  const order: MasteryState[] = ["mastered", "provisional", "developing", "needs_work", "not_started"];
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const d = addDays(now, i - 6);
+    return { label: d.toLocaleDateString("en-US", { weekday: "narrow" }), iso: isoDay(d), active: provenDays.has(isoDay(d)), today: isoDay(d) === todayIso };
+  });
+  const quizzes = [course, ...samples].flatMap((c) => {
+    if (!c.examDate || isCompleted(c)) return [];
+    const daysLeft = Math.round((new Date(`${c.examDate}T00:00:00`).getTime() - new Date(`${todayIso}T00:00:00`).getTime()) / 86_400_000);
+    return daysLeft < 0 ? [] : [{ course: c.name, href: `/course/${c.id}`, label: c.deadline, daysLeft }];
+  }).sort((a, b) => a.daysLeft - b.daysLeft);
+  return {
+    activeCourseId: course.id,
+    upNext,
+    attention: getMisconceptionLog(course.id).filter((m) => m.open).slice(0, 3),
+    reviews: { due: reviews.due.length, upcoming: reviews.upcoming.length, nextWhen: reviews.due[0]?.when ?? reviews.upcoming[0]?.when ?? null },
+    mastery: order.map((state) => ({ state, count: all.filter((c) => c.state === state).length })),
+    week: { streak: streak(), days },
+    quizzes,
+    recent: getHistory().slice(0, 4),
+  };
 }

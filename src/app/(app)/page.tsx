@@ -2,35 +2,48 @@ import Link from "next/link";
 import { Plus } from "lucide-react";
 import { AppShell } from "@proveit/app/_components/shell/AppShell";
 import { AddCourseModal } from "@proveit/app/_components/shell/AddCourseModal";
-import { Log } from "@proveit/app/_components/shell/Log";
-import { AssistantMessage } from "@proveit/app/_components/chat/AssistantMessage";
-import { ChipRow } from "@proveit/app/_components/chat/ChipRow";
 import { buttonStyles } from "@proveit/app/_components/Button";
-import { ReviewCard } from "@proveit/app/_components/mastery/ReviewCard";
-import { getCourse, getDashboard, getReviews } from "@proveit/server/store";
+import { CourseTicker } from "@proveit/app/_components/dashboard/CourseTicker";
+import { TickerCard } from "@proveit/app/_components/dashboard/TickerCard";
+import { DueForReview, MasteryOverview, NeedsAttention, RecentActivity, StudyWeek, UpNext, UpcomingQuizzes } from "@proveit/app/_components/dashboard/Widgets";
+import { getCourse, getDashboard, getDashboardWidgets, listCourses } from "@proveit/server/store";
 
 export const dynamic = "force-dynamic";
 
 export default async function Dashboard({ searchParams }: PageProps<"/">) {
   const { add } = await searchParams;
-  const d = getDashboard();
-  const c = d.courses[0];
-  const chips = [
-    ...(c ? [{ label: `How am I doing in ${c.name}?`, href: `/course/${c.id}/tutor` }] : []),
-    ...(getReviews().due.length > 0 ? [{ label: "Start my reviews", href: "/review" }] : []),
-    { label: "Add a course", href: "/?add=1" },
-  ];
+  const head = getDashboard();
+  const courses = listCourses();
+  const widgets = getDashboardWidgets();
+  const demo = courses[0];
   return (
     <AppShell
       active="dashboard"
-      crumbs={[{ label: d.greeting }, { label: d.dateLabel }]}
+      crumbs={[{ label: head.greeting }, { label: head.dateLabel }]}
       right={<Link href="/?add=1" className={buttonStyles({ size: "md" })}><Plus size={13} strokeWidth={2.4} aria-hidden />Add a course</Link>}
     >
-      <Log>
-        <AssistantMessage><ReviewCard d={d} /></AssistantMessage>
-      </Log>
-      <ChipRow chips={chips} />
-      {add && c && <AddCourseModal demoCourseId={c.id} demoConcepts={getCourse(c.id).total} />}
+      <div className="min-h-0 flex-1 overflow-y-auto px-7 py-6">
+        <div className="flex flex-col gap-8">
+          <section aria-labelledby="courses-heading" className="flex flex-col gap-3">
+            <div className="flex items-baseline justify-between">
+              <h1 id="courses-heading" className="m-0 text-[22px] font-semibold">Courses</h1>
+              <Link href="/courses" className="text-xs text-ink-muted no-underline hover:text-ink">View all and manage</Link>
+            </div>
+            <CourseTicker count={courses.length}>{courses.map((c) => <TickerCard key={c.id} c={c} />)}</CourseTicker>
+          </section>
+
+          <div className="grid grid-cols-2 gap-4">
+            <UpNext d={widgets} />
+            <NeedsAttention d={widgets} />
+            <DueForReview d={widgets} />
+            <MasteryOverview d={widgets} />
+            <UpcomingQuizzes d={widgets} />
+            <StudyWeek d={widgets} />
+            <RecentActivity d={widgets} />
+          </div>
+        </div>
+      </div>
+      {add && demo && <AddCourseModal demoCourseId={demo.id} demoConcepts={getCourse(demo.id).total} />}
     </AppShell>
   );
 }

@@ -32,7 +32,7 @@ Status as of the last push to `main`. Tick items as they land.
 - [ ] Add source retrieval and citations so "Rule from course material" points at real text
 - [ ] Have the model word the lesson, then show the "Wording by AI" tag
 - [ ] Build course upload and concept extraction (the Add a course modal is disabled)
-- [ ] Make the sample Linear Algebra course real, or remove it before the demo (it is placeholder data)
+- [ ] Make the sample Linear Algebra and Personal Finance 101 courses real, or remove them before the demo (placeholder data)
 - [ ] Let the store run practice for more than one active course (only Intro Statistics is practicable)
 - [ ] Decide on the free-text tutor chat (needs a chat backend), or leave it out
 
@@ -82,6 +82,7 @@ Status as of the last push to `main`. Tick items as they land.
 - [x] Upload check with the "not your work" rejection path
 - [x] Voice mode with transcript review, Sketch, Camera and Add file
 - [x] Store, evaluator and upload route tests (23)
+- [x] Dashboard with a scrolling course ticker and seven widgets (up next, needs attention, due for review, mastery overview, upcoming quizzes, study week, recent activity)
 - [x] Courses page with filters, row selection, batch and right-click "Mark as completed"
 - [x] Sidebar splits courses into In progress and Completed, with a sample completed course
 - [x] Repo on GitHub, `main` up to date
