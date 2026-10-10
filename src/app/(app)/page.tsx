@@ -11,7 +11,7 @@ import { TodoCard } from "@proveit/app/_components/dashboard/TodoCard";
 import { RankCard } from "@proveit/app/_components/dashboard/RankCard";
 import { RankChip } from "@proveit/app/_components/dashboard/RankChip";
 import { getScheduledTodos, getSchedule } from "@proveit/server/schedule";
-import { getDashboard, getRewards, listCourses } from "@proveit/server/store";
+import { getCourse, getDashboard, getRewards, listCourses } from "@proveit/server/store";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +20,7 @@ export default async function Dashboard({ searchParams }: PageProps<"/">) {
   const head = getDashboard();
   const courses = listCourses();
   const rewards = getRewards();
+  const demo = courses.find((c) => c.id === "intro-stats");
   return (
     <AppShell
       active="dashboard"
@@ -28,7 +29,7 @@ export default async function Dashboard({ searchParams }: PageProps<"/">) {
     >
       <div className="min-h-0 flex-1 overflow-y-auto px-7 py-6">
         <div className="flex flex-col gap-8">
-          <RankCard r={rewards} previewable={false} />
+          <RankCard r={rewards} previewable />
 
           <section aria-labelledby="courses-heading" className="flex flex-col gap-3">
             <div className="flex items-baseline justify-between">
@@ -45,7 +46,7 @@ export default async function Dashboard({ searchParams }: PageProps<"/">) {
 
         </div>
       </div>
-      {add && <AddCourseModal />}
+      {add && demo && <AddCourseModal demoCourseId={demo.id} demoConcepts={getCourse(demo.id).total} />}
       {connect && <ConnectCalendarModal closeHref="/" />}
     </AppShell>
   );
