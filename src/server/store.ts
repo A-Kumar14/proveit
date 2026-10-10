@@ -469,10 +469,9 @@ export function getDashboard(): DashboardView {
 
 export type QuestionView = { courseName: string; conceptId: string; conceptName: string; state: MasteryState; prompt: string; why: string; probe: string; source: string };
 export function getQuestion(courseId: string, conceptId: string): QuestionView {
-  assertCourse(courseId);
-  const c = concept(conceptId);
-  const a = AUTHORED[conceptId];
-  if (!a) throw new NotFoundError(`no question for ${conceptId}`);
+  const course = courseFor(courseId);
+  const c = conceptFor(courseId, conceptId);
+  const spec = specFor(courseId, conceptId);
   const skills = c.skills ?? [];
   const weak = [...skills].filter((s) => s.label !== "New-question test").sort((x, y) => x.pct - y.pct)[0];
   const strong = [...skills].filter((s) => s.label !== "New-question test").sort((x, y) => y.pct - x.pct)[0];
@@ -480,16 +479,29 @@ export function getQuestion(courseId: string, conceptId: string): QuestionView {
     c.state === "not_started" ? "You haven't been tested on this yet, so this question sets your starting point."
     : weak && strong && weak !== strong && strong.pct - weak.pct >= 30 ? `${strong.label} is at ${strong.pct}% but ${weak.label} is at ${weak.pct}%, so this checks the meaning, not the mechanics.`
     : "Your answers so far are only partly right. This checks whether the idea holds up in your own words.";
-  return { courseName: db().course.name, conceptId, conceptName: c.name, state: c.state, prompt: a.question, why, probe: a.probe, source: a.lesson.rule?.replace("Rule from course material, ", "") ?? "your course material" };
+  const firstSource = spec.sources.find((source) => spec.assessment.sourceIds.includes(source.id));
+  return {
+    courseName: course.name,
+    conceptId,
+    conceptName: c.name,
+    state: c.state,
+    prompt: spec.assessment.question,
+    why,
+    probe: spec.assessment.probe,
+    source: firstSource?.title ?? "your course material",
+  };
+}
+
+/** Generate runtime-course content on demand, then return the same question view used for authored content. */
+export async function ensureQuestion(courseId: string, conceptId: string): Promise<QuestionView> {
+  await ensureConceptLearningSpec(courseId, conceptId);
+  return getQuestion(courseId, conceptId);
 }
 
 // ---- assess / diagnose ----
 
 export async function assess(input: AssessInput): Promise<AssessResult> {
-  assertCourse(input.courseId);
-  const c = concept(input.conceptId);
-  const a = AUTHORED[c.id];
-  if (!a) throw new NotFoundError(`no content for ${c.id}`);
+  const c = conceptFor(input.courseId, input.conceptId);
 
   const parent = input.followUpTo ? attempt(input.followUpTo) : null;
   if (parent && (parent.courseId !== input.courseId || parent.conceptId !== input.conceptId)) {
@@ -497,55 +509,90 @@ export async function assess(input: AssessInput): Promise<AssessResult> {
   }
   if (parent && !parent.evaluation) throw new InvalidAttemptLinkError("follow-up parent has no diagnosable response");
   if (parent && rootHasPassedTransfer(parent.rootAttemptId)) throw new InvalidAttemptLinkError("learning episode is already complete");
-  if (parent && !rootIsCurrentForConcept(parent.conceptId, parent.rootAttemptId)) throw new InvalidAttemptLinkError("follow-up episode is stale");
+  if (parent && !rootIsCurrentForConcept(parent.conceptId, parent.rootAttemptId, parent.courseId)) {
+    throw new InvalidAttemptLinkError("follow-up episode is stale");
+  }
   if (parent && latestEvaluatedInRoot(parent.rootAttemptId)?.id !== parent.id) {
     throw new InvalidAttemptLinkError("follow-up parent is stale");
   }
 
+  // Clarifications stay on the exact learning-spec revision that produced the original diagnosis.
+  const spec = parent ? specForAttempt(parent) : await ensureConceptLearningSpec(input.courseId, input.conceptId);
   const previousState = c.state;
   const judged = input.imageSummary ? `${input.answer}\n\n[Student's attached work, transcribed] ${input.imageSummary}` : input.answer;
-  const j = await judgeAnswer(c.id, judged, parent ? answerContext(parent) : undefined);
-  // Recheck after the async evaluator so two simultaneous follow-ups cannot both mutate the episode.
-  if (parent && (!rootIsCurrentForConcept(parent.conceptId, parent.rootAttemptId) || latestEvaluatedInRoot(parent.rootAttemptId)?.id !== parent.id)) {
+  const j = await judgeAnswerForSpec(spec, judged, parent ? answerContext(parent) : undefined);
+
+  // Recheck after the async evaluator so stale/concurrent requests cannot mutate a replaced course or episode.
+  if (conceptFor(input.courseId, input.conceptId) !== c) {
+    throw new InvalidAttemptLinkError("course state changed while evaluating");
+  }
+  if (parent && (
+    !rootIsCurrentForConcept(parent.conceptId, parent.rootAttemptId, parent.courseId) ||
+    latestEvaluatedInRoot(parent.rootAttemptId)?.id !== parent.id
+  )) {
     throw new InvalidAttemptLinkError("follow-up parent became stale");
   }
+
   const base: Evaluation = {
     verdict: j.verdict, errorType: "none", misconceptionId: null, misconceptionName: null, evidenceQuote: null, gapSentence: null,
     skills: [], votes: j.votes, followUp: null, recommendation: "",
   };
-  const diagnosed = j.misconceptionId ? a.misconceptions.find((m) => m.id === j.misconceptionId) ?? null : null;
+  const diagnosed = misconceptionForSpec(spec, j.misconceptionId);
   let evaluation: Evaluation;
   if (j.verdict === "uncertain" || (j.verdict === "incorrect" && !diagnosed)) {
-    evaluation = { ...base, verdict: "uncertain", errorType: "uncertain", followUp: "Add one more sentence. Say what the idea applies to, and why.", recommendation: "One more answer would make the diagnosis reliable." };
+    evaluation = {
+      ...base,
+      verdict: "uncertain",
+      errorType: "uncertain",
+      followUp: "Add one more sentence. Say what the idea applies to, and why.",
+      recommendation: "One more answer would make the diagnosis reliable.",
+    };
   } else if (j.verdict === "incorrect") {
-    upsertSkill(c, a.skillOnWrong);
+    upsertSkill(c, spec.skills.onWrong);
     c.state = "needs_work";
     c.evidence.transferPassed = false;
     c.evidence.answers++;
     evaluation = {
-      ...base, errorType: "conceptual", misconceptionId: diagnosed!.id, misconceptionName: diagnosed!.name,
-      evidenceQuote: j.quote && input.answer.includes(j.quote) ? j.quote : null, gapSentence: diagnosed!.gap,
+      ...base,
+      errorType: "conceptual",
+      misconceptionId: diagnosed!.id,
+      misconceptionName: diagnosed!.name,
+      evidenceQuote: j.quote && input.answer.includes(j.quote) ? j.quote : null,
+      gapSentence: diagnosed!.description,
       skills: (c.skills ?? []).filter((s) => s.label !== "New-question test"),
-      recommendation: "A 3-minute lesson on the one idea you missed, then one new question with a different setup.",
+      recommendation: "A short lesson on the one idea you missed, then one new question with a different setup.",
     };
   } else {
-    upsertSkill(c, a.skillOnRight);
+    upsertSkill(c, spec.skills.onRight);
     if (c.state === "not_started" || c.state === "needs_work") c.state = "developing";
     c.evidence.answers++;
     c.evidence.sound++;
-    evaluation = { ...base, skills: (c.skills ?? []).filter((s) => s.label !== "New-question test"), recommendation: "Nodes only turn green after a new-question test. Try a different setup to prove it." };
+    evaluation = {
+      ...base,
+      skills: (c.skills ?? []).filter((s) => s.label !== "New-question test"),
+      recommendation: "Nodes only turn green after a new-question test. Try a different setup to prove it.",
+    };
   }
+
   const rec = recordAttempt({
-    courseId: input.courseId, conceptId: c.id, kind: parent ? "clarification" : "initial", outcome: evaluation.verdict,
-    parentAttemptId: parent?.id ?? null, answer: input.answer, imageName: input.imageSummary ? input.imageName : undefined,
-    evaluation, previousState, createdAt: Date.now(),
+    courseId: input.courseId,
+    conceptId: c.id,
+    kind: parent ? "clarification" : "initial",
+    outcome: evaluation.verdict,
+    parentAttemptId: parent?.id ?? null,
+    learningSpecRevision: spec.revision,
+    answer: input.answer,
+    imageName: input.imageSummary ? input.imageName : undefined,
+    evaluation,
+    previousState,
+    createdAt: Date.now(),
   });
   return { attemptId: rec.id, evaluation };
 }
 
 export type EvidenceAttemptView = {
   id: string; courseId: string; conceptId: string; kind: AttemptKind; outcome: AttemptOutcome;
-  parentAttemptId: string | null; rootAttemptId: string; answer: string; evaluation: Evaluation | null;
+  parentAttemptId: string | null; rootAttemptId: string; learningSpecRevision: number | null; answer: string; evaluation: Evaluation | null;
   previousState: MasteryState; createdAt: number;
 };
 /** Raw evidence view: unlike the diagnosis view, transfer passes and non-diagnostic misses are valid records. */
@@ -553,7 +600,7 @@ export function getEvidenceAttempt(id: string): EvidenceAttemptView {
   const a = attempt(id);
   return {
     id: a.id, courseId: a.courseId, conceptId: a.conceptId, kind: a.kind, outcome: a.outcome,
-    parentAttemptId: a.parentAttemptId, rootAttemptId: a.rootAttemptId, answer: a.answer, evaluation: a.evaluation,
+    parentAttemptId: a.parentAttemptId, rootAttemptId: a.rootAttemptId, learningSpecRevision: a.learningSpecRevision ?? null, answer: a.answer, evaluation: a.evaluation,
     previousState: a.previousState, createdAt: a.createdAt,
   };
 }
@@ -568,16 +615,18 @@ export function getEvidenceTrail(id: string): EvidenceAttemptView[] {
 
 export type AttemptView = {
   id: string; courseId: string; conceptId: string; conceptName: string; question: string; state: MasteryState; answer: string; attachment: string | null; evaluation: Evaluation;
-  kind: AttemptKind; outcome: AttemptOutcome; parentAttemptId: string | null; rootAttemptId: string; createdAt: number;
+  kind: AttemptKind; outcome: AttemptOutcome; parentAttemptId: string | null; rootAttemptId: string; learningSpecRevision: number | null; createdAt: number;
 };
 export function getAttempt(id: string): AttemptView {
   const a = attempt(id);
   if (!a.evaluation) throw new NotFoundError(`attempt ${id} has no evaluation`);
-  const c = concept(a.conceptId);
+  const c = conceptFor(a.courseId, a.conceptId);
+  const spec = specForAttempt(a);
   return {
-    id: a.id, courseId: a.courseId, conceptId: c.id, conceptName: c.name, question: AUTHORED[c.id]?.question ?? "", state: c.state,
+    id: a.id, courseId: a.courseId, conceptId: c.id, conceptName: c.name, question: spec.assessment.question, state: c.state,
     answer: a.answer, attachment: a.imageName ?? null, evaluation: a.evaluation,
-    kind: a.kind, outcome: a.outcome, parentAttemptId: a.parentAttemptId, rootAttemptId: a.rootAttemptId, createdAt: a.createdAt,
+    kind: a.kind, outcome: a.outcome, parentAttemptId: a.parentAttemptId, rootAttemptId: a.rootAttemptId,
+    learningSpecRevision: a.learningSpecRevision ?? spec.revision, createdAt: a.createdAt,
   };
 }
 
@@ -585,7 +634,7 @@ export function clarify(attemptId: string) {
   const a = attempt(attemptId);
   if (!a.evaluation) throw new NotFoundError(`attempt ${attemptId} has no evaluation to clarify`);
   if (rootHasPassedTransfer(a.rootAttemptId)) throw new InvalidAttemptLinkError("learning episode is already complete");
-  if (!rootIsCurrentForConcept(a.conceptId, a.rootAttemptId) || latestEvaluatedInRoot(a.rootAttemptId)?.id !== a.id) {
+  if (!rootIsCurrentForConcept(a.conceptId, a.rootAttemptId, a.courseId) || latestEvaluatedInRoot(a.rootAttemptId)?.id !== a.id) {
     throw new InvalidAttemptLinkError("clarification source is stale");
   }
   return { courseId: a.courseId, conceptId: a.conceptId, followUp: clarificationPromptFor(a) };
