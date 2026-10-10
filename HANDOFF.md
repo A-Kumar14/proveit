@@ -22,7 +22,7 @@ NEXT_PUBLIC_DEMO_MODE=1 pnpm dev          # shows demo upload items and the "Pre
 pnpm typecheck && pnpm lint && pnpm test  # run all three before calling anything done
 ```
 
-Env (see `.env.example`): `GOOGLE_GENERATIVE_AI_API_KEY` (optional), `GEMINI_MODEL` (optional, default `gemini-3.8-flash`), `NEXT_PUBLIC_DEMO_MODE`, `PROVEIT_DATA`. There is a local `.env` the owner edits. Do not read it, print it or commit it.
+Env (see `.env.example`): `OPENROUTER_API_KEY` and `OPENROUTER_MODEL` (OpenRouter wins when set, default `google/gemini-3.8-flash`), `GOOGLE_GENERATIVE_AI_API_KEY` (optional fallback), `GEMINI_MODEL` (optional, default `gemini-3.8-flash`), `NEXT_PUBLIC_DEMO_MODE`, `PROVEIT_DATA`. There is a local `.env` the owner edits. Do not read it, print it or commit it.
 
 Restart the dev server after changing `src/server/store.ts`: state lives on `globalThis.__proveit`, so hot reload keeps stale seed data.
 
