@@ -23,7 +23,7 @@ async function PracticePage({ params, searchParams }: PageProps<"/course/[course
   if (modeParam === "speak") return <VoiceSession courseId={courseId} question={q} typeHref={`/course/${courseId}/practice/${conceptId}?mode=type`} uploads={uploads} />;
   return (
     <AppShell active="practice" courseId={courseId} state={q.state} crumbs={[{ label: q.courseName, href: `/course/${courseId}` }, { label: q.conceptName }]} right={<SwitchToVoice href={`/course/${courseId}/practice/${conceptId}?mode=speak`} />}>
-      <PracticeFlow key={resume?.attemptId ?? "new"} courseId={courseId} question={q} resume={resume} uploads={uploads} modeParam={modeParam} />
+      <PracticeFlow key={resume?.attemptId ?? "new"} courseId={courseId} question={q} resume={resume} uploads={uploads} modeParam={modeParam} guide={aiEnabled()} />
     </AppShell>
   );
 }
