@@ -89,12 +89,17 @@ function demoRuntimeState(): Db {
     const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   };
+  const pop = data.course.concepts.find((c) => c.id === "pop")!;
+  const cic = data.course.concepts.find((c) => c.id === "cic")!;
   const cii = data.course.concepts.find((c) => c.id === "cii")!;
   const se = data.course.concepts.find((c) => c.id === "se")!;
   se.state = "provisional";
   se.skills = [{ label: "Application", pct: 85 }, { label: "New-question test", pct: 90 }, { label: "Retention", pct: 55 }];
   se.evidence = app(3, 2, true);
   se.nextReview = day(0);
+  pop.skills = [...(pop.skills ?? []), { label: "Retention", pct: 90 }];
+  pop.evidence = app(4, 4, true);
+  pop.nextReview = day(7);
 
   const ciAnswer = "It means there's a 95% probability that the true population mean is inside our interval.";
   const seWrong = "The bigger sample has more standard error because there is more data that can vary.";
@@ -135,11 +140,29 @@ function demoRuntimeState(): Db {
         recommendation: "Prove it on a materially different question before calling it mastered.",
       },
     },
+    {
+      id: "a5", courseId: "intro-stats", conceptId: "pop", kind: "review", outcome: "pass",
+      parentAttemptId: null, rootAttemptId: "a5",
+      answer: "A population is the whole group we want to reason about; a sample is the observed subset we actually measured.",
+      previousState: "provisional", createdAt: base + 240_000, evaluation: null,
+    },
+    {
+      id: "a6", courseId: "intro-stats", conceptId: "cic", kind: "initial", outcome: "uncertain",
+      parentAttemptId: null, rootAttemptId: "a6",
+      answer: "You take the estimate and add something around it, but I am not sure exactly what controls that amount.",
+      previousState: "developing", createdAt: base + 300_000,
+      evaluation: {
+        verdict: "uncertain", errorType: "uncertain", misconceptionId: null, misconceptionName: null, evidenceQuote: null, gapSentence: null,
+        skills: cic.skills ?? [{ label: "Application", pct: 60 }], votes: { agree: 1, of: 3 },
+        followUp: "What two ingredients determine the distance from the point estimate to either confidence-interval endpoint?",
+        recommendation: "Give one more precise answer before mastery changes.",
+      },
+    },
   ];
   data.provenDays = new Set([day(-2), day(-1), day(0)]);
   data.taskDone = new Set(["pv"]);
   data.peakPoints = 6000;
-  data.seq = 4;
+  data.seq = 6;
   return data;
 }
 
