@@ -22,6 +22,7 @@ const base: ResultView = {
   segments: ["mastered", "provisional", "developing"],
   coursePct: 50,
   provenLabel: "1 proven + 1 provisional",
+  points: [{ label: "Proved the concept", points: 200 }, { label: "Passed on the first try", points: 50 }],
 };
 
 describe("MasteryChangeCard diagnosis truthfulness", () => {
