@@ -1,0 +1,79 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: var(--font-inter), system-ui, sans-serif;
+
+  --color-ink: #1f1f1f;
+  --color-ink-2: #2b2b2b;
+  --color-ink-3: #4a4a4a;
+  --color-ink-muted: #6b6b6b;
+  --color-ink-faint: #8a8a8a;
+
+  --color-surface: #ffffff;
+  --color-surface-sidebar: #f7f7f7;
+  --color-surface-subtle: #fafafa;
+  --color-surface-hover: #f5f5f5;
+  --color-surface-active: #efefef;
+  --color-surface-strong: #e8e8e8;
+
+  --color-line: #e6e6e6;
+  --color-line-button: #dcdcdc;
+  --color-line-soft: #e3e3e3;
+
+  --color-mastered: #2e9e5b;
+  --color-mastered-text: #23824a;
+  --color-mastered-bg: #eef7f1;
+  --color-mastered-line: #cfe8d7;
+
+  --color-developing: #c98a0c;
+  --color-developing-text: #9a6700;
+  --color-developing-bg: #fbf3e2;
+  --color-developing-line: #efddb3;
+
+  --color-needswork: #d14343;
+  --color-needswork-text: #b53a3a;
+  --color-needswork-bg: #fbeeee;
+  --color-needswork-line: #f0d0d0;
+
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 10px;
+}
+
+@utility eyebrow {
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-ink-muted);
+}
+
+body {
+  margin: 0;
+  background: var(--color-surface);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-ink);
+  outline-offset: 2px;
+}
+
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, #efefef 25%, #f7f7f7 50%, #efefef 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s linear infinite;
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

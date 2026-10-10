@@ -1,0 +1,48 @@
+"use client";
+
+import type { ConceptView } from "@proveit/server/store";
+import { ConceptNode } from "./ConceptNode";
+
+const shortUnit = (u: string) => u.slice(3).replace("CONFIDENCE INTERVALS", "CONF. INTERVALS").replace("HYPOTHESIS TESTING", "HYPOTHESIS");
+
+/** Edge look from the two end states: green when both mastered, red dashed into a needs-work node, faint dashed when untouched. */
+function edgeLook(a: ConceptView, b: ConceptView) {
+  if (a.state === "mastered" && b.state === "mastered") return { stroke: "#2E9E5B", w: 2, dash: undefined };
+  if (b.state === "needs_work" || a.state === "needs_work") return { stroke: "#D14343", w: 2, dash: "6 4" };
+  if (a.state === "not_started" || b.state === "not_started") return { stroke: "#E6E6E6", w: 1.4, dash: "3 4" };
+  return { stroke: "#E6E6E6", w: 1.5, dash: undefined };
+}
+
+function edgePath(a: ConceptView, b: ConceptView) {
+  if (a.x === b.x) {
+    const down = b.y > a.y;
+    return `M${a.x} ${a.y + (down ? 20 : -20)} L${b.x} ${b.y + (down ? -20 : 20)}`;
+  }
+  const x1 = a.x + 20, x2 = b.x - 20, mid = (x1 + x2) / 2;
+  return a.y === b.y ? `M${x1} ${a.y} L${x2} ${b.y}` : `M${x1} ${a.y} C${mid} ${a.y} ${mid} ${b.y} ${x2} ${b.y}`;
+}
+
+export function ConceptGraph({ concepts, edges, selectedId, onSelect }: {
+  concepts: ConceptView[]; edges: [string, string][]; selectedId: string; onSelect: (id: string) => void;
+}) {
+  const byId = new Map(concepts.map((c) => [c.id, c]));
+  const units = [...new Set(concepts.map((c) => c.unit))];
+  return (
+    <div className="relative h-[336px] w-[480px]">
+      <div className="absolute left-0 top-1.5 grid w-[480px] grid-cols-4 text-center text-[10px] tracking-[0.06em] text-ink-faint">
+        {units.map((u) => <span key={u}>{shortUnit(u)}</span>)}
+      </div>
+      <svg width="480" height="336" viewBox="0 0 480 336" aria-hidden className="absolute left-0 top-0">
+        {edges.map(([from, to]) => {
+          const a = byId.get(from), b = byId.get(to);
+          if (!a || !b) return null;
+          const l = edgeLook(a, b);
+          return <path key={`${from}-${to}`} d={edgePath(a, b)} fill="none" stroke={l.stroke} strokeWidth={l.w} strokeDasharray={l.dash} />;
+        })}
+      </svg>
+      {concepts.map((c) => (
+        <ConceptNode key={c.id} id={c.id} name={c.name} short={c.short} x={c.x} y={c.y} state={c.state} selected={c.id === selectedId} onSelect={onSelect} />
+      ))}
+    </div>
+  );
+}
