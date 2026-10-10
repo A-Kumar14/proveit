@@ -10,6 +10,7 @@ import { loadUserJson, saveUserJson } from "./persistence";
 import type { CourseSpec } from "@proveit/lib/courseSpec";
 import type { CalEvent } from "./calendar";
 import { POINTS, STREAK_CAP, standing, TIERS, type Standing } from "@proveit/lib/rewards";
+import { aiEnabled } from "./ai";
 
 /**
  * The course catalog stays in code for the hackathon, while learner state is persisted through
@@ -167,7 +168,7 @@ export function removeAddedCourse(id: string): boolean {
     data.taskDone.delete(concept.id);
     data.taskDone.delete(`review:${concept.id}`);
   }
-  delete data.peakByCourse[id];
+  if (data.peakByCourse) delete data.peakByCourse[id];
   persistLearning();
   return true;
 }
@@ -354,7 +355,7 @@ const dueConcepts = () => {
 };
 
 const testableIn = (courseId: string, c: Concept) => Boolean(getLearningSpec(courseId, c.id));
-const canPractice = (course: Course, c: Concept) => course.runtime === true || testableIn(course.id, c);
+const canPractice = (course: Course, c: Concept) => testableIn(course.id, c) || (course.runtime === true && aiEnabled());
 const upsertSkill = (c: Concept, skill: Skill) => {
   const skills = c.skills ?? [];
   c.skills = skills.some((x) => x.label === skill.label)
@@ -405,7 +406,11 @@ const evidenceText = (c: Concept) =>
   c.evidence.answers === 0 ? "none yet" : c.evidence.transferPassed ? "new question passed" : `${c.evidence.sound} of ${c.evidence.answers} answers sound`;
 
 const ctaFor = (course: Course, c: Concept): ConceptView["cta"] => {
-  if (!canPractice(course, c)) return { label: "Not authored yet", href: null };
+  if (!canPractice(course, c)) {
+    return course.runtime
+      ? { label: "Study with the tutor", href: `/course/${course.id}/tutor` }
+      : { label: "Not authored yet", href: null };
+  }
   const label = c.state === "mastered" || c.state === "provisional"
     ? "Review anyway"
     : c.state === "not_started"
@@ -1242,7 +1247,9 @@ function tasksFor(c: Course, _active: boolean): Task[] {
 /** Tasks grouped by course, open ones first by urgency. Completed courses drop out. */
 export function getTodos(): TodoGroup[] {
   const { course, samples } = db();
-  return [course, ...samples].filter((c) => !isCompleted(c)).map((c) => {
+  return [course, ...samples]
+    .filter((c) => !isCompleted(c) && c.concepts.some((concept) => canPractice(c, concept)))
+    .map((c) => {
     const all = tasksFor(c, c === course);
     const open = all.filter((t) => !t.done).sort((a, b) => taskRank(a) - taskRank(b));
     return { courseId: c.id, courseName: c.name, open, done: all.filter((t) => t.done), total: all.length, doneCount: all.filter((t) => t.done).length };
