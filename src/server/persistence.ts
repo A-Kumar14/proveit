@@ -11,7 +11,7 @@ function configuredPath(): string | null {
   const explicit = process.env.PROVEIT_DB_PATH?.trim();
   if (explicit) return explicit;
   if (process.env.NODE_ENV === "test" || process.env.VERCEL) return null;
-  return resolve(process.cwd(), ".data", "proveit.sqlite");
+  return resolve(process.cwd(), ".data", "proveit-demo.sqlite");
 }
 
 function database(): DatabaseSync | null {
