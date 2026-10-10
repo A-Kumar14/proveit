@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { Upload } from "lucide-react";
 import { buttonStyles } from "../Button";
 import { Modal } from "./Modal";
@@ -17,7 +18,7 @@ export function AddCourseModal() {
         <label className="flex items-start gap-2 text-xs text-ink-muted"><input type="checkbox" className="mt-0.5 accent-ink" />I have the right to use these files for my own studying.</label>
       </fieldset>
       <div className="flex justify-end gap-2">
-        <a href="/" className={buttonStyles({ variant: "secondary" })}>Cancel</a>
+        <Link href="/" className={buttonStyles({ variant: "secondary" })}>Cancel</Link>
         <span aria-disabled className={`${buttonStyles()} cursor-not-allowed opacity-50`}>Build concept map</span>
       </div>
     </Modal>
