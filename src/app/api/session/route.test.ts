@@ -14,14 +14,14 @@ import { POST } from "./route";
 const req = (fields: Record<string, string>) => {
   const f = new FormData();
   for (const [k, v] of Object.entries(fields)) f.append(k, v);
-  return new Request("http://x/api/guide", { method: "POST", body: f });
+  return new Request("http://x/api/session", { method: "POST", body: f });
 };
 const msgs = JSON.stringify([{ role: "user", text: "I don't know yet" }]);
 const stream = (...chunks: string[]) => streamText.mockReturnValue({ stream: new ReadableStream({ start(c) { chunks.forEach((x) => c.enqueue(new TextEncoder().encode(x))); c.close(); } }) });
 
 beforeEach(() => { ai = true; streamText.mockReset(); (globalThis as { __proveit?: unknown }).__proveit = undefined; });
 
-describe("POST /api/guide", () => {
+describe("POST /api/session", () => {
   it("streams the tutor's first step, briefed on the question, and sends only the chat to the model", async () => {
     stream("What do you think ", "the 95 refers to?");
     const res = await POST(req({ courseId: "intro-stats", conceptId: "cii", messages: msgs }));
