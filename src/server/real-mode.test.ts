@@ -9,6 +9,7 @@ type TestGlobal = { __proveit?: unknown; __proveitTestSeedFactory?: () => unknow
 
 beforeEach(() => {
   delete process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+  process.env.PROVEIT_DEMO_SEED = "0";
   const g = globalThis as unknown as TestGlobal;
   g.__proveitTestSeedFactory = undefined;
   g.__proveit = undefined;
@@ -20,6 +21,7 @@ afterEach(() => {
   g.__proveit = undefined;
   g.__proveitCal = undefined;
   g.__proveitTestSeedFactory = demoStateForTests;
+  delete process.env.PROVEIT_DEMO_SEED;
 });
 
 describe("real runtime state", () => {
