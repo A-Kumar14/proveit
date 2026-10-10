@@ -4,6 +4,7 @@ import { toneForPct, type Tone } from "@proveit/lib/mastery";
 import { AUTHORED } from "./content";
 import { judgeAnswer, judgeReview, judgeTransfer, type AnswerContext } from "./evaluator";
 import { loadJson, saveJson } from "./persistence";
+import type { CourseSpec } from "@proveit/lib/courseSpec";
 import type { CalEvent } from "./calendar";
 import { POINTS, STREAK_CAP, standing, TIERS, type Standing } from "@proveit/lib/rewards";
 
@@ -29,7 +30,7 @@ type Attempt = {
   previousState: MasteryState; createdAt: number;
 };
 /** `completedOverride` is the student's own call. null means derive it from the concepts. */
-type Course = { id: string; name: string; deadline: string; concepts: Concept[]; edges: [string, string][]; files: CourseFile[]; completedOverride: boolean | null; /** ISO date of the next quiz, if any. */ examDate: string | null };
+type Course = { id: string; name: string; deadline: string; concepts: Concept[]; edges: [string, string][]; files: CourseFile[]; completedOverride: boolean | null; /** ISO date of the next quiz, if any. */ examDate: string | null; /** Set for courses added at runtime. They have notes and a map, but no authored questions, so there is no diagnose loop yet. */ spec?: CourseSpec };
 /** `course` is the one being worked on. `samples` are finished courses that only fill the sidebar and map views. */
 type Db = { course: Course; samples: Course[]; attempts: Attempt[]; provenDays: Set<string>; /** Tasks the student ticked off by hand. */ taskDone: Set<string>; /** Highest point total ever shown. Rank never drops when a concept slips. */ peakPoints: number; /** Same rule per course, so a course's rank never drops either. */ peakByCourse: Record<string, number>; seq: number };
 
@@ -84,6 +85,7 @@ type StoredLearning = {
 
 function restoreLearning(): Db {
   const data = initialState();
+  for (const spec of loadJson<CourseSpec[]>("added_courses") ?? []) data.samples.push(courseFromSpec(spec));
   const stored = loadJson<StoredLearning>("learning");
   if (!stored) return data;
 
@@ -118,6 +120,51 @@ function persistLearning(): void {
     completedOverride: current.course.completedOverride,
   };
   saveJson("learning", snapshot);
+}
+
+// ---- courses added at runtime ----
+
+const unitLabel = (name: string, i: number) => `${String(i + 1).padStart(2, "0")} ${name.toUpperCase()}`;
+
+function courseFromSpec(spec: CourseSpec): Course {
+  let n = 0;
+  const concepts = spec.units.flatMap((u, ui): Concept[] => u.concepts.map((c) => {
+    n++;
+    return { id: `${spec.id}-${n}`, name: c.name, short: c.name.length > 14 ? `${c.name.slice(0, 13).trimEnd()}.` : c.name, unit: unitLabel(u.name, ui), desc: c.desc, x: 0, y: 0, state: "not_started", skills: null, evidence: { answers: 0, sound: 0, transferPassed: false }, nextReview: null };
+  }));
+  return {
+    id: spec.id, name: spec.name, deadline: "No quiz scheduled", concepts, edges: [], completedOverride: null, examDate: null, spec,
+    files: [{ name: `${spec.name} course notes`, kind: spec.source === "catalog" ? "Curated course" : "Your course", detail: spec.summary }],
+  };
+}
+
+function persistAdded(): void {
+  saveJson("added_courses", db().samples.flatMap((c) => (c.spec ? [c.spec] : [])));
+}
+
+/** Adds a course built from notes. Adding the same id twice changes nothing. */
+export function addCourseSpec(spec: CourseSpec): { id: string; added: boolean } {
+  const data = db();
+  if (data.course.id === spec.id || data.samples.some((c) => c.id === spec.id)) return { id: spec.id, added: false };
+  data.samples.push(courseFromSpec(spec));
+  persistAdded();
+  return { id: spec.id, added: true };
+}
+
+export function removeAddedCourse(id: string): boolean {
+  const data = db();
+  const i = data.samples.findIndex((c) => c.id === id && c.spec);
+  if (i < 0) return false;
+  data.samples.splice(i, 1);
+  persistAdded();
+  return true;
+}
+
+export const addedCourseIds = (): string[] => db().samples.flatMap((c) => (c.spec ? [c.id] : []));
+
+/** The notes a course was built from, or null for a course with authored content only. */
+export function courseSpec(courseId: string): CourseSpec | null {
+  return courseFor(courseId).spec ?? null;
 }
 
 // ---- helpers ----
@@ -332,7 +379,7 @@ export function getCourse(courseId: string): CourseView {
     provisional: course.concepts.filter((c) => c.state === "provisional").length,
     total: course.concepts.length,
     needsWork: course.concepts.filter((c) => c.state === "needs_work").length,
-    concepts: course.concepts.map((c) => ({ id: c.id, name: c.name, short: c.short, unit: c.unit, desc: c.desc, x: c.x, y: c.y, state: c.state, dims: dimsFor(c), evidence: evidenceText(c), cta: active ? ctaFor(c) : { label: c.state === "mastered" ? "Mastered" : "Not authored yet", href: null } })),
+    concepts: course.concepts.map((c) => ({ id: c.id, name: c.name, short: c.short, unit: c.unit, desc: c.desc, x: c.x, y: c.y, state: c.state, dims: dimsFor(c), evidence: evidenceText(c), cta: active ? ctaFor(c) : course.spec ? { label: "Study with the tutor", href: `/course/${course.id}/tutor` } : { label: c.state === "mastered" ? "Mastered" : "Not authored yet", href: null } })),
     edges: course.edges,
     nextUp: next ? { id: next.id, name: next.name } : null,
   };
@@ -942,6 +989,7 @@ export class TaskLockedError extends Error {}
 export const taskRank = (t: Task) => (t.kind === "review" ? 1 : t.state === "needs_work" ? 0 : t.state === "developing" ? 2 : 3);
 
 function tasksFor(c: Course, active: boolean): Task[] {
+  if (c.spec) return [];
   const today = isoDay(new Date());
   return c.concepts.flatMap((x): Task[] => {
     const provedByWork = x.state === "provisional" || x.state === "mastered";
@@ -960,7 +1008,7 @@ function tasksFor(c: Course, active: boolean): Task[] {
 /** Tasks grouped by course, open ones first by urgency. Completed courses drop out. */
 export function getTodos(): TodoGroup[] {
   const { course, samples } = db();
-  return [course, ...samples].filter((c) => !isCompleted(c)).map((c) => {
+  return [course, ...samples].filter((c) => !isCompleted(c) && !c.spec).map((c) => {
     const all = tasksFor(c, c === course);
     const open = all.filter((t) => !t.done).sort((a, b) => taskRank(a) - taskRank(b));
     return { courseId: c.id, courseName: c.name, open, done: all.filter((t) => t.done), total: all.length, doneCount: all.filter((t) => t.done).length };

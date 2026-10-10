@@ -183,3 +183,9 @@ export type PracticeResult = z.infer<typeof PracticeResult>;
 export const TutorMessage = z.object({ role: z.enum(["user", "assistant"]), text: z.string().trim().min(1).max(8000) });
 export type TutorMessage = z.infer<typeof TutorMessage>;
 export const TutorMessages = z.array(TutorMessage).min(1).max(40);
+
+// ---- course catalog ----
+
+export const CatalogAddInput = z.object({ id: z.string().min(1).max(80) });
+export const CatalogAddResult = z.object({ id: z.string(), added: z.boolean() });
+export const CatalogRemoveResult = z.object({ removed: z.boolean() });

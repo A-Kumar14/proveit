@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Plus } from "lucide-react";
+import { Library, Plus } from "lucide-react";
 import { AppShell } from "@proveit/app/_components/shell/AppShell";
 import { ListPage } from "@proveit/app/_components/shell/ListPage";
 import { buttonStyles } from "@proveit/app/_components/Button";
@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 export default function CoursesPage() {
   const rows = listCourses();
   return (
-    <AppShell active="courses" crumbs={[{ label: "Courses" }]} right={<Link href="/?add=1" className={buttonStyles()}><Plus size={13} strokeWidth={2.4} aria-hidden />Add a course</Link>}>
+    <AppShell active="courses" crumbs={[{ label: "Courses" }]} right={<div className="flex items-center gap-2"><Link href="/courses/browse" className={buttonStyles({ variant: "secondary" })}><Library size={13} strokeWidth={2} aria-hidden />Browse courses</Link><Link href="/?add=1" className={buttonStyles()}><Plus size={13} strokeWidth={2.4} aria-hidden />Add a course</Link></div>}>
       <ListPage eyebrow="All courses" title="Courses">
         <CoursesTable rows={rows} />
       </ListPage>
