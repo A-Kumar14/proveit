@@ -8,7 +8,7 @@ It uses a separate local SQLite file:
 .data/proveit-demo.sqlite
 ```
 
-On the first server read, the branch seeds that database with a coherent demo learner state. The seed covers:
+On the first server read, the branch seeds that database with a coherent demo learner state. Set `PROVEIT_DEMO_SEED=0` only when you explicitly need to verify the production-style empty state on this branch. The seed covers:
 
 - Intro Statistics mastery across mastered, developing, provisional, needs-work and not-started states
 - an open CI-interpretation misconception with evidence
