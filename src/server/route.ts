@@ -14,7 +14,7 @@ export async function handle<S extends z.ZodType, R>(req: Request, schema: S, ru
     if (e instanceof NotFoundError) return NextResponse.json({ error: "Not found." }, { status: 404 });
     if (e instanceof CalendarError) return NextResponse.json({ error: e.message }, { status: 400 });
     if (e instanceof TaskLockedError) return NextResponse.json({ error: e.message }, { status: 409 });
-    if (e instanceof InvalidAttemptLinkError) return NextResponse.json({ error: "That follow-up no longer matches this learning attempt. Restart the question." }, { status: 409 });
+    if (e instanceof InvalidAttemptLinkError) return NextResponse.json({ error: "That learning step is no longer current. Refresh or restart the question." }, { status: 409 });
     console.error(e);
     return NextResponse.json({ error: "The evaluator failed. Retry." }, { status: 500 });
   }
