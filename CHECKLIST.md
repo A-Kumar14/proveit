@@ -100,7 +100,7 @@ Status as of the last push to `main`. Tick items as they land.
 - [x] Upload check with the "not your work" rejection path
 - [x] Voice mode with transcript review, Sketch, Camera and Add file
 - [x] Store, evaluator and upload route tests (23)
-- [x] Dashboard with a scrolling course ticker and seven widgets (up next, needs attention, due for review, mastery overview, upcoming quizzes, study week, recent activity)
+- [x] Dashboard with a scrolling course ticker, rank card, to-do list and calendar
 - [x] Dashboard to-do list that finishes by itself, hand ticking with confetti, and a calendar card
 - [x] Calendar page with a month view, iCal connect and refresh, and suggested study slots
 - [x] Review queue suggests times from free gaps in the calendar

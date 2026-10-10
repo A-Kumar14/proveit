@@ -575,29 +575,6 @@ export function setCoursesCompleted(ids: string[], completed: boolean): string[]
 
 // ---- dashboard widgets ----
 
-export type DashboardWidgets = {
-  mastery: { state: MasteryState; count: number }[];
-  week: { streak: number; days: { label: string; iso: string; active: boolean; today: boolean }[] };
-  recent: HistoryEvent[];
-};
-
-export function getDashboardWidgets(): DashboardWidgets {
-  const { course, samples, provenDays } = db();
-  const now = new Date();
-  const todayIso = isoDay(now);
-  const all = [course, ...samples].flatMap((c) => c.concepts);
-  const order: MasteryState[] = ["mastered", "provisional", "developing", "needs_work", "not_started"];
-  const days = Array.from({ length: 7 }, (_, i) => {
-    const d = addDays(now, i - 6);
-    return { label: d.toLocaleDateString("en-US", { weekday: "narrow" }), iso: isoDay(d), active: provenDays.has(isoDay(d)), today: isoDay(d) === todayIso };
-  });
-  return {
-    mastery: order.map((state) => ({ state, count: all.filter((c) => c.state === state).length })),
-    week: { streak: streak(), days },
-    recent: getHistory().slice(0, 4),
-  };
-}
-
 // ---- to-do list ----
 
 export type Task = {

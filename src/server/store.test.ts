@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { getDashboardWidgets, getRewards, listCourses, setCoursesCompleted, setTaskDone } from "./store";
+import { getRewards, listCourses, setCoursesCompleted, setTaskDone } from "./store";
 import { assess, getAttempt, getCourse, getDashboard, getQuestion, getRemediation, getFiles, getHistory, getMisconceptionLog, getResult, getReviewBase, getReviews, getSidebar, NotFoundError, submitTransfer } from "./store";
 
 const WRONG = "It means there's a 95% probability that the true population mean is inside our interval.";
@@ -203,28 +203,13 @@ describe("marking courses completed", () => {
   });
 });
 
-describe("dashboard widgets and ticker rows", () => {
+describe("ticker rows", () => {
   it("counts each course's concepts by status and names what is next", () => {
     const rows = Object.fromEntries(listCourses().map((c) => [c.id, c]));
     expect(rows["intro-stats"]).toMatchObject({ proven: 5, inProgress: 3, needsWork: 1, notStarted: 3, next: "CI interpretation" });
     expect(rows["linear-algebra"]).toMatchObject({ proven: 8, inProgress: 0, notStarted: 0, next: null, completed: true });
     expect(rows["personal-finance"]).toMatchObject({ proven: 3, inProgress: 3, notStarted: 2, next: "Debt payoff", completed: false });
     for (const c of Object.values(rows)) expect(c.proven + c.inProgress + c.needsWork + c.notStarted).toBe(c.total);
-  });
-
-  it("builds every widget from real state", () => {
-    const w = getDashboardWidgets();
-    expect(w.mastery.reduce((n, m) => n + m.count, 0)).toBe(28);
-    expect(w.week.days).toHaveLength(7);
-    expect(w.week.days.filter((d) => d.today)).toHaveLength(1);
-    expect(w.recent).toEqual([]);
-  });
-
-  it("records the day a concept is proven", async () => {
-    const { attemptId } = await run(WRONG);
-    await submitTransfer(attemptId, RIGHT_TRANSFER);
-    expect(getDashboardWidgets().week.days.at(-1)).toMatchObject({ today: true, active: true });
-    expect(getDashboardWidgets().recent[0]?.tone).toBe("good");
   });
 });
 

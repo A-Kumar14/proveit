@@ -13,5 +13,3 @@ export function Widget({ title, action, className, children }: { title: string; 
     </section>
   );
 }
-
-export const Empty = ({ children }: { children: React.ReactNode }) => <p className="m-0 text-[13px] text-ink-muted">{children}</p>;
