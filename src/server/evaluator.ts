@@ -30,7 +30,9 @@ export type TransferJudgement = {
   votes: Evaluation["votes"];
 };
 
-export class EvaluationRequiresAIError extends Error {
+export class LearningSpecEvaluationError extends Error {}
+
+export class EvaluationRequiresAIError extends LearningSpecEvaluationError {
   constructor() {
     super("Evaluating generated course content requires an AI key.");
   }
@@ -43,7 +45,7 @@ const Check = z.object({
   verdict: z.enum(["correct", "incorrect", "uncertain"]),
   misconceptionId: z.string().nullable(),
   evidenceQuote: z.string().nullable(),
-});
+}).strict();
 type Check = z.infer<typeof Check>;
 
 const ChallengeCheck = z.object({
@@ -51,7 +53,7 @@ const ChallengeCheck = z.object({
   misconceptionId: z.string().nullable(),
   evidenceQuote: z.string().nullable(),
   feedback: z.string().max(240).nullable(),
-});
+}).strict();
 type ChallengeCheck = z.infer<typeof ChallengeCheck>;
 
 const SYSTEM = [
@@ -139,7 +141,7 @@ function misconceptionContext(spec: ConceptLearningSpecType): object[] {
     id: m.id,
     name: m.name,
     description: m.description,
-    sourceIds: m.sourceIds,
+    sources: sourceContext(spec, m.sourceIds),
   }));
 }
 
@@ -271,7 +273,7 @@ async function voteChallenge(
     sourceContext: sourceContext(spec, challenge.sourceIds),
     knownMisconceptions: misconceptionContext(spec),
   };
-  const prompt = label + " learning specification:\n" + JSON.stringify(authority) +
+  const prompt = label + " question:\n" + JSON.stringify(authority) +
     "\n\nCURRENT student answer:\n\"\"\"\n" + answer + "\n\"\"\"";
 
   const checks = await Promise.all(
@@ -359,6 +361,11 @@ export function judgeReviewForSpec(
 ): Promise<TransferJudgement> {
   return judgeChallengeForSpec(spec, answer, "review");
 }
+
+/** Stable spec-first names for runtime-course callers. */
+export const judgeSpecAnswer = judgeAnswerForSpec;
+export const judgeSpecTransfer = judgeTransferForSpec;
+export const judgeSpecReview = judgeReviewForSpec;
 
 /** Compatibility wrapper for the current authored-only mastery store. */
 export function judgeTransfer(conceptId: string, answer: string): Promise<TransferJudgement> {
