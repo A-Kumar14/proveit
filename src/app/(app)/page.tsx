@@ -11,7 +11,7 @@ import { TodoCard } from "@proveit/app/_components/dashboard/TodoCard";
 import { RankCard } from "@proveit/app/_components/dashboard/RankCard";
 import { RankChip } from "@proveit/app/_components/dashboard/RankChip";
 import { getScheduledTodos, getSchedule } from "@proveit/server/schedule";
-import { getDashboard, getRewards, listCourses } from "@proveit/server/store";
+import { getCourseRanks, getDashboard, getRewards, listCourses } from "@proveit/server/store";
 
 export const dynamic = "force-dynamic";
 
@@ -20,6 +20,7 @@ export default async function Dashboard({ searchParams }: PageProps<"/">) {
   const head = getDashboard();
   const courses = listCourses();
   const rewards = getRewards();
+  const ranks = getCourseRanks();
   return (
     <AppShell
       active="dashboard"
@@ -28,14 +29,14 @@ export default async function Dashboard({ searchParams }: PageProps<"/">) {
     >
       <div className="min-h-0 flex-1 overflow-y-auto px-7 py-6">
         <div className="flex flex-col gap-8">
-          <RankCard r={rewards} previewable={false} />
+          <RankCard r={rewards} courses={ranks} previewable={false} />
 
           <section aria-labelledby="courses-heading" className="flex flex-col gap-3">
             <div className="flex items-baseline justify-between">
               <h1 id="courses-heading" className="m-0 text-[22px] font-semibold">Courses</h1>
               <Link href="/courses" className="text-xs text-ink-muted no-underline hover:text-ink">View all and manage</Link>
             </div>
-            <CourseTicker count={courses.length}>{courses.map((c) => <TickerCard key={c.id} c={c} />)}</CourseTicker>
+            <CourseTicker count={courses.length}>{courses.map((c) => <TickerCard key={c.id} c={c} rank={ranks.find((r) => r.courseId === c.id)} />)}</CourseTicker>
           </section>
 
           <div className="grid grid-cols-2 items-start gap-4">

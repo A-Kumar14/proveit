@@ -31,7 +31,7 @@ type Attempt = {
 /** `completedOverride` is the student's own call. null means derive it from the concepts. */
 type Course = { id: string; name: string; deadline: string; concepts: Concept[]; edges: [string, string][]; files: CourseFile[]; completedOverride: boolean | null; /** ISO date of the next quiz, if any. */ examDate: string | null };
 /** `course` is the one being worked on. `samples` are finished courses that only fill the sidebar and map views. */
-type Db = { course: Course; samples: Course[]; attempts: Attempt[]; provenDays: Set<string>; /** Tasks the student ticked off by hand. */ taskDone: Set<string>; /** Highest point total ever shown. Rank never drops when a concept slips. */ peakPoints: number; seq: number };
+type Db = { course: Course; samples: Course[]; attempts: Attempt[]; provenDays: Set<string>; /** Tasks the student ticked off by hand. */ taskDone: Set<string>; /** Highest point total ever shown. Rank never drops when a concept slips. */ peakPoints: number; /** Same rule per course, so a course's rank never drops either. */ peakByCourse: Record<string, number>; seq: number };
 
 const app = (answers: number, sound: number, transferPassed = false) => ({ answers, sound, transferPassed });
 
@@ -66,6 +66,7 @@ function initialState(): Db {
     provenDays: new Set(),
     taskDone: new Set(),
     peakPoints: 0,
+    peakByCourse: {},
     seq: 0,
   };
 }
@@ -76,6 +77,7 @@ type StoredLearning = {
   provenDays: string[];
   taskDone: string[];
   peakPoints: number;
+  peakByCourse?: Record<string, number>;
   seq: number;
   completedOverride: boolean | null;
 };
@@ -93,6 +95,7 @@ function restoreLearning(): Db {
   if (Array.isArray(stored.provenDays)) data.provenDays = new Set(stored.provenDays);
   if (Array.isArray(stored.taskDone)) data.taskDone = new Set(stored.taskDone);
   if (Number.isFinite(stored.peakPoints)) data.peakPoints = stored.peakPoints;
+  if (stored.peakByCourse && typeof stored.peakByCourse === "object") data.peakByCourse = { ...stored.peakByCourse };
   if (Number.isFinite(stored.seq)) data.seq = stored.seq;
   if (stored.completedOverride === null || typeof stored.completedOverride === "boolean") data.course.completedOverride = stored.completedOverride;
   return data;
@@ -110,6 +113,7 @@ function persistLearning(): void {
     provenDays: [...current.provenDays],
     taskDone: [...current.taskDone],
     peakPoints: current.peakPoints,
+    peakByCourse: current.peakByCourse,
     seq: current.seq,
     completedOverride: current.course.completedOverride,
   };
@@ -1003,10 +1007,15 @@ export type Rewards = Standing & {
  * bonuses count once per concept so a deliberate wrong answer can't be cycled for points. Rank keeps the
  * highest total ever shown: a concept slipping back doesn't take a tier away.
  */
-export function getRewards(): Rewards {
+/**
+ * Points for one course, or for every course when `courseId` is left out. The overall rank is not the sum of
+ * the course ranks, because the streak counts once, for the student, and not per course.
+ */
+export function getRewards(courseId?: string): Rewards {
   const { course, samples, attempts } = db();
-  const concepts = [course, ...samples].flatMap((c) => c.concepts);
-  const passed = attempts.filter((a) => a.kind === "transfer" && a.outcome === "pass");
+  const scope = courseId ? [courseFor(courseId)] : [course, ...samples];
+  const concepts = scope.flatMap((c) => c.concepts);
+  const passed = attempts.filter((a) => a.kind === "transfer" && a.outcome === "pass" && (!courseId || a.courseId === courseId));
   const repairedConcepts = new Set(
     passed.filter((a) => confirmedIncorrectForRoot(a.rootAttemptId)).map((a) => a.conceptId),
   );
@@ -1018,13 +1027,27 @@ export function getRewards(): Rewards {
     { label: "Concepts proved with a new question", count: concepts.filter((c) => c.state === "provisional").length, each: POINTS.proved },
     { label: "Misconceptions repaired", count: repairedConcepts.size, each: POINTS.repaired },
     { label: "Passed a new question first try", count: firstTryConcepts.size, each: POINTS.firstTry },
-    { label: "Courses mastered end to end", count: [course, ...samples].filter((c) => c.completedOverride === null && c.concepts.length > 0 && c.concepts.every((x) => x.state === "mastered")).length, each: POINTS.course },
-    { label: "Streak days, up to 7", count: Math.min(streak(), STREAK_CAP), each: POINTS.streakDay },
+    { label: "Courses mastered end to end", count: scope.filter((c) => c.completedOverride === null && c.concepts.length > 0 && c.concepts.every((x) => x.state === "mastered")).length, each: POINTS.course },
+    ...(courseId ? [] : [{ label: "Streak days, up to 7", count: Math.min(streak(), STREAK_CAP), each: POINTS.streakDay }]),
   ].map((r) => ({ ...r, points: r.count * r.each }));
   const earned = rows.reduce((n, r) => n + r.points, 0);
-  const previousPeak = db().peakPoints;
-  db().peakPoints = Math.max(previousPeak, earned);
-  if (db().peakPoints !== previousPeak) persistLearning();
-  const s = standing(db().peakPoints);
+  const peaks = (db().peakByCourse ??= {});
+  const previousPeak = courseId ? peaks[courseId] ?? 0 : db().peakPoints;
+  const peak = Math.max(previousPeak, earned);
+  if (peak !== previousPeak) {
+    if (courseId) peaks[courseId] = peak; else db().peakPoints = peak;
+    persistLearning();
+  }
+  const s = standing(peak);
   return { ...s, breakdown: rows, ladder: TIERS.map((t, i) => ({ id: t.id, name: t.name, min: t.min, reached: i <= s.tierIndex, current: i === s.tierIndex })) };
+}
+
+export type CourseRank = { courseId: string; name: string } & Standing;
+/** Each course's own rank, using the same tiers. */
+export function getCourseRanks(): CourseRank[] {
+  const { course, samples } = db();
+  return [course, ...samples].map((c) => {
+    const { points, tierIndex, tier, next, toNext, pct } = getRewards(c.id);
+    return { courseId: c.id, name: c.name, points, tierIndex, tier, next, toNext, pct };
+  });
 }

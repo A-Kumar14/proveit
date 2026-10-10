@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { Rewards } from "@proveit/server/store";
+import type { CourseRank, Rewards } from "@proveit/server/store";
 import { POINTS } from "@proveit/lib/rewards";
 import { cn } from "@proveit/lib/cn";
 import { TierBadge } from "./TierBadge";
@@ -7,11 +7,11 @@ import { TierCelebration } from "./TierCelebration";
 import { Widget } from "./Widget";
 
 /** Rank: prestige for proven understanding. Nothing is bought or unlocked, it only shows how far you've come. */
-export function RankCard({ r, previewable }: { r: Rewards; previewable: boolean }) {
+export function RankCard({ r, courses, previewable }: { r: Rewards; courses: CourseRank[]; previewable: boolean }) {
   const fmt = (n: number) => n.toLocaleString("en-US");
   return (
     <div id="rank" className="scroll-mt-4">
-      <Widget title="Rank" action={{ label: "All courses", href: "/courses" }}>
+      <Widget title="Overall rank" action={{ label: "All courses", href: "/courses" }}>
         <div className="flex flex-col gap-5">
           <div className="flex items-center gap-4">
             <TierBadge id={r.tier.id} size={56} />
@@ -37,6 +37,21 @@ export function RankCard({ r, previewable }: { r: Rewards; previewable: boolean 
             ))}
           </ol>
 
+          <section aria-label="Rank by course" className="flex flex-col gap-1.5">
+            <h3 className="m-0 text-[11px] font-medium tracking-[0.06em] text-ink-faint uppercase">By course</h3>
+            <p className="m-0 text-xs text-ink-muted">Your overall rank adds up everything across every course, plus your streak. Each course also has its own rank on the same ladder.</p>
+            <ul className="m-0 grid list-none grid-cols-1 gap-x-6 gap-y-1 p-0 sm:grid-cols-2">
+              {courses.map((c) => (
+                <li key={c.courseId} className="flex items-center gap-2 border-t border-line py-1.5 text-xs">
+                  <TierBadge id={c.tier.id} size={20} />
+                  <Link href={`/course/${c.courseId}`} className="min-w-0 flex-1 truncate text-ink no-underline hover:underline">{c.name}</Link>
+                  <span className="font-semibold">{c.tier.name}</span>
+                  <span className="w-16 text-right tabular-nums text-ink-muted">{fmt(c.points)}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+
           <details className="group">
             <summary className="cursor-pointer list-none text-xs text-ink-muted [&::-webkit-details-marker]:hidden">How points work</summary>
             <table className="mt-2 w-full border-collapse text-xs">
@@ -52,7 +67,7 @@ export function RankCard({ r, previewable }: { r: Rewards; previewable: boolean 
               </tbody>
             </table>
             <p className="m-0 mt-2 max-w-xl text-[11px] leading-normal text-ink-faint">
-              Points come from evidence: passing a new question ({POINTS.proved}), mastering a concept ({POINTS.mastered}), and the extras above. Ticking tasks or marking a course done earns nothing. Rank never drops, even if a concept slips. <Link href="/courses" className="text-ink-muted">Manage courses</Link>
+              The overall rank counts every course. Points come from evidence: passing a new question ({POINTS.proved}), mastering a concept ({POINTS.mastered}), and the extras above. Ticking tasks or marking a course done earns nothing. Rank never drops, even if a concept slips. <Link href="/courses" className="text-ink-muted">Manage courses</Link>
             </p>
           </details>
         </div>
