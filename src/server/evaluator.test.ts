@@ -9,11 +9,11 @@ import { getAuthoredLearningSpec } from "./authoredLearningSpecs";
 import {
   judgeAnswer,
   judgeReview,
-  judgeSpecAnswer,
-  judgeSpecReview,
-  judgeSpecTransfer,
+  judgeAnswerForSpec,
+  judgeReviewForSpec,
+  judgeTransferForSpec,
   judgeTransfer,
-  LearningSpecEvaluationError,
+  EvaluationRequiresAIError,
 } from "./evaluator";
 
 const ANSWER = "It means there's a 95% probability that the true population mean is inside our interval.";
@@ -159,7 +159,7 @@ describe("canonical ConceptLearningSpec evaluation", () => {
     reply(correct, correct, { verdict: "uncertain", misconceptionId: null, evidenceQuote: null });
 
     const spec = generatedSpec();
-    const result = await judgeSpecAnswer(spec, "The 95% is long-run coverage across repeated samples.");
+    const result = await judgeAnswerForSpec(spec, "The 95% is long-run coverage across repeated samples.");
 
     expect(result).toMatchObject({ verdict: "correct", votes: { agree: 2, of: 3 } });
     const prompt = generateText.mock.calls[0]?.[0]?.prompt as string;
@@ -177,7 +177,7 @@ describe("canonical ConceptLearningSpec evaluation", () => {
     };
     reply(invented, invented, { verdict: "uncertain", misconceptionId: null, evidenceQuote: null });
 
-    expect(await judgeSpecAnswer(generatedSpec(), "It is a 95% probability.")).toMatchObject({
+    expect(await judgeAnswerForSpec(generatedSpec(), "It is a 95% probability.")).toMatchObject({
       verdict: "uncertain",
       misconceptionId: null,
       quote: null,
@@ -187,14 +187,14 @@ describe("canonical ConceptLearningSpec evaluation", () => {
   it("uses the generated transfer and delayed-review rubrics", async () => {
     reply(transferPass, transferPass, transferUncertain);
     const spec = generatedSpec();
-    await judgeSpecTransfer(spec, "About 95 of 100; one realized interval either contains the mean or not.");
+    await judgeTransferForSpec(spec, "About 95 of 100; one realized interval either contains the mean or not.");
     const transferPrompt = generateText.mock.calls[0]?.[0]?.prompt as string;
     expect(transferPrompt).toContain(spec.transfer.rubric);
     expect(transferPrompt).toContain("Transfer question");
 
     generateText.mockReset();
     reply(transferPass, transferPass, transferUncertain);
-    await judgeSpecReview(spec, "The claim is invalid; 95% refers to repeated-method coverage.");
+    await judgeReviewForSpec(spec, "The claim is invalid; 95% refers to repeated-method coverage.");
     const reviewPrompt = generateText.mock.calls[0]?.[0]?.prompt as string;
     expect(reviewPrompt).toContain(spec.review.rubric);
     expect(reviewPrompt).toContain("Delayed review question");
@@ -204,9 +204,9 @@ describe("canonical ConceptLearningSpec evaluation", () => {
     mocked.enabled = false;
     const spec = generatedSpec();
 
-    await expect(judgeSpecAnswer(spec, "answer")).rejects.toBeInstanceOf(LearningSpecEvaluationError);
-    await expect(judgeSpecTransfer(spec, "answer")).rejects.toThrow(/requires an AI key/i);
-    await expect(judgeSpecReview(spec, "answer")).rejects.toThrow(/requires an AI key/i);
+    await expect(judgeAnswerForSpec(spec, "answer")).rejects.toBeInstanceOf(EvaluationRequiresAIError);
+    await expect(judgeTransferForSpec(spec, "answer")).rejects.toThrow(/requires an AI key/i);
+    await expect(judgeReviewForSpec(spec, "answer")).rejects.toThrow(/requires an AI key/i);
     expect(generateText).not.toHaveBeenCalled();
   });
 
@@ -214,7 +214,7 @@ describe("canonical ConceptLearningSpec evaluation", () => {
     mocked.enabled = false;
     const spec = getAuthoredLearningSpec("intro-stats", "cii")!;
 
-    expect(await judgeSpecAnswer(spec, "Across repeated samples about 95% of intervals from the method contain the mean."))
+    expect(await judgeAnswerForSpec(spec, "Across repeated samples about 95% of intervals from the method contain the mean."))
       .toMatchObject({ verdict: "correct", votes: null });
     expect(generateText).not.toHaveBeenCalled();
   });
