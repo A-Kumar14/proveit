@@ -18,7 +18,7 @@ export function CalendarControls({ connected, connectHref, compact = false }: { 
     setNote(null);
     try {
       await (kind === "refresh" ? api.refreshCalendar() : api.disconnectCalendar());
-      setNote({ text: kind === "refresh" ? "Calendar refreshed." : "Calendar disconnected. Showing the sample again.", error: false });
+      setNote({ text: kind === "refresh" ? "Calendar refreshed." : "Calendar disconnected.", error: false });
       router.refresh();
     } catch (e) {
       setNote({ text: e instanceof Error ? e.message : "Something went wrong. Retry.", error: true });

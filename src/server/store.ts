@@ -2,15 +2,15 @@ import "server-only";
 import { cardStatus, type AssessInput, type AssessResult, type AttemptKind, type AttemptOutcome, type Evaluation, type MasteryState, type ReviewSubmitResult, type ReviewText, type TransferResult } from "@proveit/lib/schemas";
 import { toneForPct, type Tone } from "@proveit/lib/mastery";
 import { AUTHORED } from "./content";
-import { demoData } from "./mode";
 import { judgeAnswer, judgeReview, judgeTransfer, type AnswerContext } from "./evaluator";
+import { loadJson, saveJson } from "./persistence";
 import type { CalEvent } from "./calendar";
 import { POINTS, STREAK_CAP, standing, TIERS, type Standing } from "@proveit/lib/rewards";
 
 /**
- * In-memory stand-in for the real data layer. Every exported function is the seam the backend
- * replaces (Supabase or otherwise); pages and route handlers only talk to these.
- * State resets when the dev server restarts, which doubles as a demo reset.
+ * The course catalog stays in code for the hackathon, while learner state is persisted through
+ * the database seam in persistence.ts. Pages and route handlers only talk to these exported
+ * functions, so the storage engine can change without touching the UI.
  */
 
 type Skill = { label: string; pct: number };
@@ -34,88 +34,87 @@ type Course = { id: string; name: string; deadline: string; concepts: Concept[];
 type Db = { course: Course; samples: Course[]; attempts: Attempt[]; provenDays: Set<string>; /** Tasks the student ticked off by hand. */ taskDone: Set<string>; /** Highest point total ever shown. Rank never drops when a concept slips. */ peakPoints: number; seq: number };
 
 const app = (answers: number, sound: number, transferPassed = false) => ({ answers, sound, transferPassed });
-const M: Skill[] = [{ label: "Application", pct: 90 }, { label: "New-question test", pct: 85 }];
-const D: Skill[] = [{ label: "Application", pct: 64 }, { label: "New-question test", pct: 25 }];
 
-function seed(): Db {
-  const c = (id: string, name: string, short: string, unit: string, desc: string, x: number, y: number, state: MasteryState, skills: Skill[] | null, evidence: Concept["evidence"]): Concept =>
-    ({ id, name, short, unit, desc, x, y, state, skills, evidence, nextReview: null });
+function initialState(): Db {
+  const c = (id: string, name: string, short: string, unit: string, desc: string, x: number, y: number): Concept =>
+    ({ id, name, short, unit, desc, x, y, state: "not_started", skills: null, evidence: app(0, 0), nextReview: null });
   const U1 = "01 SAMPLING", U2 = "02 DISTRIBUTIONS", U3 = "03 CONFIDENCE INTERVALS", U4 = "04 HYPOTHESIS TESTING";
-  const data: Db = {
+  return {
     course: {
       id: "intro-stats", name: "Intro Statistics", deadline: "Quiz Thursday, Oct 15",
       concepts: [
-        c("pop", "Population vs. sample", "Population", U1, "Tell the whole group apart from the part you measured.", 60, 72, "mastered", M, app(3, 3, true)),
-        c("par", "Parameter vs. statistic", "Parameter", U1, "A parameter describes the population; a statistic describes your sample.", 60, 165, "mastered", M, app(3, 3, true)),
-        c("var", "Sampling variability", "Variability", U1, "Different samples give different statistics, even with the same method.", 60, 258, "developing", D, app(1, 1)),
-        c("se", "Standard error", "Std. error", U2, "How much a statistic typically moves from sample to sample.", 180, 72, "developing", D, app(1, 1)),
-        c("clt", "Central Limit Theorem", "CLT", U2, "Sample means pile up into a normal shape as samples grow.", 180, 165, "mastered", M, app(3, 3, true)),
-        c("size", "Effect of sample size", "Sample size", U2, "Bigger samples shrink the standard error, at a square-root rate.", 180, 258, "mastered", M, app(3, 3, true)),
-        c("moe", "Margin of error", "Margin", U3, "How far the interval reaches on each side of the estimate.", 300, 72, "mastered", M, app(3, 3, true)),
-        c("cic", "CI construction", "Construction", U3, "Build an interval from an estimate, a critical value, and the SE.", 300, 165, "developing", D, app(1, 1)),
-        c("cii", "CI interpretation", "Interpretation", U3, "Say what a confidence level does and does not tell you about one interval.", 300, 258, "needs_work", [{ label: "Calculation", pct: 90 }, { label: "Interpretation", pct: 28 }], app(3, 1)),
-        c("nul", "Null vs. alternative", "Null / alt", U4, "Frame the claim you are testing and what would count against it.", 420, 72, "not_started", null, app(0, 0)),
-        c("pv", "p-value", "p-value", U4, "How surprising your data would be if the null were true.", 420, 165, "not_started", null, app(0, 0)),
-        c("err", "Type I / Type II errors", "Error types", U4, "The two ways a test can be wrong, and the trade-off between them.", 420, 258, "not_started", null, app(0, 0)),
+        c("pop", "Population vs. sample", "Population", U1, "Tell the whole group apart from the part you measured.", 60, 72),
+        c("par", "Parameter vs. statistic", "Parameter", U1, "A parameter describes the population; a statistic describes your sample.", 60, 165),
+        c("var", "Sampling variability", "Variability", U1, "Different samples give different statistics, even with the same method.", 60, 258),
+        c("se", "Standard error", "Std. error", U2, "How much a statistic typically moves from sample to sample.", 180, 72),
+        c("clt", "Central Limit Theorem", "CLT", U2, "Sample means pile up into a normal shape as samples grow.", 180, 165),
+        c("size", "Effect of sample size", "Sample size", U2, "Bigger samples shrink the standard error, at a square-root rate.", 180, 258),
+        c("moe", "Margin of error", "Margin", U3, "How far the interval reaches on each side of the estimate.", 300, 72),
+        c("cic", "CI construction", "Construction", U3, "Build an interval from an estimate, a critical value, and the SE.", 300, 165),
+        c("cii", "CI interpretation", "Interpretation", U3, "Say what a confidence level does and does not tell you about one interval.", 300, 258),
+        c("nul", "Null vs. alternative", "Null / alt", U4, "Frame the claim you are testing and what would count against it.", 420, 72),
+        c("pv", "p-value", "p-value", U4, "How surprising your data would be if the null were true.", 420, 165),
+        c("err", "Type I / Type II errors", "Error types", U4, "The two ways a test can be wrong, and the trade-off between them.", 420, 258),
       ],
       completedOverride: null,
       examDate: "2026-10-15",
       files: [{ name: "OpenStax Introductory Statistics 2e", kind: "Textbook, CC BY 4.0", detail: "Source for all 12 concepts and the misconceptions they carry." }],
       edges: [["pop", "par"], ["par", "se"], ["var", "se"], ["var", "par"], ["se", "moe"], ["size", "moe"], ["clt", "cic"], ["moe", "cic"], ["cic", "cii"], ["cic", "pv"], ["nul", "pv"], ["pv", "err"]],
     },
-    samples: [sampleLinearAlgebra(), samplePersonalFinance()],
+    samples: [],
     attempts: [],
     provenDays: new Set(),
     taskDone: new Set(),
     peakPoints: 0,
     seq: 0,
   };
-  if (!demoData()) {
-    for (const x of data.course.concepts) Object.assign(x, { state: "not_started", skills: null, evidence: app(0, 0), nextReview: null });
-    data.samples = [];
+}
+
+type StoredLearning = {
+  concepts: Record<string, Pick<Concept, "state" | "skills" | "evidence" | "nextReview">>;
+  attempts: Attempt[];
+  provenDays: string[];
+  taskDone: string[];
+  peakPoints: number;
+  seq: number;
+  completedOverride: boolean | null;
+};
+
+function restoreLearning(): Db {
+  const data = initialState();
+  const stored = loadJson<StoredLearning>("learning");
+  if (!stored) return data;
+
+  for (const concept of data.course.concepts) {
+    const saved = stored.concepts?.[concept.id];
+    if (saved) Object.assign(concept, saved);
   }
+  if (Array.isArray(stored.attempts)) data.attempts = stored.attempts;
+  if (Array.isArray(stored.provenDays)) data.provenDays = new Set(stored.provenDays);
+  if (Array.isArray(stored.taskDone)) data.taskDone = new Set(stored.taskDone);
+  if (Number.isFinite(stored.peakPoints)) data.peakPoints = stored.peakPoints;
+  if (Number.isFinite(stored.seq)) data.seq = stored.seq;
+  if (stored.completedOverride === null || typeof stored.completedOverride === "boolean") data.course.completedOverride = stored.completedOverride;
   return data;
 }
 
-/** Sample courses so the sidebar, Courses page and dashboard have more than one course. They can be opened but not practiced. */
-type SampleSpec = [id: string, name: string, short: string, unit: string, desc: string, state: MasteryState];
-function sampleCourse(id: string, name: string, deadline: string, examDate: string | null, units: string[], spec: SampleSpec[], file: CourseFile): Course {
-  const concepts = spec.map(([cid, cname, short, unit, desc, state], i): Concept => ({
-    id: cid, name: cname, short, unit, desc, state, x: 60 + 120 * units.indexOf(unit), y: i % 2 === 0 ? 72 : 165,
-    skills: state === "mastered" ? M : state === "developing" || state === "provisional" ? D : null,
-    evidence: state === "mastered" ? app(3, 3, true) : state === "not_started" ? app(0, 0) : app(1, 1), nextReview: null,
-  }));
-  return { id, name, deadline, examDate, concepts, edges: concepts.slice(1).map((c, i) => [concepts[i]!.id, c.id] as [string, string]), files: [file], completedOverride: null };
+type StoreGlobal = { __proveit?: Db; __proveitTestSeedFactory?: () => Db };
+const g = globalThis as unknown as StoreGlobal;
+const db = (): Db => (g.__proveit ??= process.env.NODE_ENV === "test" && g.__proveitTestSeedFactory ? g.__proveitTestSeedFactory() : restoreLearning());
+
+function persistLearning(): void {
+  const current = db();
+  const snapshot: StoredLearning = {
+    concepts: Object.fromEntries(current.course.concepts.map((c) => [c.id, { state: c.state, skills: c.skills, evidence: c.evidence, nextReview: c.nextReview }])),
+    attempts: current.attempts,
+    provenDays: [...current.provenDays],
+    taskDone: [...current.taskDone],
+    peakPoints: current.peakPoints,
+    seq: current.seq,
+    completedOverride: current.course.completedOverride,
+  };
+  saveJson("learning", snapshot);
 }
-
-const sampleFile = (what: string): CourseFile => ({ name: "Sample syllabus.pdf", kind: "Sample", detail: `Placeholder so ${what} has data to show.` });
-
-const sampleLinearAlgebra = () => sampleCourse("linear-algebra", "Linear Algebra", "Completed Aug 14", null,
-  ["01 VECTORS", "02 MATRICES", "03 SYSTEMS", "04 EIGEN"], [
-    ["la-vec", "Vectors and span", "Vectors", "01 VECTORS", "Combine vectors and describe everything they can reach.", "mastered"],
-    ["la-ind", "Linear independence", "Independence", "01 VECTORS", "Tell when a set of vectors adds no new direction.", "mastered"],
-    ["la-mat", "Matrix operations", "Matrices", "02 MATRICES", "Add, scale and multiply matrices, and know when each is defined.", "mastered"],
-    ["la-inv", "Inverses", "Inverses", "02 MATRICES", "Undo a matrix, and know when that is impossible.", "mastered"],
-    ["la-sys", "Solving systems", "Systems", "03 SYSTEMS", "Row reduce to find every solution of a linear system.", "mastered"],
-    ["la-det", "Determinants", "Determinants", "03 SYSTEMS", "Read invertibility and area scaling from one number.", "mastered"],
-    ["la-eig", "Eigenvalues", "Eigenvalues", "04 EIGEN", "Find the directions a matrix only stretches.", "mastered"],
-    ["la-dia", "Diagonalization", "Diagonalize", "04 EIGEN", "Rewrite a matrix in the basis of its eigenvectors.", "mastered"],
-  ], sampleFile("the completed-course group"));
-
-const samplePersonalFinance = () => sampleCourse("personal-finance", "Personal Finance 101", "Quiz Friday, Oct 23", "2026-10-23",
-  ["01 BASICS", "02 CREDIT", "03 GROWTH", "04 PLANNING"], [
-    ["pf-bud", "Budgeting basics", "Budgeting", "01 BASICS", "Track income and spending against a plan.", "mastered"],
-    ["pf-emg", "Emergency fund", "Emergency", "01 BASICS", "Size a cash buffer and decide where to keep it.", "mastered"],
-    ["pf-crs", "Credit scores", "Credit", "02 CREDIT", "What moves a score, and what a lender reads from it.", "mastered"],
-    ["pf-dbt", "Debt payoff", "Debt", "02 CREDIT", "Compare avalanche and snowball payoff orders.", "developing"],
-    ["pf-cmp", "Compound interest", "Compound", "03 GROWTH", "How interest on interest grows a balance over time.", "provisional"],
-    ["pf-idx", "Index funds", "Index funds", "03 GROWTH", "Why low-fee broad funds beat most stock picking.", "developing"],
-    ["pf-tax", "Taxes 101", "Taxes", "04 PLANNING", "Marginal rates, deductions and what a paycheck withholds.", "not_started"],
-    ["pf-ret", "Retirement accounts", "Retirement", "04 PLANNING", "401(k), IRA and Roth: who gets which tax break.", "not_started"],
-  ], sampleFile("an in-progress sample course"));
-
-const g = globalThis as unknown as { __proveit?: Db };
-const db = (): Db => (g.__proveit ??= seed());
 
 // ---- helpers ----
 
@@ -178,6 +177,7 @@ function recordAttempt(data: NewAttempt): Attempt {
     rootAttemptId: parent?.rootAttemptId ?? id,
   };
   db().attempts.push(rec);
+  persistLearning();
   return rec;
 }
 
@@ -312,7 +312,7 @@ const evidenceText = (c: Concept) =>
   c.evidence.answers === 0 ? "none yet" : c.evidence.transferPassed ? "new question passed" : `${c.evidence.sound} of ${c.evidence.answers} answers sound`;
 
 const ctaFor = (c: Concept): ConceptView["cta"] => {
-  if (!testable(c)) return { label: "Not in the demo yet", href: null };
+  if (!testable(c)) return { label: "Not authored yet", href: null };
   const label = c.state === "mastered" || c.state === "provisional" ? "Review anyway" : c.state === "not_started" ? "Start this concept" : "Test this concept";
   return { label, href: practiceHref(c) };
 };
@@ -328,7 +328,7 @@ export function getCourse(courseId: string): CourseView {
     provisional: course.concepts.filter((c) => c.state === "provisional").length,
     total: course.concepts.length,
     needsWork: course.concepts.filter((c) => c.state === "needs_work").length,
-    concepts: course.concepts.map((c) => ({ id: c.id, name: c.name, short: c.short, unit: c.unit, desc: c.desc, x: c.x, y: c.y, state: c.state, dims: dimsFor(c), evidence: evidenceText(c), cta: active ? ctaFor(c) : { label: c.state === "mastered" ? "Mastered" : "Not in the demo yet", href: null } })),
+    concepts: course.concepts.map((c) => ({ id: c.id, name: c.name, short: c.short, unit: c.unit, desc: c.desc, x: c.x, y: c.y, state: c.state, dims: dimsFor(c), evidence: evidenceText(c), cta: active ? ctaFor(c) : { label: c.state === "mastered" ? "Mastered" : "Not authored yet", href: null } })),
     edges: course.edges,
     nextUp: next ? { id: next.id, name: next.name } : null,
   };
@@ -383,7 +383,7 @@ export function getDashboard(): DashboardView {
     counts: { proven: cs.filter((c) => c.state === "mastered").length, due, needsWork: cs.filter((c) => c.state === "needs_work").length, courses: 1 },
     courses: [{ id: course.id, name: course.name, pct: coursePct(cs), proven: cs.filter((c) => c.state === "mastered").length, total: cs.length, openMisconception: bad ? lastBad(bad.id) : null }],
     risk: bad ? { concept: `${bad.name} in ${course.name}`, reason: `${lastBad(bad.id) ?? "An open misconception"} is still open. Fix it before ${course.deadline.replace("Quiz ", "the quiz on ")}.` } : null,
-    recommendation: next ? `${bad ? "Fix" : "Work on"} ${next.name} next${due > 0 ? ", then clear your reviews" : ""}.` : "Nothing left to test in this demo course.",
+    recommendation: next ? `${bad ? "Fix" : "Work on"} ${next.name} next${due > 0 ? ", then clear your reviews" : ""}.` : "Nothing left to test in the currently authored course content.",
     nextActions: next ? [{ label: `Test ${next.name} · ${course.name}`, href: practiceHref(next) }] : [],
     recentlyCaught,
   };
@@ -478,6 +478,14 @@ export function getEvidenceAttempt(id: string): EvidenceAttemptView {
     parentAttemptId: a.parentAttemptId, rootAttemptId: a.rootAttemptId, answer: a.answer, evaluation: a.evaluation,
     previousState: a.previousState, createdAt: a.createdAt,
   };
+}
+
+export function getEvidenceTrail(id: string): EvidenceAttemptView[] {
+  const current = attempt(id);
+  return db().attempts
+    .filter((a) => a.rootAttemptId === current.rootAttemptId)
+    .sort((a, b) => a.createdAt - b.createdAt)
+    .map((a) => getEvidenceAttempt(a.id));
 }
 
 export type AttemptView = {
@@ -640,7 +648,7 @@ export function getResult(attemptId: string): ResultView {
     intervention: diagnosed ? "1 short lesson" : hadOverturnedDiagnosis ? "Clarified the diagnosis" : "No remediation needed",
     transferText: earlierMisses === 0 ? "Correct on first try" : `Correct after ${earlierMisses} earlier ${earlierMisses === 1 ? "miss" : "misses"}`,
     nextReview: c.nextReview ? `${c.nextReview === isoDay(addDays(new Date(), 1)) ? "Tomorrow, " : ""}${shortDate(new Date(`${c.nextReview}T00:00:00`))}` : "Not scheduled",
-    recommendation: nxt ? `${nxt.name} is next. You're one new question away from proving it.` : "You've covered everything in this demo course.",
+    recommendation: nxt ? `${nxt.name} is next. You're one new question away from proving it.` : "You've covered everything currently authored for this course.",
     nextConcept: nxt ? { name: nxt.name, href: practiceHref(nxt) } : null,
     segments: [...course.concepts].map((x) => x.state).sort((p, q) => RANK.indexOf(p) - RANK.indexOf(q)),
     coursePct: coursePct(course.concepts),
@@ -694,8 +702,8 @@ export function getReviewBase(courseId: string): ReviewBase {
     facts,
     fallback: {
       misconceptions: facts.map((f) => ({ concept: f.concept, misconception: f.misconception })),
-      biggestRisk: { reason: active ? d.risk?.reason ?? "No open misconceptions right now." : "No open misconceptions in this sample course." },
-      recommendation: active ? d.recommendation : isCompleted(course) ? "This course is complete. Come back for reviews when they are due." : "This sample course can't be practiced in the demo yet.",
+      biggestRisk: { reason: active ? d.risk?.reason ?? "No open misconceptions right now." : "No open misconceptions in this course." },
+      recommendation: active ? d.recommendation : isCompleted(course) ? "This course is complete. Come back for reviews when they are due." : "This course does not have authored practice content yet.",
       nextActions: active ? d.nextActions.map((a) => a.label) : [],
     },
   };
@@ -910,6 +918,7 @@ export function listCourses(): CourseRow[] {
 export function setCoursesCompleted(ids: string[], completed: boolean): string[] {
   const found = ids.map((id) => courseFor(id));
   for (const c of found) c.completedOverride = completed;
+  persistLearning();
   return found.map((c) => c.id);
 }
 
@@ -962,6 +971,7 @@ export function setTaskDone(id: string, done: boolean): void {
   if (task.doneBy === "progress") throw new TaskLockedError("Your answers already completed this task.");
   if (done) db().taskDone.add(id);
   else db().taskDone.delete(id);
+  persistLearning();
 }
 
 // ---- events that come from courses ----
@@ -1012,7 +1022,9 @@ export function getRewards(): Rewards {
     { label: "Streak days, up to 7", count: Math.min(streak(), STREAK_CAP), each: POINTS.streakDay },
   ].map((r) => ({ ...r, points: r.count * r.each }));
   const earned = rows.reduce((n, r) => n + r.points, 0);
-  db().peakPoints = Math.max(db().peakPoints, earned);
+  const previousPeak = db().peakPoints;
+  db().peakPoints = Math.max(previousPeak, earned);
+  if (db().peakPoints !== previousPeak) persistLearning();
   const s = standing(db().peakPoints);
   return { ...s, breakdown: rows, ladder: TIERS.map((t, i) => ({ id: t.id, name: t.name, min: t.min, reached: i <= s.tierIndex, current: i === s.tierIndex })) };
 }

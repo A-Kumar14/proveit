@@ -27,7 +27,7 @@ export default function ReviewPage() {
       <div className="grid min-h-0 flex-1 grid-cols-1 items-start gap-8 overflow-y-auto px-7 py-6 xl:grid-cols-[minmax(0,1fr)_300px]">
         <section aria-label="Review queue" className="flex min-w-0 flex-col gap-4">
           <div>
-            <div className="eyebrow">{connected ? calendar.provider : "Sample calendar"}</div>
+            <div className="eyebrow">{connected ? calendar.provider : "No calendar connected"}</div>
             <h1 className="m-0 mt-1 text-[22px] font-semibold">Review queue</h1>
             <p className="m-0 mt-2 max-w-xl text-[13px] text-ink-muted">
               Ordered by the next quiz or class on your calendar, then by what still needs work. Suggested times are free gaps. They are not added to the calendar.{" "}
@@ -52,7 +52,7 @@ export default function ReviewPage() {
                   <div className="mt-1 text-xs text-ink-3">{row.because}</div>
                   {row.slot && <div className="mt-0.5 text-[11px] text-ink-muted">Suggested <time dateTime={row.slot.start} suppressHydrationWarning>{when(row.slot.start)}</time></div>}
                 </div>
-                {row.href ? <Link href={row.href} className={buttonStyles({ size: "sm" })}>{row.pressure === "review" ? "Review now" : "Start"}</Link> : <span className="pt-1 text-[11px] text-ink-faint">Not in demo</span>}
+                {row.href ? <Link href={row.href} className={buttonStyles({ size: "sm" })}>{row.pressure === "review" ? "Review now" : "Start"}</Link> : <span className="pt-1 text-[11px] text-ink-faint">Not authored yet</span>}
               </li>
             ))}
           </ol>
@@ -63,7 +63,7 @@ export default function ReviewPage() {
             <h2 className="m-0 text-sm font-semibold">Coming up</h2>
             <Link href="/calendar" className="text-xs text-ink-muted no-underline hover:text-ink">Calendar</Link>
           </div>
-          <p className="m-0 text-xs text-ink-muted">{connected ? `Synced from ${calendar.provider}.` : "Sample week, until you connect a calendar."}</p>
+          <p className="m-0 text-xs text-ink-muted">{connected ? `Synced from ${calendar.provider}.` : "Connect a calendar to schedule around your real week."}</p>
           {days.length === 0 && <p className="m-0 text-[13px] text-ink-muted">Nothing on the calendar for the next {DAYS} days.</p>}
           {days.map((day) => (
             <section key={day} aria-label={dayHeading(new Date(`${day}T00:00:00`), now)} className="flex flex-col gap-1">

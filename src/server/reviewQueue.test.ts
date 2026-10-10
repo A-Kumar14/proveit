@@ -17,7 +17,7 @@ const now = new Date(2026, 9, 10, 8, 0);
 describe("review queue", () => {
   it("orders open concepts by the sooner quiz, then by how far they are from mastered", () => {
     const rows = getReviewQueue(now);
-    expect(rows.map((r) => r.id)).toEqual(["cii", "var", "se", "cic", "nul", "pv", "err", "pf-dbt", "pf-idx", "pf-tax", "pf-ret"]);
+    expect(rows.map((r) => r.id)).toEqual(["cii", "var", "se", "cic", "pf-dbt", "pf-idx"]);
     expect(rows[0]).toMatchObject({ pressure: "quiz", href: "/course/intro-stats/practice/cii", because: "Before the quiz, Thu, Oct 15" });
     expect(rows.find((r) => r.id === "pf-dbt")).toMatchObject({ href: null, because: "Before the quiz, Fri, Oct 23" });
     expect(rows.filter((r) => r.slot)).toHaveLength(3);

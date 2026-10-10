@@ -9,7 +9,7 @@ import { Widget } from "./Widget";
 const DAYS = 7;
 const MAX = 7;
 
-/** The next few days at a glance, plus connect and refresh. Real events replace the sample once a feed is connected. */
+/** The next few days at a glance, plus connect and refresh. Only connected calendar events and course deadlines are shown. */
 export function CalendarCard({ schedule, now = new Date() }: { schedule: Schedule; now?: Date }) {
   const { calendar, events } = schedule;
   const start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -21,7 +21,7 @@ export function CalendarCard({ schedule, now = new Date() }: { schedule: Schedul
     <Widget title="Calendar" action={{ label: "Open calendar", href: "/calendar" }} className="min-w-0">
       <div className="flex flex-col gap-3">
         <p className="m-0 text-xs text-ink-muted">
-          {connected ? `${calendar.provider} · synced ${calendar.syncedAt ? ago(calendar.syncedAt) : "just now"}` : events.some((e) => e.id.startsWith("sample-")) ? "Sample calendar. Connect yours so reviews and study blocks fit around your real week." : "No calendar connected. Connect yours so reviews and study blocks fit around your week."}
+          {connected ? `${calendar.provider} · synced ${calendar.syncedAt ? ago(calendar.syncedAt) : "just now"}` : "No calendar connected. Connect yours so reviews and study blocks fit around your week."}
         </p>
         {days.length === 0 && <p className="m-0 text-[13px] text-ink-muted">Nothing on the calendar for the next {DAYS} days.</p>}
         {days.map((day) => (

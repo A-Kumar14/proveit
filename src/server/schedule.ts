@@ -83,7 +83,7 @@ export function getReviewQueue(now = new Date()): QueueRow[] {
     const event = driverFor(g.courseId, g.courseName, events, now);
     if (!event) return [];
     const pressure: QueuePressure = event.kind === "quiz" ? "quiz" : "class";
-    return g.open.filter((t) => t.kind === "practice").map((t) => ({
+    return g.open.filter((t) => t.kind === "practice" && t.state !== "not_started").map((t) => ({
       id: t.id, name: t.title, courseName: t.courseName, state: t.state, href: t.href, pressure, because: because(pressure, event.start, false), eventStart: event.start, slot: null,
     }));
   });

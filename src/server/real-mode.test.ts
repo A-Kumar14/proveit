@@ -1,31 +1,42 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { disconnectCalendar, getCalendarState } from "./calendar";
 import { assess, getCourse, getRewards, getTodos, listCourses } from "./store";
+import { getReviewQueue } from "./schedule";
+import { demoStateForTests } from "../test/demo-state";
 
 const RIGHT = "The 95% describes the method. Over many repeated samples, about 95% of the intervals built this way contain the true mean.";
+type TestGlobal = { __proveit?: unknown; __proveitTestSeedFactory?: () => unknown; __proveitCal?: unknown };
 
 beforeEach(() => {
-  vi.stubEnv("PROVEIT_DATA", "");
   delete process.env.GOOGLE_GENERATIVE_AI_API_KEY;
-  (globalThis as { __proveit?: unknown }).__proveit = undefined;
+  const g = globalThis as unknown as TestGlobal;
+  g.__proveitTestSeedFactory = undefined;
+  g.__proveit = undefined;
+  g.__proveitCal = undefined;
   disconnectCalendar();
 });
-afterEach(() => { vi.unstubAllEnvs(); (globalThis as { __proveit?: unknown }).__proveit = undefined; });
+afterEach(() => {
+  const g = globalThis as unknown as TestGlobal;
+  g.__proveit = undefined;
+  g.__proveitCal = undefined;
+  g.__proveitTestSeedFactory = demoStateForTests;
+});
 
-describe("real mode (no PROVEIT_DATA=demo)", () => {
-  it("starts with one course, nothing started, no rank and no sample calendar", () => {
+describe("real runtime state", () => {
+  it("starts with one course, nothing started, no rank and no fabricated calendar", () => {
     const course = getCourse("intro-stats");
     expect(course.concepts.every((c) => c.state === "not_started" && c.dims.every((d) => d.tone === "none"))).toBe(true);
     expect(listCourses().map((c) => c.id)).toEqual(["intro-stats"]);
     expect(getRewards().points).toBe(0);
     expect(getTodos().flatMap((g) => g.done)).toEqual([]);
-    expect(getCalendarState().events).toEqual([]);
+    expect(getCalendarState()).toMatchObject({ mode: "none", events: [] });
+    expect(getReviewQueue(new Date(2026, 9, 10, 8, 0))).toEqual([]);
   });
 
   it("moves a concept only because of an answer", async () => {
     await assess({ courseId: "intro-stats", conceptId: "cii", answer: RIGHT });
     const states = Object.fromEntries(getCourse("intro-stats").concepts.map((c) => [c.id, c.state]));
     expect(states.cii).toBe("developing");
-    expect(Object.entries(states).filter(([id]) => id !== "cii").every(([, s]) => s === "not_started")).toBe(true);
+    expect(Object.entries(states).filter(([id]) => id !== "cii").every(([, state]) => state === "not_started")).toBe(true);
   });
 });

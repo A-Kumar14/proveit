@@ -9,7 +9,6 @@ import { clarify, getAttempt, getQuestion } from "@proveit/server/store";
 export const dynamic = "force-dynamic";
 
 export default async function PracticePage({ params, searchParams }: PageProps<"/course/[courseId]/practice/[conceptId]">) {
-  const demo = process.env.NEXT_PUBLIC_DEMO_MODE === "1";
   const { courseId, conceptId } = await params;
   const { clarify: clarifyId, mode } = await searchParams;
   const modeParam = typeof mode === "string" ? mode : undefined;
@@ -19,7 +18,7 @@ export default async function PracticePage({ params, searchParams }: PageProps<"
     const resume = prior && prior.conceptId === conceptId ? { attemptId: prior.id, answer: prior.answer, followUp: clarify(prior.id).followUp } : undefined;
     return { q, resume };
   });
-  const uploads = { enabled: aiEnabled() || demo, demo };
+  const uploads = { enabled: aiEnabled() };
   if (modeParam === "speak") return <VoiceSession courseId={courseId} question={q} typeHref={`/course/${courseId}/practice/${conceptId}?mode=type`} uploads={uploads} />;
   return (
     <AppShell active="practice" courseId={courseId} state={q.state} crumbs={[{ label: q.courseName, href: `/course/${courseId}` }, { label: q.conceptName }]} right={<SwitchToVoice href={`/course/${courseId}/practice/${conceptId}?mode=speak`} />}>

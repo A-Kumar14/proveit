@@ -11,7 +11,8 @@ Status as of the last push to `main`. Tick items as they land.
 - [ ] Check the upload check accepts a photo of real work and rejects a lecture slide
 - [ ] Check Sketch and Camera send a frame through the upload check
 - [ ] Check voice mode with a real mic: speech, mute, End and review, edited transcript
-- [ ] Replace the in-memory store with the real database behind the same functions in `src/server/store.ts`
+- [x] Persist learner state locally through the SQLite adapter behind `src/server/store.ts`
+- [ ] Replace/localize SQLite with durable hosted storage before relying on serverless deployment persistence
 - [ ] Add a demo reset (button or endpoint) so state can clear without a restart
 - [ ] Lock one deterministic demo path and rehearse it
 - [ ] Deploy (Vercel) and confirm state survives between requests
@@ -26,15 +27,15 @@ Status as of the last push to `main`. Tick items as they land.
 ## Product gaps
 
 - [ ] Generate transfer questions dynamically and validate they test the same concept
-- [ ] Promote Provisional to Mastered when a delayed review passes
-- [ ] Make the Review queue's "Review now" run a real review attempt
+- [x] Promote Provisional to Mastered when a delayed review passes
+- [x] Make the Review queue's "Review now" run a real review attempt
 - [ ] Let the evaluator return procedural errors and slips, not only conceptual ones
 - [ ] Add source retrieval and citations so "Rule from course material" points at real text
 - [ ] Have the model word the lesson, then show the "Wording by AI" tag
 - [ ] Build course upload and concept extraction (the Add a course modal is disabled)
-- [ ] Make the sample Linear Algebra and Personal Finance 101 courses real, or remove them before the demo (placeholder data)
+- [x] Remove sample Linear Algebra and Personal Finance runtime courses from main; keep fabricated demo data off main
 - [ ] Let the store run practice for more than one active course (only Intro Statistics is practicable)
-- [ ] Decide on the free-text tutor chat (needs a chat backend), or leave it out
+- [x] Build the free-text Tutor chat with files, dictation and spoken mode
 
 ## Handoff done-checklist
 
@@ -63,14 +64,15 @@ Status as of the last push to `main`. Tick items as they land.
 - [ ] Store the calendar link per user in the database, not server memory
 - [ ] Use the student's time zone for events and slots (today they use the server's)
 - [ ] Add study blocks to the student's own calendar (write access), not only suggest them
-- [ ] Let a passed review mark its review task done and promote Provisional to Mastered
+- [x] Let a passed review promote Provisional to Mastered; due-review task disappears from the queue after rescheduling
 - [ ] Decide what happens to hand-ticked tasks when the same concept is later proved by answers
 
 ## Rank
 
 - [ ] Tune the point values and tier thresholds against real use (they are first guesses)
-- [ ] Exclude sample and seeded courses from points once real courses exist (they inflate the starting rank today)
-- [ ] Store peak points and the celebrated tier per user in the database (peak is server memory, celebrated tier is browser storage)
+- [x] Remove runtime sample/seeded course points from main; rank starts at 0
+- [x] Persist peak points locally in SQLite
+- [ ] Persist celebrated tier and user-scoped rank state once auth/multi-user storage exists
 - [ ] Show points earned on the review result once a passed review can promote to Mastered
 - [ ] Decide whether to add a leaderboard or sharing for bragging rights
 
