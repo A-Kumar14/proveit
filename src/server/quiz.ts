@@ -6,13 +6,13 @@ import { z } from "zod";
 import { aiEnabled, model } from "./ai";
 import { courseMaterial } from "./materials";
 import { getWeakness, type Weak } from "./practice";
-import { NotFoundError } from "./store";
+import { NotFoundError, recordQuizEvidence } from "./store";
 import type { QuizQuestion, QuizResult, QuizStartResult } from "@proveit/lib/schemas";
 
 export const DEFAULT_QUESTIONS = 8;
 
-type Keyed = QuizQuestion & { correct: number; explanation: string };
-type Held = { id: string; courseName: string; questions: Keyed[]; at: number; result: QuizResult | null };
+type Keyed = QuizQuestion & { conceptId: string; correct: number; explanation: string };
+type Held = { id: string; courseId: string; courseName: string; questions: Keyed[]; at: number; result: QuizResult | null };
 
 const g = globalThis as unknown as { __proveitQuizzes?: Map<string, Held> };
 const quizzes = (): Map<string, Held> => userCache("quizzes", () => (g.__proveitQuizzes ??= new Map<string, Held>()), () => new Map<string, Held>());
@@ -34,9 +34,9 @@ function shuffle<T>(xs: T[]): T[] {
 }
 
 /** Put the right answer at a random place, so a model that likes option A can't give the quiz away. */
-function place(concept: string, prompt: string, right: string, wrong: string[], explanation: string, n: number): Keyed {
+function place(conceptId: string, concept: string, prompt: string, right: string, wrong: string[], explanation: string, n: number): Keyed {
   const options = shuffle([right, ...wrong.slice(0, 3)]);
-  return { id: `q${n + 1}`, concept, prompt, options, correct: options.indexOf(right), explanation };
+  return { id: `q${n + 1}`, conceptId, concept, prompt, options, correct: options.indexOf(right), explanation };
 }
 
 // Concepts with an open mistake first, then other weak ones, then the rest.
@@ -52,7 +52,7 @@ function offline(concepts: Weak[], count: number): Keyed[] {
   return chosen.flatMap((c, i) => {
     const wrong = shuffle(concepts.filter((x) => x.id !== c.id)).slice(0, 3).map((x) => x.desc);
     if (wrong.length < 3) return [];
-    return [place(c.name, `Which statement describes "${c.name}"?`, c.desc, wrong, `${c.name}: ${c.desc}`, i)];
+    return [place(c.id, c.name, `Which statement describes "${c.name}"?`, c.desc, wrong, `${c.name}: ${c.desc}`, i)];
   });
 }
 
@@ -79,13 +79,15 @@ async function written(courseId: string, courseName: string, concepts: Weak[], c
     output: Output.object({ schema: Out }),
     prompt: JSON.stringify({ course: courseName, notes: courseMaterial(courseId, 20_000), concepts: concepts.map((c) => ({ name: c.name, about: c.desc, weak: c.weak, misconceptions: c.mistakes.map((m) => m.name) })) }),
   });
-  const known = new Set(concepts.map((c) => c.name));
+  const known = new Map(concepts.map((c) => [c.name.trim().toLowerCase(), c]));
   const out: Keyed[] = [];
   for (const q of output.questions) {
     const opts = q.options.map((o) => o.trim());
     if (new Set(opts.map((o) => o.toLowerCase())).size !== 4 || opts.some((o) => !o) || !q.prompt.trim()) continue;
     const right = opts[q.answerIndex]!;
-    out.push(place(known.has(q.concept) ? q.concept : concepts[0]?.name ?? q.concept, q.prompt.trim(), right, opts.filter((_, i) => i !== q.answerIndex), q.explanation.trim(), out.length));
+    const target = known.get(q.concept.trim().toLowerCase()) ?? concepts[0];
+    if (!target) continue;
+    out.push(place(target.id, target.name, q.prompt.trim(), right, opts.filter((_, i) => i !== q.answerIndex), q.explanation.trim(), out.length));
   }
   // A quiz with most questions thrown out isn't the quiz that was asked for.
   if (out.length < Math.ceil(count / 2)) throw new Error("the model returned too few usable quiz questions");
@@ -101,18 +103,36 @@ export async function startQuiz(courseId: string, count = DEFAULT_QUESTIONS): Pr
   const questions = useAi ? await written(courseId, w.courseName, w.concepts, count) : offline(w.concepts, count);
   if (questions.length === 0) throw new NotFoundError(`course ${courseId} is too small for a quiz`);
   const id = randomUUID();
-  remember({ id, courseName: w.courseName, questions, at: Date.now(), result: null });
+  remember({ id, courseId, courseName: w.courseName, questions, at: Date.now(), result: null });
   return { quizId: id, courseName: w.courseName, questions: questions.map(strip), aiWritten: useAi };
 }
 
-/** Grades a quiz. Submitting twice returns the first result. A quiz never changes mastery or rank. */
+/**
+ * Grades a quiz and records answered items as low-stakes evidence.
+ * Quiz evidence can move an unseen concept to developing, but never diagnoses, proves transfer,
+ * grants mastery, schedules review, or directly awards rank points.
+ */
 export function submitQuiz(quizId: string, answers: (number | null)[]): QuizResult {
   const quiz = quizzes().get(quizId);
   if (!quiz) throw new NotFoundError(`quiz ${quizId}`);
   if (quiz.result) return quiz.result;
+
   const items = quiz.questions.map((q, i) => ({ ...strip(q), picked: answers[i] ?? null, correct: q.correct, explanation: q.explanation }));
   const score = items.filter((it) => it.picked === it.correct).length;
-  const byConcept = [...items.reduce((m, it) => m.set(it.concept, { concept: it.concept, right: (m.get(it.concept)?.right ?? 0) + (it.picked === it.correct ? 1 : 0), total: (m.get(it.concept)?.total ?? 0) + 1 }), new Map<string, { concept: string; right: number; total: number }>()).values()];
+  const byConcept = [...items.reduce((m, it) => m.set(it.concept, {
+    concept: it.concept,
+    right: (m.get(it.concept)?.right ?? 0) + (it.picked === it.correct ? 1 : 0),
+    total: (m.get(it.concept)?.total ?? 0) + 1,
+  }), new Map<string, { concept: string; right: number; total: number }>()).values()];
+
+  recordQuizEvidence(quiz.courseId, quiz.questions.flatMap((q, i) => {
+    const picked = answers[i] ?? null;
+    if (picked === null) return [];
+    const selected = q.options[picked];
+    if (selected === undefined) return [];
+    return [{ conceptId: q.conceptId, prompt: q.prompt, selected, correct: picked === q.correct }];
+  }));
+
   quiz.result = { score, total: items.length, pct: Math.round((score / items.length) * 100), items, byConcept };
   return quiz.result;
 }
