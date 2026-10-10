@@ -7,72 +7,155 @@ import type { Evaluation } from "@proveit/lib/schemas";
 
 export type Judgement = {
   verdict: "correct" | "incorrect" | "uncertain";
-  /** Exact substring of the judged text, or null. */
   quote: string | null;
+  misconceptionId: string | null;
+  votes: Evaluation["votes"];
+};
+
+export type AnswerContext = {
+  previous: { answer: string; verdict: "correct" | "incorrect" | "uncertain"; misconceptionId: string | null }[];
+  followUpPrompt: string | null;
+};
+
+export type TransferJudgement = {
+  verdict: "pass" | "fail" | "uncertain";
+  quote: string | null;
+  misconceptionId: string | null;
+  feedback: string | null;
   votes: Evaluation["votes"];
 };
 
 const CHECKS = 3;
+const TEMPERATURE = 0.2;
 
 const Check = z.object({
   verdict: z.enum(["correct", "incorrect", "uncertain"]),
-  misconceptionId: z.string().nullable().describe("An id from the misconception list, or null."),
-  evidenceQuote: z.string().nullable().describe("A phrase copied exactly from the student's answer that shows the error, or null."),
+  misconceptionId: z.string().nullable(),
+  evidenceQuote: z.string().nullable(),
 });
+type Check = z.infer<typeof Check>;
+
+const TransferCheck = z.object({
+  verdict: z.enum(["pass", "fail", "uncertain"]),
+  misconceptionId: z.string().nullable(),
+  evidenceQuote: z.string().nullable(),
+  feedback: z.string().max(240).nullable(),
+});
+type TransferCheck = z.infer<typeof TransferCheck>;
 
 const SYSTEM = `You grade a student's explanation against course material.
 Rules:
 - The course material below is the only grading authority.
-- Mark "incorrect" only when the answer clearly states one of the listed misconceptions. Quote the exact phrase.
-- Mark "uncertain" when the answer is too short or vague to tell. Never guess a misconception.
-- Mark "correct" only when the answer matches the course material in its own words.
+- Mark "incorrect" only when the CURRENT answer clearly states one of the listed misconceptions. Quote the exact phrase from the current answer.
+- Mark "uncertain" when the current evidence is too short, vague or ambiguous. Never guess a misconception.
+- Mark "correct" only when the current evidence demonstrates the course material in the student's own words.
+- Earlier responses are context, not permanent truth. If the current clarification explicitly corrects an earlier statement, the later clarification supersedes it.
 - Calculation slips, wording quibbles and missing detail are not misconceptions.`;
 
-/** Independent checks vote. A split with no majority becomes "uncertain" rather than a guess. */
-async function vote(conceptId: string, answer: string): Promise<Judgement> {
+const TRANSFER_SYSTEM = `You grade a transfer question against its rubric.
+Rules:
+- "pass" only when every required part of the rubric is demonstrated.
+- "fail" only when the current answer clearly contradicts the rubric or clearly states a listed misconception.
+- "uncertain" when the answer is incomplete, vague or ambiguous rather than clearly wrong.
+- If a listed misconception clearly explains the failure, return its exact id; otherwise return null.
+- Quote only exact text from the CURRENT answer.
+- Feedback must be brief, diagnostic, and must not reveal the full correct answer.`;
+
+const count = <T extends string>(rows: { verdict: T }[], verdict: T) => rows.filter((r) => r.verdict === verdict).length;
+const majority = <T extends string>(rows: { verdict: T }[], ordered: readonly T[]) =>
+  ordered.find((v) => count(rows, v) > rows.length / 2) ?? null;
+
+function majorityMisconception<T extends { verdict: string; misconceptionId: string | null }>(
+  rows: T[], verdict: string, allowed: Set<string>,
+): { id: string; count: number } | null {
+  const counts = new Map<string, number>();
+  for (const row of rows) {
+    if (row.verdict !== verdict || !row.misconceptionId || !allowed.has(row.misconceptionId)) continue;
+    counts.set(row.misconceptionId, (counts.get(row.misconceptionId) ?? 0) + 1);
+  }
+  const top = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
+  return top && top[1] > rows.length / 2 ? { id: top[0], count: top[1] } : null;
+}
+
+function contextBlock(context?: AnswerContext) {
+  if (!context?.previous.length) return "";
+  const prior = context.previous.map((p, i) =>
+    `Earlier response ${i + 1} [${p.verdict}${p.misconceptionId ? `, ${p.misconceptionId}` : ""}]:
+"""
+${p.answer}
+"""`
+  ).join("\n");
+  return `
+Earlier evidence in this same learning episode:
+${prior}
+${context.followUpPrompt ? `Follow-up the student is answering now: ${context.followUpPrompt}` : ""}
+Evaluate the CURRENT answer below as the latest evidence. A clear correction can supersede an earlier mistake.
+`;
+}
+
+async function vote(conceptId: string, answer: string, context?: AnswerContext): Promise<Judgement> {
   const a = AUTHORED[conceptId];
   if (!a) throw new Error(`no authored content for ${conceptId}`);
   const prompt = `Question: ${a.question}
 Course material: ${a.correct}
-Known misconceptions: ${JSON.stringify([{ id: a.misconception.id, name: a.misconception.name, description: a.misconception.gap }])}
-
-Student answer:
+Known misconceptions: ${JSON.stringify(a.misconceptions.map((m) => ({ id: m.id, name: m.name, description: m.gap })))}
+${contextBlock(context)}
+CURRENT student answer:
 """
 ${answer}
 """`;
   const checks = await Promise.all(
-    Array.from({ length: CHECKS }, () => generateText({ model: model(), system: SYSTEM, prompt, output: Output.object({ schema: Check }), temperature: 0.7 }).then((r) => r.output)),
+    Array.from({ length: CHECKS }, () => generateText({ model: model(), system: SYSTEM, prompt, output: Output.object({ schema: Check }), temperature: TEMPERATURE }).then((r) => r.output)),
   );
-  const count = (v: Check["verdict"]) => checks.filter((c) => c.verdict === v).length;
-  const winner = (["incorrect", "correct", "uncertain"] as const).find((v) => count(v) > CHECKS / 2);
-  if (!winner) return { verdict: "uncertain", quote: null, votes: { agree: Math.max(count("incorrect"), count("correct"), count("uncertain")), of: CHECKS } };
-  const quote = checks.find((c) => c.verdict === winner && c.evidenceQuote && answer.includes(c.evidenceQuote))?.evidenceQuote ?? null;
-  return { verdict: winner, quote: winner === "incorrect" ? quote : null, votes: { agree: count(winner), of: CHECKS } };
+  const winner = majority(checks, ["incorrect", "correct", "uncertain"] as const);
+  const maxVotes = Math.max(...(["incorrect", "correct", "uncertain"] as const).map((v) => count(checks, v)));
+  if (!winner) return { verdict: "uncertain", quote: null, misconceptionId: null, votes: { agree: maxVotes, of: CHECKS } };
+  if (winner !== "incorrect") return { verdict: winner, quote: null, misconceptionId: null, votes: { agree: count(checks, winner), of: CHECKS } };
+  const allowed = new Set(a.misconceptions.map((m) => m.id));
+  const diagnosis = majorityMisconception(checks, "incorrect", allowed);
+  if (!diagnosis) return { verdict: "uncertain", quote: null, misconceptionId: null, votes: { agree: count(checks, "incorrect"), of: CHECKS } };
+  const quote = checks.find((c) => c.verdict === "incorrect" && c.misconceptionId === diagnosis.id && c.evidenceQuote && answer.includes(c.evidenceQuote))?.evidenceQuote ?? null;
+  return { verdict: "incorrect", quote, misconceptionId: diagnosis.id, votes: { agree: diagnosis.count, of: CHECKS } };
 }
-type Check = z.infer<typeof Check>;
 
-export async function judgeAnswer(conceptId: string, answer: string): Promise<Judgement> {
-  if (aiEnabled()) return vote(conceptId, answer);
+export async function judgeAnswer(conceptId: string, answer: string, context?: AnswerContext): Promise<Judgement> {
+  if (aiEnabled()) return vote(conceptId, answer, context);
   const j = AUTHORED[conceptId]?.judge(answer);
   if (!j) throw new Error(`no authored content for ${conceptId}`);
-  return { verdict: j.verdict, quote: j.quote, votes: null };
+  return { verdict: j.verdict, quote: j.quote, misconceptionId: j.misconceptionId, votes: null };
 }
 
-const Pass = z.object({ passes: z.boolean() });
-
-export async function judgeTransfer(conceptId: string, answer: string): Promise<boolean> {
+async function voteTransfer(conceptId: string, answer: string): Promise<TransferJudgement> {
   const a = AUTHORED[conceptId];
   if (!a) throw new Error(`no authored content for ${conceptId}`);
-  if (!aiEnabled()) return a.transfer.judge(answer);
-  const prompt = `Grade this answer to a transfer question. Be strict: all parts of the rubric must be present.
-Question: ${a.transfer.question}
+  const prompt = `Transfer question: ${a.transfer.question}
 Rubric: ${a.transfer.rubric}
-Student answer:
+Known misconceptions: ${JSON.stringify(a.misconceptions.map((m) => ({ id: m.id, name: m.name, description: m.gap })))}
+
+CURRENT student answer:
 """
 ${answer}
 """`;
-  const results = await Promise.all(
-    Array.from({ length: CHECKS }, () => generateText({ model: model(), prompt, output: Output.object({ schema: Pass }), temperature: 0.7 }).then((r) => r.output.passes)),
+  const checks = await Promise.all(
+    Array.from({ length: CHECKS }, () => generateText({ model: model(), system: TRANSFER_SYSTEM, prompt, output: Output.object({ schema: TransferCheck }), temperature: TEMPERATURE }).then((r) => r.output)),
   );
-  return results.filter(Boolean).length > CHECKS / 2;
+  const winner = majority(checks, ["fail", "pass", "uncertain"] as const);
+  const maxVotes = Math.max(...(["fail", "pass", "uncertain"] as const).map((v) => count(checks, v)));
+  if (!winner) return { verdict: "uncertain", quote: null, misconceptionId: null, feedback: "Give one more precise sentence that addresses every part of the question.", votes: { agree: maxVotes, of: CHECKS } };
+  const agreeing = checks.filter((c) => c.verdict === winner);
+  const feedback = agreeing.find((c) => c.feedback?.trim())?.feedback ?? (winner === "pass" ? null : "Give one more precise sentence that addresses every part of the question.");
+  if (winner !== "fail") return { verdict: winner, quote: null, misconceptionId: null, feedback, votes: { agree: agreeing.length, of: CHECKS } };
+  const allowed = new Set(a.misconceptions.map((m) => m.id));
+  const diagnosis = majorityMisconception(checks, "fail", allowed);
+  const quote = diagnosis
+    ? checks.find((c) => c.verdict === "fail" && c.misconceptionId === diagnosis.id && c.evidenceQuote && answer.includes(c.evidenceQuote))?.evidenceQuote ?? null
+    : null;
+  return { verdict: "fail", quote, misconceptionId: diagnosis?.id ?? null, feedback, votes: { agree: diagnosis?.count ?? agreeing.length, of: CHECKS } };
+}
+
+export async function judgeTransfer(conceptId: string, answer: string): Promise<TransferJudgement> {
+  const a = AUTHORED[conceptId];
+  if (!a) throw new Error(`no authored content for ${conceptId}`);
+  if (aiEnabled()) return voteTransfer(conceptId, answer);
+  return { ...a.transfer.judge(answer), votes: null };
 }
