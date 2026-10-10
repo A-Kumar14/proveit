@@ -1,15 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-<<<<<<< HEAD
 
 const { settings } = vi.hoisted(() => ({ settings: [] as Record<string, unknown>[] }));
 vi.mock("@openrouter/ai-sdk-provider", async (orig) => {
   const m = await orig<typeof import("@openrouter/ai-sdk-provider")>();
   return { ...m, createOpenRouter: (s: Record<string, unknown>) => { settings.push(s); return m.createOpenRouter(s); } };
 });
-import { aiEnabled, aiProvider, model } from "./ai";
-=======
 import { aiEnabled, aiModelId, aiProvider, model } from "./ai";
->>>>>>> origin/main
 
 afterEach(() => vi.unstubAllEnvs());
 const env = (or: string, g: string) => { vi.stubEnv("OPENROUTER_API_KEY", or); vi.stubEnv("GOOGLE_GENERATIVE_AI_API_KEY", g); };
