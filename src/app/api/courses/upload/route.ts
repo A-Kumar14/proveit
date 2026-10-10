@@ -1,6 +1,7 @@
 import { after, NextResponse } from "next/server";
 import { createJob, runCourseJob, type JobInput } from "@proveit/server/courseJobs";
 import { kindOf, MAX_FILE_BYTES, MAX_FILES, MAX_TOTAL_BYTES } from "@proveit/server/courseUpload";
+import { withUserRoute } from "@proveit/server/userBoundary";
 import { aiEnabled } from "@proveit/server/ai";
 
 export const maxDuration = 300;
@@ -12,7 +13,7 @@ const bad = (error: string, status = 400) => NextResponse.json({ error }, { stat
  * The build runs after the response, and the browser follows it at /api/courses/jobs/[id].
  * Typeset PDFs and text are read on this machine. The model only reads scans and images, and writes the outline.
  */
-export async function POST(req: Request) {
+async function POSTForUser(req: Request) {
   const form = await req.formData().catch(() => null);
   if (!form) return bad("Invalid request.");
   const name = String(form.get("name") ?? "").trim();
@@ -33,6 +34,9 @@ export async function POST(req: Request) {
 
   const inputs: JobInput[] = await Promise.all(raw.map(async (f) => ({ name: f.name, type: f.type || (kindOf(f) === "pdf" ? "application/pdf" : "text/plain"), size: f.size, bytes: new Uint8Array(await f.arrayBuffer()) })));
   const jobId = createJob(name, inputs);
+  // The build runs after this response, so it carries the user it belongs to.
   after(() => runCourseJob(jobId, inputs));
   return NextResponse.json({ jobId }, { status: 202 });
 }
+
+export const POST = withUserRoute(POSTForUser);

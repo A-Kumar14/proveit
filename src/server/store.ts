@@ -1,10 +1,11 @@
+import { userCache } from "./userScope";
 import "server-only";
 import { cardStatus, type AssessInput, type AssessResult, type AttemptKind, type AttemptOutcome, type CourseOutline, type Evaluation, type MasteryState, type ReviewSubmitResult, type ReviewText, type TransferResult } from "@proveit/lib/schemas";
 import { toneForPct, type Tone } from "@proveit/lib/mastery";
 import { AUTHORED } from "./content";
 import { judgeAnswer, judgeReview, judgeTransfer, type AnswerContext } from "./evaluator";
 import { followUpFor } from "./followup";
-import { loadJson, saveJson } from "./persistence";
+import { loadUserJson, saveUserJson } from "./persistence";
 import type { CourseSpec } from "@proveit/lib/courseSpec";
 import type { CalEvent } from "./calendar";
 import { POINTS, STREAK_CAP, standing, TIERS, type Standing } from "@proveit/lib/rewards";
@@ -88,7 +89,7 @@ type StoredLearning = {
 
 function restoreLearning(): Db {
   const data = initialState();
-  const stored = loadJson<StoredLearning>("learning");
+  const stored = loadUserJson<StoredLearning>("learning");
   if (!stored) return data;
 
   for (const concept of data.course.concepts) {
@@ -108,7 +109,7 @@ function restoreLearning(): Db {
 
 type StoreGlobal = { __proveit?: Db; __proveitTestSeedFactory?: () => Db };
 const g = globalThis as unknown as StoreGlobal;
-const db = (): Db => (g.__proveit ??= process.env.NODE_ENV === "test" && g.__proveitTestSeedFactory ? g.__proveitTestSeedFactory() : restoreLearning());
+const db = (): Db => userCache("learning", () => (g.__proveit ??= process.env.NODE_ENV === "test" && g.__proveitTestSeedFactory ? g.__proveitTestSeedFactory() : restoreLearning()), restoreLearning);
 
 function persistLearning(): void {
   const current = db();
@@ -123,7 +124,7 @@ function persistLearning(): void {
     completedOverride: current.course.completedOverride,
     courses: current.samples,
   };
-  saveJson("learning", snapshot);
+  saveUserJson("learning", snapshot);
 }
 
 // ---- courses added at runtime ----

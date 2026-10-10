@@ -13,7 +13,8 @@ const KEY = "proveit.tier.celebrated";
  * The first visit only records the tier. Rank never goes down, so this only ever fires upward.
  * In demo mode a button replays it so the animation can be reviewed without earning a tier.
  */
-export function TierCelebration({ tierIndex, tierId, tierName, points, previewable }: { tierIndex: number; tierId: string; tierName: string; points: number; previewable: boolean }) {
+export function TierCelebration({ tierIndex, tierId, tierName, points, previewable, userId = "local" }: { tierIndex: number; tierId: string; tierName: string; points: number; previewable: boolean; userId?: string }) {
+  const storageKey = userId === "local" ? KEY : `${KEY}:${JSON.stringify(userId)}`;
   const confetti = useConfetti();
   const [open, setOpen] = useState(false);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
@@ -28,12 +29,12 @@ export function TierCelebration({ tierIndex, tierId, tierName, points, previewab
   useEffect(() => {
     let play: ReturnType<typeof setTimeout> | undefined;
     try {
-      const seen = localStorage.getItem(KEY);
+      const seen = localStorage.getItem(storageKey);
       if (seen !== null && tierIndex > Number(seen)) play = setTimeout(celebrate, 0);
-      if (seen === null || tierIndex > Number(seen)) localStorage.setItem(KEY, String(tierIndex));
+      if (seen === null || tierIndex > Number(seen)) localStorage.setItem(storageKey, String(tierIndex));
     } catch { /* storage unavailable: no celebration */ }
     return () => clearTimeout(play);
-  }, [tierIndex, celebrate]);
+  }, [tierIndex, celebrate, storageKey]);
 
   useEffect(() => () => timers.current.forEach(clearTimeout), []);
 

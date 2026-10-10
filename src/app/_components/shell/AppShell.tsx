@@ -1,3 +1,4 @@
+import { withUserPage } from "@proveit/server/userBoundary";
 import { currentProfile } from "@proveit/server/auth";
 import { getSidebar } from "@proveit/server/store";
 import { Sidebar, type NavKey } from "./Sidebar";
@@ -5,7 +6,7 @@ import { HeaderBar, type Crumb } from "./HeaderBar";
 import type { MasteryState } from "@proveit/lib/schemas";
 
 /** Sidebar + header + a content region. Pages render <Log> and, when they have one, a <ComposerDock>. */
-export async function AppShell({ active, courseId, crumbs, state, right, children }: {
+async function AppShellForUser({ active, courseId, crumbs, state, right, children }: {
   active: NavKey; courseId?: string; crumbs: Crumb[]; state?: MasteryState; right?: React.ReactNode; children: React.ReactNode;
 }) {
   return (
@@ -18,3 +19,5 @@ export async function AppShell({ active, courseId, crumbs, state, right, childre
     </div>
   );
 }
+
+export const AppShell = withUserPage(AppShellForUser);

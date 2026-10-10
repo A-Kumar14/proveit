@@ -1,3 +1,4 @@
+import { withUserPage } from "@proveit/server/userBoundary";
 import { notFound } from "next/navigation";
 import { AppShell } from "@proveit/app/_components/shell/AppShell";
 import { Log } from "@proveit/app/_components/shell/Log";
@@ -8,7 +9,7 @@ import { getResult } from "@proveit/server/store";
 
 export const dynamic = "force-dynamic";
 
-export default async function ResultPage({ params }: PageProps<"/course/[courseId]/result/[attemptId]">) {
+async function ResultPage({ params }: PageProps<"/course/[courseId]/result/[attemptId]">) {
   const { courseId, attemptId } = await params;
   const r = orNotFound(() => getResult(attemptId));
   if (r.courseId !== courseId) notFound();
@@ -18,3 +19,5 @@ export default async function ResultPage({ params }: PageProps<"/course/[courseI
     </AppShell>
   );
 }
+
+export default withUserPage(ResultPage);

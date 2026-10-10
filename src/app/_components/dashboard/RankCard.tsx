@@ -7,7 +7,7 @@ import { TierCelebration } from "./TierCelebration";
 import { Widget } from "./Widget";
 
 /** Rank: prestige for proven understanding. Nothing is bought or unlocked, it only shows how far you've come. */
-export function RankCard({ r, courses, previewable }: { r: Rewards; courses: CourseRank[]; previewable: boolean }) {
+export function RankCard({ r, courses, previewable, userId = "local" }: { r: Rewards; courses: CourseRank[]; previewable: boolean; userId?: string }) {
   const fmt = (n: number) => n.toLocaleString("en-US");
   return (
     <div id="rank" className="scroll-mt-4">
@@ -24,7 +24,7 @@ export function RankCard({ r, courses, previewable }: { r: Rewards; courses: Cou
                 <span className="w-44 text-right text-xs text-ink-muted">{r.next ? `${fmt(r.toNext)} to ${r.next.name}` : "Top tier reached"}</span>
               </div>
             </div>
-            <TierCelebration tierIndex={r.tierIndex} tierId={r.tier.id} tierName={r.tier.name} points={r.points} previewable={previewable} />
+            <TierCelebration key={userId} userId={userId} tierIndex={r.tierIndex} tierId={r.tier.id} tierName={r.tier.name} points={r.points} previewable={previewable} />
           </div>
 
           <ol className="m-0 grid list-none grid-cols-7 gap-2 p-0" aria-label="Tiers">

@@ -1,3 +1,4 @@
+import { withUserRoute } from "@proveit/server/userBoundary";
 import { NextResponse } from "next/server";
 import { ConnectInput } from "@proveit/lib/schemas";
 import { currentUserId } from "@proveit/server/auth";
@@ -7,7 +8,7 @@ import { handle } from "@proveit/server/route";
 
 export const maxDuration = 60;
 
-export async function POST(req: Request, ctx: RouteContext<"/api/integrations/[provider]/connect">) {
+async function POSTForUser(req: Request, ctx: RouteContext<"/api/integrations/[provider]/connect">) {
   const { provider } = await ctx.params;
   if (!isProvider(provider)) return NextResponse.json({ error: "Not found." }, { status: 404 });
   const user = await currentUserId();
@@ -21,3 +22,5 @@ export async function POST(req: Request, ctx: RouteContext<"/api/integrations/[p
     }
   });
 }
+
+export const POST = withUserRoute(POSTForUser);

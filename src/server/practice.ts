@@ -78,7 +78,7 @@ async function buildPaper(courseId: string): Promise<Paper> {
 - Use only the course material given, including courseNotes. No outside facts. Plain text, no LaTeX, no markdown.
 - Never write Chinese characters, because the PDF font can't show them. Write Mandarin in pinyin with tone marks, such as nǐ hǎo.`,
     output: Output.object({ schema: PaperOut }),
-    prompt: JSON.stringify({ course: w.courseName, courseNotes: courseMaterial(courseId, 20_000), concepts: w.concepts.map((c) => ({ name: c.name, about: c.desc, weak: c.weak, courseMaterial: c.material, mistakes: c.mistakes.map((m) => ({ name: m.name, whatIsWrong: m.gap })) })) }),
+    prompt: JSON.stringify({ course: w.courseName, courseNotes: courseMaterial(courseId, 80_000), concepts: w.concepts.map((c) => ({ name: c.name, about: c.desc, weak: c.weak, courseMaterial: c.material, mistakes: c.mistakes.map((m) => ({ name: m.name, whatIsWrong: m.gap })) })) }),
   });
   if (output.questions.length === 0 || output.key.length !== output.questions.length) throw new Error("the model returned a paper whose key doesn't match");
   return { title: output.title.trim() || "Sample question paper", courseName: w.courseName, questions: output.questions, key: output.key };
@@ -103,7 +103,7 @@ async function buildNotes(courseId: string): Promise<Notes> {
 - Use only the course material given, including courseNotes. Where none is given, stay within the description. No outside facts, no LaTeX, no markdown.
 - Never write Chinese characters, because the PDF font can't show them. Write Mandarin in pinyin with tone marks, such as nǐ hǎo.`,
       output: Output.object({ schema: SectionsOut }),
-      prompt: JSON.stringify({ course: w.courseName, courseNotes: courseMaterial(courseId, 20_000), concepts: ordered.map((c) => ({ name: c.name, about: c.desc, courseMaterial: c.material })) }),
+      prompt: JSON.stringify({ course: w.courseName, courseNotes: courseMaterial(courseId, 80_000), concepts: ordered.map((c) => ({ name: c.name, about: c.desc, courseMaterial: c.material })) }),
     });
     // Keep the concept order and names from the course, in case the model reorders or renames.
     const byName = new Map(output.sections.map((s) => [s.concept, s]));

@@ -7,6 +7,7 @@ import { MaterialError, readMaterial, saveMaterial, type Material } from "./mate
 import { modelErrorMessage } from "./modelError";
 import { loadJson, saveJson } from "./persistence";
 import { createCourse, EmptyOutlineError, type CourseFile } from "./store";
+import { runAsUser, scopedUserId } from "./userScope";
 
 /** The stages a build goes through, in order. The student sees these. */
 export const STAGES = [
@@ -19,7 +20,7 @@ export type StageId = (typeof STAGES)[number]["id"];
 
 type FileState = { name: string; state: "waiting" | "reading" | "done" | "failed"; note?: string };
 type Job = {
-  id: string; name: string; stage: StageId | "done" | "failed" | "cancelled"; files: FileState[];
+  id: string; /** Who started it. Only they can follow or cancel it. */ userId: string; name: string; stage: StageId | "done" | "failed" | "cancelled"; files: FileState[];
   startedAt: number; updatedAt: number; endedAt?: number; courseId?: string; error?: string; concepts?: number;
   /** The stage a failed or cancelled build stopped in. */ stoppedAt?: StageId;
 };
@@ -40,9 +41,11 @@ function save(job: Job) {
   saveJson(key(job.id), job);
 }
 const load = (id: string): Job | null => loadJson<Job>(key(id)) ?? jobs().get(id) ?? null;
+/** A job the current user doesn't own looks like it doesn't exist. */
+const mine = (id: string): Job | null => { const j = load(id); return j && j.userId === scopedUserId() ? j : null; };
 
 export function getJob(id: string): CourseJobView | null {
-  let job = load(id);
+  let job = mine(id);
   if (!job) return null;
   const over = job.stage === "done" || job.stage === "failed" || job.stage === "cancelled";
   if (!over && Date.now() - job.updatedAt > STALE_MS) {
@@ -62,7 +65,7 @@ export function getJob(id: string): CourseJobView | null {
 }
 
 export function cancelJob(id: string): boolean {
-  const job = load(id);
+  const job = mine(id);
   if (!job || job.stage === "done" || job.stage === "failed" || job.stage === "cancelled") return false;
   save({ ...job, stoppedAt: job.stage, stage: "cancelled", endedAt: Date.now() });
   return true;
@@ -71,7 +74,7 @@ const cancelled = (id: string) => load(id)?.stage === "cancelled";
 
 export function createJob(name: string, files: JobInput[]): string {
   const id = randomUUID();
-  save({ id, name, stage: "reading", files: files.map((f) => ({ name: f.name, state: "waiting" })), startedAt: Date.now(), updatedAt: Date.now() });
+  save({ id, userId: scopedUserId(), name, stage: "reading", files: files.map((f) => ({ name: f.name, state: "waiting" })), startedAt: Date.now(), updatedAt: Date.now() });
   return id;
 }
 
@@ -89,6 +92,12 @@ class Stop extends Error {}
  * Reading is local for typeset PDFs and text, and the model only reads scans and images, a few at a time.
  */
 export async function runCourseJob(id: string, inputs: JobInput[]): Promise<void> {
+  const owner = load(id)?.userId;
+  if (!owner) return;
+  return runAsUser(owner, () => buildCourse(id, inputs));
+}
+
+async function buildCourse(id: string, inputs: JobInput[]): Promise<void> {
   const at = (stage: StageId) => { const j = load(id); if (j && j.stage !== "cancelled") save({ ...j, stage }); if (cancelled(id)) throw new Stop(); };
   try {
     const job = load(id)!;

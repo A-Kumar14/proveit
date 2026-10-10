@@ -1,3 +1,4 @@
+import { withUserRoute } from "@proveit/server/userBoundary";
 import { createTextStreamResponse, Output, streamText, toTextStream } from "ai";
 import { NextResponse } from "next/server";
 import { ReviewInput, ReviewText } from "@proveit/lib/schemas";
@@ -12,7 +13,7 @@ const SYSTEM = `You write the text fields of a student's mastery review.
 - Plain, short sentences. No praise, no emoji.
 - nextActions has 1 or 2 imperative sentences.`;
 
-export async function POST(req: Request) {
+async function POSTForUser(req: Request) {
   const parsed = ReviewInput.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   let base;
@@ -33,3 +34,5 @@ export async function POST(req: Request) {
   });
   return createTextStreamResponse({ stream: toTextStream({ stream: result.stream }) });
 }
+
+export const POST = withUserRoute(POSTForUser);

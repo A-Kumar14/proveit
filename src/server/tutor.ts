@@ -25,7 +25,7 @@ export function tutorSystem(courseId: string): string {
     concepts: course.concepts.map((c) => ({ name: c.name, state: c.state })),
     openMisconceptions: open.map((m) => ({ concept: m.concept, name: m.name })),
   };
-  const notes = courseMaterial(courseId, 20_000);
+  const notes = courseMaterial(courseId, 120_000);
   return `${SYSTEM}\n\nCourse context:\n${JSON.stringify(context)}${notes ? `\n\nThe course's own notes and the student's uploaded files. Prefer these over general knowledge when they cover the question:\n"""\n${notes}\n"""` : ""}`;
 }
 

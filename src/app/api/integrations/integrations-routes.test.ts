@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const completeConnect = vi.fn();
 const beginConnect = vi.fn();
-vi.mock("@proveit/server/auth", () => ({ currentUserId: async () => "u1" }));
+vi.mock("@proveit/server/auth", async (orig) => ({ ...(await orig<typeof import("@proveit/server/auth")>()), currentUserId: async () => "u1" }));
 vi.mock("@proveit/server/integrations", async (orig) => ({ ...(await orig<typeof import("@proveit/server/integrations")>()), completeConnect: (...a: unknown[]) => completeConnect(...a), beginConnect: (...a: unknown[]) => beginConnect(...a) }));
 
 import { GET as callback } from "./[provider]/callback/route";

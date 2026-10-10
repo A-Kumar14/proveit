@@ -1,8 +1,9 @@
+import { userCache } from "./userScope";
 import "server-only";
 import { generateText } from "ai";
 import { aiEnabled, model } from "./ai";
 import { AUTHORED } from "./content";
-import { loadJson, saveJson } from "./persistence";
+import { loadUserJson, saveUserJson } from "./persistence";
 import { pdfText } from "./pdfText";
 import { courseSpec, getCourse } from "./store";
 
@@ -20,8 +21,9 @@ const KEY = "materials";
 
 type Held = { items: Material[]; seq: number };
 const g = globalThis as unknown as { __proveitMaterials?: Held };
-const held = (): Held => (g.__proveitMaterials ??= { items: loadJson<Material[]>(KEY) ?? [], seq: 0 });
-const save = () => saveJson(KEY, held().items);
+const restore = (): Held => ({ items: loadUserJson<Material[]>(KEY) ?? [], seq: 0 });
+const held = (): Held => userCache("materials", () => (g.__proveitMaterials ??= restore()), restore);
+const save = () => saveUserJson(KEY, held().items);
 
 const words = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;
 const isText = (f: { name: string; type: string }) => f.type === "text/markdown" || f.type === "text/plain" || /\.(md|markdown|txt)$/i.test(f.name);
@@ -145,6 +147,9 @@ export function courseMaterial(courseId: string, budget = 24_000): string {
   if (authored) parts.push(`# Course notes\n${authored}`);
   for (const m of listMaterials(courseId)) parts.push(`# Uploaded file: ${m.name}\n${m.text}`);
   const all = parts.join("\n\n");
-  return all.length > budget ? `${all.slice(0, budget)}\n[...cut for length]` : all;
+  if (all.length <= budget) return all;
+  // Over budget: every file gets an equal share, so the last files aren't the ones that get cut.
+  const share = Math.floor(budget / parts.length);
+  return parts.map((p) => (p.length > share ? `${p.slice(0, share)}\n[...cut for length]` : p)).join("\n\n");
 }
 

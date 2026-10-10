@@ -112,7 +112,7 @@ Server components read from `store` / `schedule`. Browser mutations go `lib/api.
 - Course build pipeline (`server/courseJobs.ts`): uploading returns a job id at once and the build runs after the response, in four stages the modal shows (reading, topics, map, notes) with per-file status, a timer and Cancel. Typeset PDFs and text are read locally (`unpdf`, about 50 ms each). Only scans and images go to the model, in parallel, at low reasoning effort, with timeouts. Job state lives in SQLite so any server process can answer the poll. It replaced a pipeline that transcribed every PDF with the model, one at a time, which took minutes per file.
 - Add a course: upload notes (markdown headings keep their structure, other notes go to the model for an outline), browse curated, or import from Granola or Wispr Flow.
 - Granola and Wispr Flow: real MCP OAuth (dynamic client registration) in `server/integrations.ts`, per-user tokens in SQLite, a read-only import agent, connect and disconnect on the Account page. Connect was checked against both live servers up to the sign-in page. The callback and the import itself have not run, because they need real accounts.
-- Accounts with Clerk (`src/proxy.ts`, `/sign-in`, `/sign-up`, `/account`). On only when both Clerk keys are set. Learning progress is still one global state, not per user.
+- Accounts with Clerk (`src/proxy.ts`, `/sign-in`, `/sign-up`, `/account`). On only when both Clerk keys are set. Learning state is now scoped per account at server page/API boundaries.
 
 ## Known gaps
 
@@ -120,7 +120,7 @@ Server components read from `store` / `schedule`. Browser mutations go `lib/api.
 - Courses added at runtime have no authored questions, so they skip the diagnose, teach and transfer loop. Generating those from notes needs grounding and review.
 - Transfer/review questions are hand-authored for the current concepts.
 - Source retrieval/citations are not built.
-- Clerk gates access, but learner state, files and quizzes are not keyed by user. Two accounts on one server share progress. Only connected-app tokens are per user.
+- Clerk identity now scopes learner state, runtime courses, calendar, materials and quizzes. Legacy global data stays local-owned; quiz sessions remain ephemeral. SQLite snapshots still do not provide multi-process write coordination.
 - Curated course files are read from `content/courses` at runtime. A deploy must include that folder.
 - PDF generation needs `tectonic` on the server, so it works locally and not on Vercel.
 - Hosted durable DB is not wired; SQLite is local persistence.
@@ -149,3 +149,9 @@ pnpm build
 ```
 
 Also inspect the exact PR head against the latest `main` before merging.
+
+## User-scoped persistence milestone
+
+`src/server/userBoundary.ts` wraps all API exports and application page components, plus AppShell (React renders nested server components separately). `src/server/userScope.ts` uses AsyncLocalStorage to retain trusted identity across asynchronous evaluation, and isolates account caches. An auth-enabled unscoped state access fails closed. `loadUserJson` / `saveUserJson` namespace learning/calendar/material keys; raw persistence functions remain available for existing per-user OAuth keys.
+
+The no-auth `local` namespace keeps original keys and test reset hooks. Pre-auth global snapshots are not assigned to new accounts. Isolation tests cover concurrent grading/failure, account memory and reload state, foreign attempt/course/material/quiz access, rank and calendar, plus anonymous route rejection. No sample data is introduced on main.

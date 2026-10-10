@@ -1,3 +1,4 @@
+import { withUserPage } from "@proveit/server/userBoundary";
 import Link from "next/link";
 import { AppShell } from "@proveit/app/_components/shell/AppShell";
 import { ListPage } from "@proveit/app/_components/shell/ListPage";
@@ -13,7 +14,7 @@ export const dynamic = "force-dynamic";
 const fmt = (n: number) => n.toLocaleString("en-US");
 const initials = (name: string) => name.split(/\s+/).map((p) => p[0]).slice(0, 2).join("").toUpperCase();
 
-export default async function AccountPage({ searchParams }: PageProps<"/account">) {
+async function AccountPage({ searchParams }: PageProps<"/account">) {
   const { connected, integration_error: integrationError } = await searchParams;
   const enabled = authEnabled();
   const profile = await currentProfile();
@@ -63,3 +64,5 @@ export default async function AccountPage({ searchParams }: PageProps<"/account"
     </AppShell>
   );
 }
+
+export default withUserPage(AccountPage);

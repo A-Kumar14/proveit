@@ -1,6 +1,7 @@
+import { userCache } from "./userScope";
 import "server-only";
 import { lookup } from "node:dns/promises";
-import { loadJson, saveJson } from "./persistence";
+import { loadUserJson, saveUserJson } from "./persistence";
 import { isIP } from "node:net";
 import ical, { type VEvent } from "node-ical";
 
@@ -26,14 +27,14 @@ type Held = CalendarState & { url: string | null };
 const g = globalThis as unknown as { __proveitCal?: Held };
 
 function restoreCalendar(): Held {
-  const saved = loadJson<Held>("calendar");
+  const saved = loadUserJson<Held>("calendar");
   if (!saved || (saved.mode !== "ics" && saved.mode !== "none")) return { mode: "none", provider: null, syncedAt: null, events: [], url: null };
   return { mode: saved.mode, provider: saved.provider ?? null, syncedAt: saved.syncedAt ?? null, events: Array.isArray(saved.events) ? saved.events : [], url: saved.url ?? null };
 }
-const held = (): Held => (g.__proveitCal ??= restoreCalendar());
+const held = (): Held => userCache("calendar", () => (g.__proveitCal ??= restoreCalendar()), restoreCalendar);
 const persistCalendar = () => {
   const h = held();
-  saveJson("calendar", { mode: h.mode, provider: h.provider, syncedAt: h.syncedAt, events: h.events, url: h.url });
+  saveUserJson("calendar", { mode: h.mode, provider: h.provider, syncedAt: h.syncedAt, events: h.events, url: h.url });
 };
 
 export class CalendarError extends Error {}

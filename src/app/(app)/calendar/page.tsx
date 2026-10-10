@@ -1,3 +1,4 @@
+import { withUserPage } from "@proveit/server/userBoundary";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { AppShell } from "@proveit/app/_components/shell/AppShell";
@@ -12,7 +13,7 @@ import { getScheduledTodos, getSchedule } from "@proveit/server/schedule";
 
 export const dynamic = "force-dynamic";
 
-export default async function CalendarPage({ searchParams }: PageProps<"/calendar">) {
+async function CalendarPage({ searchParams }: PageProps<"/calendar">) {
   const { m, d, connect } = await searchParams;
   const now = new Date();
   const today = dayKey(now);
@@ -72,3 +73,5 @@ export default async function CalendarPage({ searchParams }: PageProps<"/calenda
     </AppShell>
   );
 }
+
+export default withUserPage(CalendarPage);
