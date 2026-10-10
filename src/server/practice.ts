@@ -2,10 +2,10 @@ import "server-only";
 import { generateText, Output } from "ai";
 import { z } from "zod";
 import { aiEnabled, model } from "./ai";
-import { AUTHORED } from "./content";
+import { getLearningSpec } from "./learningSpecStore";
 import { compile, keyTex, notesTex, paperTex, type Notes, type Paper } from "./latex";
 import { courseMaterial } from "./materials";
-import { getCourse, getMisconceptionLog } from "./store";
+import { getCourse, getMisconceptionLog, getQuizSignal } from "./store";
 import type { MasteryState, PracticeDoc, PracticeResult } from "@proveit/lib/schemas";
 
 const QUESTIONS = 10;
@@ -13,22 +13,41 @@ const MARKS = 5;
 
 export type Weak = {
   id: string; name: string; desc: string; state: MasteryState; weak: boolean;
-  /** Course-material truth for concepts that have authored content. */
+  /** Course-material truth for concepts with a canonical learning spec. */
   material: string | null;
   mistakes: { name: string; gap: string; quote: string | null; fix: string }[];
 };
 
-/** What the student keeps getting wrong. Weak means needs work, developing, or an open mistake. */
+/**
+ * What the student should revisit. Confirmed mastery state and open misconceptions are primary.
+ * A recent low quiz score is only a prioritization signal; it never changes mastery by itself.
+ */
 export function getWeakness(courseId: string): { courseName: string; concepts: Weak[] } {
   const course = getCourse(courseId);
   const log = getMisconceptionLog(courseId).filter((m) => m.open);
   const concepts = course.concepts.map((c): Weak => {
-    const au = AUTHORED[c.id];
+    const spec = getLearningSpec(courseId, c.id);
     const mistakes = log.filter((m) => m.concept === c.name).map((m) => {
-      const def = au?.misconceptions.find((x) => x.name === m.name);
-      return { name: m.name, gap: def?.gap ?? m.note, quote: m.quote, fix: au ? `${au.lesson.actuallyTrue} ${au.lesson.explanation}` : "" };
+      const def = spec?.misconceptions.find((x) => x.name === m.name);
+      const remediation = def ? spec?.remediations.find((r) => r.misconceptionId === def.id) : null;
+      return {
+        name: m.name,
+        gap: def?.description ?? m.gap ?? m.note,
+        quote: m.quote,
+        fix: remediation ? `${remediation.actuallyTrue} ${remediation.explanation}` : "",
+      };
     });
-    return { id: c.id, name: c.name, desc: c.desc, state: c.state, weak: c.state === "needs_work" || c.state === "developing" || mistakes.length > 0, material: au?.correct ?? null, mistakes };
+    const quiz = getQuizSignal(courseId, c.id);
+    const quizWeak = Boolean(quiz && quiz.pct < 60);
+    return {
+      id: c.id,
+      name: c.name,
+      desc: c.desc,
+      state: c.state,
+      weak: c.state === "needs_work" || c.state === "developing" || mistakes.length > 0 || quizWeak,
+      material: spec?.assessment.correctAnswer ?? null,
+      mistakes,
+    };
   });
   return { courseName: course.name, concepts };
 }
@@ -46,18 +65,21 @@ const PaperOut = z.object({
   key: z.array(z.object({ answer: z.string(), marking: z.string() })),
 });
 
-function offlinePaper(w: ReturnType<typeof getWeakness>): Paper {
+function offlinePaper(courseId: string, w: ReturnType<typeof getWeakness>): Paper {
   const seen = new Map<string, number>();
   const questions: Paper["questions"] = [];
   const key: Paper["key"] = [];
   for (const c of plan(w.concepts)) {
     const n = seen.get(c.id) ?? 0;
     seen.set(c.id, n + 1);
-    const au = AUTHORED[c.id];
-    if (au) {
+    const spec = getLearningSpec(courseId, c.id);
+    if (spec) {
       const second = n > 0;
-      questions.push({ concept: c.name, prompt: second ? au.transfer.question : au.question, marks: MARKS });
-      key.push({ answer: au.correct, marking: second ? au.transfer.rubric : `Full marks for the idea above. Deduct for: ${au.misconceptions.map((m) => m.gap).join(" ")}` });
+      questions.push({ concept: c.name, prompt: second ? spec.transfer.question : spec.assessment.question, marks: MARKS });
+      key.push({
+        answer: second ? spec.transfer.correctAnswer : spec.assessment.correctAnswer,
+        marking: second ? spec.transfer.rubric : spec.assessment.rubric,
+      });
     } else {
       questions.push({ concept: c.name, prompt: `Explain ${c.name} in your own words and give one example.`, marks: MARKS });
       key.push({ answer: c.desc, marking: "Award marks for a correct explanation of the idea and a fitting example." });
@@ -68,7 +90,7 @@ function offlinePaper(w: ReturnType<typeof getWeakness>): Paper {
 
 async function buildPaper(courseId: string): Promise<Paper> {
   const w = getWeakness(courseId);
-  if (!aiEnabled()) return offlinePaper(w);
+  if (!aiEnabled()) return offlinePaper(courseId, w);
   const { output } = await generateText({
     model: model(),
     system: `You write a sample exam paper and its answer key for one course.
@@ -91,8 +113,13 @@ async function buildNotes(courseId: string): Promise<Notes> {
   const ordered = [...w.concepts.filter((c) => c.weak), ...w.concepts.filter((c) => !c.weak)];
   const mistakes = w.concepts.flatMap((c) => c.mistakes.map((m) => ({ concept: c.name, said: m.quote, why: m.gap, fix: m.fix || c.material || c.desc })));
   const offline = (): Notes["sections"] => ordered.map((c) => {
-    const au = AUTHORED[c.id];
-    return { concept: c.name, summary: au?.correct ?? c.desc, points: au ? [au.lesson.title, au.lesson.actuallyTrue, au.lesson.explanation] : [] };
+    const spec = getLearningSpec(courseId, c.id);
+    const remediation = spec?.remediations[0];
+    return {
+      concept: c.name,
+      summary: spec?.assessment.correctAnswer ?? c.desc,
+      points: remediation ? [remediation.title, remediation.actuallyTrue, remediation.explanation] : [],
+    };
   });
   let sections = offline();
   if (aiEnabled()) {
