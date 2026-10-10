@@ -649,13 +649,29 @@ export type RemediationView = {
 };
 export function getRemediation(attemptId: string): RemediationView {
   const a = attempt(attemptId);
-  const c = concept(a.conceptId);
-  const au = AUTHORED[c.id];
-  if (!au || a.evaluation?.verdict !== "incorrect") throw new NotFoundError(`nothing to remediate for ${attemptId}`);
+  const c = conceptFor(a.courseId, a.conceptId);
+  const spec = specForAttempt(a);
+  if (a.evaluation?.verdict !== "incorrect" || !a.evaluation.misconceptionId) {
+    throw new NotFoundError(`nothing to remediate for ${attemptId}`);
+  }
+  const remediation = spec.remediations.find((item) => item.misconceptionId === a.evaluation!.misconceptionId);
+  if (!remediation) throw new NotFoundError(`no remediation for ${a.evaluation.misconceptionId}`);
   return {
-    attemptId, courseId: a.courseId, conceptId: c.id, conceptName: c.name, state: c.state,
-    lesson: { title: au.lesson.title, said: a.evaluation.evidenceQuote ?? a.answer, actuallyTrue: au.lesson.actuallyTrue, explanation: au.lesson.explanation, rule: au.lesson.rule, aiWording: false, figure: au.lesson.figure },
-    transfer: { question: au.transfer.question, hint: au.transfer.hint },
+    attemptId,
+    courseId: a.courseId,
+    conceptId: c.id,
+    conceptName: c.name,
+    state: c.state,
+    lesson: {
+      title: remediation.title,
+      said: a.evaluation.evidenceQuote ?? a.answer,
+      actuallyTrue: remediation.actuallyTrue,
+      explanation: remediation.explanation,
+      rule: remediation.sourceLabel,
+      aiWording: spec.provenance.kind === "generated",
+      figure: remediation.figure,
+    },
+    transfer: { question: spec.transfer.question, hint: spec.transfer.hint },
   };
 }
 
@@ -666,83 +682,133 @@ export type TransferChallengeView = {
 
 export function getTransferChallenge(attemptId: string): TransferChallengeView {
   const source = attempt(attemptId);
-  const c = concept(source.conceptId);
-  const au = AUTHORED[c.id];
-  if (!au || source.evaluation?.verdict !== "correct") throw new NotFoundError(`no direct transfer challenge for ${attemptId}`);
-  if (!rootIsCurrentForConcept(c.id, source.rootAttemptId) || latestConclusiveForConcept(c.id)?.id !== source.id) {
+  const c = conceptFor(source.courseId, source.conceptId);
+  const spec = specForAttempt(source);
+  if (source.evaluation?.verdict !== "correct") throw new NotFoundError(`no direct transfer challenge for ${attemptId}`);
+  if (
+    !rootIsCurrentForConcept(c.id, source.rootAttemptId, source.courseId) ||
+    latestConclusiveForConcept(c.id, source.courseId)?.id !== source.id
+  ) {
     throw new NotFoundError(`stale transfer challenge ${attemptId}`);
   }
   if (rootHasPassedTransfer(source.rootAttemptId)) {
     throw new NotFoundError(`transfer already passed for ${attemptId}`);
   }
   return {
-    attemptId: source.id, courseId: source.courseId, conceptId: c.id, conceptName: c.name, state: c.state,
-    transfer: { question: au.transfer.question, hint: au.transfer.hint },
+    attemptId: source.id,
+    courseId: source.courseId,
+    conceptId: c.id,
+    conceptName: c.name,
+    state: c.state,
+    transfer: { question: spec.transfer.question, hint: spec.transfer.hint },
   };
 }
 
 export async function submitTransfer(attemptId: string, answer: string): Promise<TransferResult> {
   const parent = attempt(attemptId);
-  const c = concept(parent.conceptId);
-  const au = AUTHORED[c.id];
-  if (!au) throw new NotFoundError(`no content for ${c.id}`);
-  if (!rootIsCurrentForConcept(c.id, parent.rootAttemptId) || latestConclusiveForConcept(c.id)?.id !== parent.id) {
+  const c = conceptFor(parent.courseId, parent.conceptId);
+  const spec = specForAttempt(parent);
+  if (
+    !rootIsCurrentForConcept(c.id, parent.rootAttemptId, parent.courseId) ||
+    latestConclusiveForConcept(c.id, parent.courseId)?.id !== parent.id
+  ) {
     throw new InvalidAttemptLinkError("transfer source is stale");
   }
   if (rootHasPassedTransfer(parent.rootAttemptId)) {
     throw new InvalidAttemptLinkError("this evidence chain already passed its transfer test");
   }
+
   const before = c.state;
-  const judged = await judgeTransfer(c.id, answer);
-  if (!rootIsCurrentForConcept(c.id, parent.rootAttemptId) || latestConclusiveForConcept(c.id)?.id !== parent.id) {
+  const judged = await judgeTransferForSpec(spec, answer);
+  if (
+    conceptFor(parent.courseId, parent.conceptId) !== c ||
+    !rootIsCurrentForConcept(c.id, parent.rootAttemptId, parent.courseId) ||
+    latestConclusiveForConcept(c.id, parent.courseId)?.id !== parent.id
+  ) {
     throw new InvalidAttemptLinkError("transfer source became stale");
   }
   if (db().attempts.some((a) => a.rootAttemptId === parent.rootAttemptId && a.kind === "transfer" && a.outcome === "pass")) {
     throw new InvalidAttemptLinkError("this evidence chain already passed its transfer test");
   }
+
   c.evidence.answers++;
   if (judged.verdict === "pass") {
     c.evidence.sound++;
     c.evidence.transferPassed = true;
-    upsertSkill(c, au.skillOnRight);
+    upsertSkill(c, spec.skills.onRight);
     upsertSkill(c, { label: "New-question test", pct: 85 });
     c.state = "provisional";
     c.nextReview = isoDay(addDays(new Date(), 1));
     db().provenDays.add(isoDay(new Date()));
     const rec = recordAttempt({
-      courseId: parent.courseId, conceptId: c.id, kind: "transfer", outcome: "pass", parentAttemptId: parent.id,
-      answer, evaluation: null, previousState: before, createdAt: Date.now(),
+      courseId: parent.courseId,
+      conceptId: c.id,
+      kind: "transfer",
+      outcome: "pass",
+      parentAttemptId: parent.id,
+      learningSpecRevision: spec.revision,
+      answer,
+      evaluation: null,
+      previousState: before,
+      createdAt: Date.now(),
     });
     return { result: "pass", resultAttemptId: rec.id };
   }
 
-  const diagnosed = misconceptionFor(c.id, judged.misconceptionId);
+  const diagnosed = misconceptionForSpec(spec, judged.misconceptionId);
   let evaluation: Evaluation;
   let followUp: string | null = null;
   if (judged.verdict === "fail" && diagnosed) {
-    upsertSkill(c, au.skillOnWrong);
+    upsertSkill(c, spec.skills.onWrong);
     upsertSkill(c, { label: "New-question test", pct: 25 });
     c.state = "needs_work";
     c.evidence.transferPassed = false;
     evaluation = {
-      verdict: "incorrect", errorType: "conceptual", misconceptionId: diagnosed.id, misconceptionName: diagnosed.name,
-      evidenceQuote: judged.quote && answer.includes(judged.quote) ? judged.quote : null, gapSentence: diagnosed.gap,
-      skills: (c.skills ?? []).filter((s) => s.label !== "New-question test"), votes: judged.votes, followUp: null,
+      verdict: "incorrect",
+      errorType: "conceptual",
+      misconceptionId: diagnosed.id,
+      misconceptionName: diagnosed.name,
+      evidenceQuote: judged.quote && answer.includes(judged.quote) ? judged.quote : null,
+      gapSentence: diagnosed.description,
+      skills: (c.skills ?? []).filter((s) => s.label !== "New-question test"),
+      votes: judged.votes,
+      followUp: null,
       recommendation: "The new setup exposed the same underlying gap. Repair that idea, then prove it again on another setup.",
     };
   } else {
     followUp = judged.feedback ?? "Give one more precise sentence that addresses every part of the question.";
     evaluation = {
-      verdict: "uncertain", errorType: "uncertain", misconceptionId: null, misconceptionName: null,
-      evidenceQuote: null, gapSentence: null, skills: (c.skills ?? []).filter((s) => s.label !== "New-question test"),
-      votes: judged.votes, followUp, recommendation: "There is not enough evidence to name a misconception yet.",
+      verdict: "uncertain",
+      errorType: "uncertain",
+      misconceptionId: null,
+      misconceptionName: null,
+      evidenceQuote: null,
+      gapSentence: null,
+      skills: (c.skills ?? []).filter((s) => s.label !== "New-question test"),
+      votes: judged.votes,
+      followUp,
+      recommendation: "There is not enough evidence to name a misconception yet.",
     };
   }
+
   const rec = recordAttempt({
-    courseId: parent.courseId, conceptId: c.id, kind: "transfer", outcome: "fail", parentAttemptId: parent.id,
-    answer, evaluation, previousState: before, createdAt: Date.now(),
+    courseId: parent.courseId,
+    conceptId: c.id,
+    kind: "transfer",
+    outcome: "fail",
+    parentAttemptId: parent.id,
+    learningSpecRevision: spec.revision,
+    answer,
+    evaluation,
+    previousState: before,
+    createdAt: Date.now(),
   });
-  return { result: "fail", failedAttemptId: rec.id, nextAttemptId: evaluation.verdict === "incorrect" ? rec.id : null, followUp };
+  return {
+    result: "fail",
+    failedAttemptId: rec.id,
+    nextAttemptId: evaluation.verdict === "incorrect" ? rec.id : null,
+    followUp,
+  };
 }
 
 export type ResultView = {
