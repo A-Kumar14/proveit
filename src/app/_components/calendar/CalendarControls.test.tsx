@@ -29,7 +29,7 @@ describe("CalendarControls", () => {
     expect(await screen.findByText("Calendar refreshed.")).toBeTruthy();
   });
 
-  it("explains why refresh did nothing on the sample calendar", async () => {
+  it("explains why refresh did nothing when no calendar is connected", async () => {
     refreshCalendar.mockRejectedValue(new Error("You're using the sample calendar. Connect yours to sync it."));
     render(<CalendarControls connected={false} connectHref="/?connect=1" />);
     await userEvent.click(screen.getByRole("button", { name: /Refresh calendar/ }));
@@ -41,6 +41,6 @@ describe("CalendarControls", () => {
     render(<CalendarControls connected connectHref="/?connect=1" />);
     await userEvent.click(screen.getByRole("button", { name: /Disconnect/ }));
     expect(disconnectCalendar).toHaveBeenCalled();
-    expect(await screen.findByText(/Showing the sample again/)).toBeTruthy();
+    expect(await screen.findByText("Calendar disconnected.")).toBeTruthy();
   });
 });
