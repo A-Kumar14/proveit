@@ -333,7 +333,6 @@ export function getDashboard(): DashboardView {
   const next = nextConcept();
   const hour = now.getHours();
   const caught = [...attempts].reverse().filter((a) =>
-    (a.kind === "initial" || a.kind === "clarification") &&
     a.evaluation?.verdict === "incorrect" &&
     a.evaluation.misconceptionName &&
     !diagnosisOverturned(a),
