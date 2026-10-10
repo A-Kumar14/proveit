@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { addCatalogCourse, browseCatalog, removeCatalogCourse } from "./courses";
+import { addMaterial, listMaterials } from "./materials";
 import { courseSpec, getCourse, getSidebar, getTodos, listCourses, NotFoundError } from "./store";
 
 beforeEach(() => {
   delete process.env.GOOGLE_GENERATIVE_AI_API_KEY;
   (globalThis as { __proveit?: unknown }).__proveit = undefined;
+  (globalThis as { __proveitMaterials?: unknown }).__proveitMaterials = undefined;
 });
 
 describe("curated courses", () => {
@@ -44,6 +46,13 @@ describe("curated courses", () => {
     expect(getSidebar().courses.some((c) => c.id === "accounting-101")).toBe(false);
     expect(removeCatalogCourse("intro-stats")).toEqual({ removed: false });
     expect(getSidebar().courses.some((c) => c.id === "intro-stats")).toBe(true);
+  });
+
+  it("also removes the files the course had, and any course added at runtime", async () => {
+    addCatalogCourse("accounting-101");
+    await addMaterial("accounting-101", new File(["Notes on ledgers."], "l.md", { type: "text/markdown" }));
+    removeCatalogCourse("accounting-101");
+    expect(listMaterials("accounting-101")).toEqual([]);
   });
 
   it("rejects an unknown course", () => {

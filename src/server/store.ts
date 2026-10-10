@@ -150,9 +150,10 @@ export function addCourseSpec(spec: CourseSpec): { id: string; added: boolean } 
   return { id: spec.id, added: true };
 }
 
+/** Removes a course added at runtime. The demo course and test placeholders can't be removed. */
 export function removeAddedCourse(id: string): boolean {
   const data = db();
-  const i = data.samples.findIndex((c) => c.id === id && c.spec);
+  const i = data.samples.findIndex((c) => c.id === id && c.runtime);
   if (i < 0) return false;
   data.samples.splice(i, 1);
   persistLearning();

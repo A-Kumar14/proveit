@@ -95,6 +95,13 @@ export async function saveUploadsAsMaterials(courseId: string, files: File[]): P
   return saved;
 }
 
+/** Drops every file of a course that was removed. */
+export function removeCourseMaterials(courseId: string): void {
+  const h = held();
+  const keep = h.items.filter((m) => m.courseId !== courseId);
+  if (keep.length !== h.items.length) { h.items = keep; save(); }
+}
+
 export function removeMaterial(courseId: string, id: string): boolean {
   getCourse(courseId);
   const h = held();

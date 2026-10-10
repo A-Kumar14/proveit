@@ -1,5 +1,6 @@
 import "server-only";
 import { catalogEntry, catalogSpecs, getCatalogSpec } from "./catalog";
+import { removeCourseMaterials } from "./materials";
 import { addCourseSpec, addedCourseIds, NotFoundError, removeAddedCourse } from "./store";
 import type { CatalogEntry } from "@proveit/lib/courseSpec";
 
@@ -18,5 +19,7 @@ export function addCatalogCourse(id: string): { id: string; added: boolean } {
 }
 
 export function removeCatalogCourse(id: string): { removed: boolean } {
-  return { removed: removeAddedCourse(id) };
+  const removed = removeAddedCourse(id);
+  if (removed) removeCourseMaterials(id);
+  return { removed };
 }
