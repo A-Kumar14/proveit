@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import { act, cleanup, render, screen, within } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CourseRank, Rewards } from "@proveit/server/store";
@@ -35,7 +35,7 @@ describe("TierCelebration", () => {
     const { unmount } = mount(3);
     await settle();
     expect(screen.getByRole("status").textContent).toContain("You reached Platinum");
-    expect(fire).toHaveBeenCalled();
+    await waitFor(() => expect(fire).toHaveBeenCalled());
     expect(localStorage.getItem(KEY)).toBe("3");
     unmount();
     mount(3);
