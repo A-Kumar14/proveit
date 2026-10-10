@@ -3,7 +3,10 @@ import { SwitchToVoice } from "@proveit/app/_components/voice/SwitchToVoice";
 import { VoiceSession } from "@proveit/app/_components/voice/VoiceSession";
 import { AppShell } from "@proveit/app/_components/shell/AppShell";
 import { PracticeFlow } from "@proveit/app/_components/practice/PracticeFlow";
+import { SessionChat } from "@proveit/app/_components/practice/SessionChat";
+import { aiEnabled } from "@proveit/server/ai";
 import { orNotFound } from "@proveit/server/page";
+import { sessionOpening } from "@proveit/server/session";
 import { clarify, getAttempt, getQuestion } from "@proveit/server/store";
 
 export const dynamic = "force-dynamic";
@@ -21,8 +24,11 @@ async function PracticePage({ params, searchParams }: PageProps<"/course/[course
   const uploads = { enabled: true, demo: true };
   if (modeParam === "speak") return <VoiceSession courseId={courseId} question={q} typeHref={`/course/${courseId}/practice/${conceptId}?mode=type`} uploads={uploads} />;
   return (
-    <AppShell active="practice" courseId={courseId} state={q.state} crumbs={[{ label: q.courseName, href: `/course/${courseId}` }, { label: q.conceptName }]} right={<SwitchToVoice href={`/course/${courseId}/practice/${conceptId}?mode=speak`} />}>
-      <PracticeFlow key={resume?.attemptId ?? "new"} courseId={courseId} question={q} resume={resume} uploads={uploads} modeParam={modeParam} />
+    <AppShell active="practice" courseId={courseId} state={q.state} crumbs={[{ label: q.courseName, href: `/course/${courseId}` }, { label: q.conceptName }]} right={aiEnabled() ? undefined : <SwitchToVoice href={`/course/${courseId}/practice/${conceptId}?mode=speak`} />}>
+      {aiEnabled()
+        // With a model, testing a concept is a conversation. Without one, it falls back to the fixed question and the offline judges.
+        ? <SessionChat key={resume?.attemptId ?? "new"} courseId={courseId} question={q} opening={sessionOpening(courseId, conceptId)} resume={resume} />
+        : <PracticeFlow key={resume?.attemptId ?? "new"} courseId={courseId} question={q} resume={resume} uploads={uploads} modeParam={modeParam} />}
     </AppShell>
   );
 }

@@ -3,16 +3,17 @@ import type { TutorMessage } from "./schemas";
 
 /** Posts the chat and hands each piece of the reply to `onText` as it arrives. Resolves with the full reply. */
 export async function streamTutor(
-  input: { courseId: string; messages: TutorMessage[]; files: File[]; signal?: AbortSignal },
+  input: { courseId: string; messages: TutorMessage[]; files: File[]; signal?: AbortSignal; /** Another streaming route that takes the same form, such as /api/guide. */ endpoint?: string; /** Extra form fields for that route. */ fields?: Record<string, string> },
   onText: (soFar: string) => void,
 ): Promise<string> {
   const form = new FormData();
   form.set("courseId", input.courseId);
   form.set("messages", JSON.stringify(input.messages));
+  for (const [k, v] of Object.entries(input.fields ?? {})) form.set(k, v);
   for (const f of input.files) form.append("files", f);
   let res: Response;
   try {
-    res = await fetch("/api/tutor", { method: "POST", body: form, signal: input.signal });
+    res = await fetch(input.endpoint ?? "/api/tutor", { method: "POST", body: form, signal: input.signal });
   } catch (e) {
     if (e instanceof DOMException && e.name === "AbortError") throw e;
     throw new Error("Can't reach the server. Check your connection and retry.");

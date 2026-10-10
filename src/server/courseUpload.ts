@@ -101,3 +101,30 @@ export async function extractOutline(courseName: string, files: UploadFile[]): P
   if (!output.isCourseMaterial) throw new NotCourseMaterialError(output.reason || "Those files don't look like course material.");
   return { units: output.units, prerequisites: output.prerequisites };
 }
+
+/** Most text sent to the model in one go. Gemini could take more, but a bigger prompt only makes it slower. */
+export const OUTLINE_CHAR_BUDGET = 300_000;
+/** A model call that takes longer than this has stalled, and the student should hear about it. */
+export const OUTLINE_TIMEOUT_MS = 120_000;
+
+/**
+ * Builds the outline from text we already extracted, so the model reads plain text and not whole PDFs.
+ * Each file gets an equal share of the budget, taken from its start, where contents and headings sit.
+ */
+export async function outlineFromTexts(courseName: string, docs: { name: string; text: string }[]): Promise<CourseOutline> {
+  const share = Math.max(15_000, Math.floor(OUTLINE_CHAR_BUDGET / Math.max(1, docs.length)));
+  const { output } = await generateText({
+    model: model({ fast: true }),
+    output: Output.object({ schema: Extraction }),
+    abortSignal: AbortSignal.timeout(OUTLINE_TIMEOUT_MS),
+    messages: [{
+      role: "user",
+      content: [
+        { type: "text", text: instructions(courseName) },
+        ...docs.map((d) => ({ type: "text" as const, text: `File "${d.name}":\n${d.text.slice(0, share)}` })),
+      ],
+    }],
+  });
+  if (!output.isCourseMaterial) throw new NotCourseMaterialError(output.reason || "Those files don't look like course material.");
+  return { units: output.units, prerequisites: output.prerequisites };
+}

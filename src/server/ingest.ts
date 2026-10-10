@@ -2,7 +2,7 @@ import "server-only";
 import type { CourseOutline } from "@proveit/lib/schemas";
 import { aiEnabled } from "./ai";
 import { parseCourseMd } from "./catalog";
-import { extractOutline, type UploadFile } from "./courseUpload";
+import { outlineFromTexts } from "./courseUpload";
 import { MaterialError, readMaterial, saveMaterial, type Material } from "./materials";
 import { createCourse, EmptyOutlineError, type CourseFile } from "./store";
 
@@ -45,9 +45,7 @@ export async function createCourseFromSources(name: string, sources: Source[], k
   let outline = outlineFromHeadings(title, combined);
   if (!outline) {
     if (!aiEnabled()) throw new MaterialError("I can't split plain notes into concepts without the AI, and no AI key is set. Use markdown with ## unit and ### concept headings, or add an AI key.");
-    const enc = new TextEncoder();
-    const files: UploadFile[] = sources.map((s) => ({ name: s.name, kind: "text", mediaType: "text/plain", data: enc.encode(s.text) }));
-    outline = await extractOutline(title, files).catch((e) => { if (e instanceof Error && e.constructor.name === "NotCourseMaterialError") throw new MaterialError(e.message); throw e; });
+    outline = await outlineFromTexts(title, sources.map((x) => ({ name: x.name, text: x.text }))).catch((e) => { if (e instanceof Error && e.constructor.name === "NotCourseMaterialError") throw new MaterialError(e.message); throw e; });
   }
   const record: CourseFile[] = sources.map((s) => ({ name: s.name, kind: `${kindLabel}, imported`, detail: "Notes pulled in from a connected app." }));
   let id: string;

@@ -7,7 +7,8 @@ vi.mock("./ai", () => ({ aiEnabled: () => ai, model: () => "mock-model" }));
 
 import { startQuiz, submitQuiz } from "./quiz";
 import { addCatalogCourse } from "./courses";
-import { getCourse, getRewards, NotFoundError } from "./store";
+import { getCourse, getCourseRanks, getEvidenceAttempt, getHistory, getRewards, NotFoundError, stateAfterQuiz } from "./store";
+import { getQuizAudit } from "./quiz";
 
 beforeEach(() => {
   ai = false;
@@ -17,7 +18,21 @@ beforeEach(() => {
   (globalThis as { __proveitMaterials?: unknown }).__proveitMaterials = undefined;
 });
 
-const model = (n: number) => ({ questions: Array.from({ length: n }, (_, i) => ({ concept: "CI interpretation", prompt: `Q${i}?`, options: [`right${i}`, `a${i}`, `b${i}`, `c${i}`], answerIndex: 0, explanation: `Because ${i}.` })) });
+type MQ = { concept: string; prompt: string; options: string[]; answerIndex: number; explanation: string };
+/** A model that answers each call for exactly the concepts and counts it was asked for. `change` can alter or drop a question. */
+const quizModel = (change: (q: MQ, k: number) => MQ | null = (q) => q) =>
+  generateText.mockImplementation(async ({ prompt }: { prompt: string }) => {
+    const out: MQ[] = [];
+    for (const c of JSON.parse(prompt).concepts as { name: string; questions: number }[]) {
+      for (let k = 0; k < c.questions; k++) {
+        const q = change({ concept: c.name, prompt: `${c.name} Q${k}?`, options: [`right ${c.name} ${k}`, `a ${c.name} ${k}`, `b ${c.name} ${k}`, `c ${c.name} ${k}`], answerIndex: 0, explanation: `Because ${c.name} ${k}.` }, k);
+        if (q) out.push(q);
+      }
+    }
+    return { output: { questions: out } };
+  });
+const answerWith = (q: { options: string[] }, right: boolean) => q.options.findIndex((o) => o.startsWith(right ? "right " : "a "));
+
 
 describe("startQuiz offline", () => {
   it("builds questions for any course and keeps the answers on the server", async () => {
@@ -69,12 +84,6 @@ describe("submitQuiz", () => {
     expect(submitQuiz(q.quizId, [1, 1, 1])).toEqual(first);
   });
 
-  it("never changes mastery or rank", async () => {
-    const before = [getRewards().points, JSON.stringify(getCourse("intro-stats").concepts.map((c) => c.state))];
-    const q = await startQuiz("intro-stats", 4);
-    submitQuiz(q.quizId, q.questions.map(() => 0));
-    expect([getRewards().points, JSON.stringify(getCourse("intro-stats").concepts.map((c) => c.state))]).toEqual(before);
-  });
 
   it("rejects an unknown quiz", () => {
     expect(() => submitQuiz("nope", [])).toThrow(NotFoundError);
@@ -84,31 +93,142 @@ describe("submitQuiz", () => {
 describe("startQuiz with a model", () => {
   it("shuffles the options but keeps the right answer marked", async () => {
     ai = true;
-    generateText.mockResolvedValueOnce({ output: model(4) });
+    quizModel();
     const q = await startQuiz("intro-stats", 4);
     expect(q.aiWritten).toBe(true);
-    const r = submitQuiz(q.quizId, q.questions.map((x, i) => x.options.indexOf(`right${i}`)));
+    const r = submitQuiz(q.quizId, q.questions.map((x) => answerWith(x, true)));
     expect(r.score).toBe(4);
-    expect(r.items[0]!.explanation).toBe("Because 0.");
+    expect(r.items[0]!.explanation).toMatch(/^Because /);
   });
 
   it("drops questions with duplicate options and refuses a quiz that is mostly unusable", async () => {
     ai = true;
-    const bad = model(4);
-    bad.questions[0]!.options = ["x", "x", "y", "z"];
-    generateText.mockResolvedValueOnce({ output: bad });
+    quizModel((q, k) => (k === 0 && q.concept === "CI interpretation" ? { ...q, options: ["x", "x", "y", "z"] } : q));
     expect((await startQuiz("intro-stats", 4)).questions).toHaveLength(3);
-    const mostlyBad = model(4);
-    mostlyBad.questions.forEach((x, i) => { if (i < 3) x.options = ["x", "x", "y", "z"]; });
-    generateText.mockResolvedValueOnce({ output: mostlyBad });
+    quizModel((q) => ({ ...q, options: ["x", "x", "y", "z"] }));
     await expect(startQuiz("intro-stats", 4)).rejects.toThrow(/too few/);
+  });
+
+  it("writes a long quiz as two parallel calls that share no concept", async () => {
+    ai = true;
+    quizModel();
+    const q = await startQuiz("intro-stats", 8);
+    expect(generateText).toHaveBeenCalledTimes(2);
+    const [a, b] = generateText.mock.calls.map((c) => (JSON.parse(c[0].prompt).concepts as { name: string }[]).map((x) => x.name));
+    expect(a!.filter((n) => b!.includes(n))).toEqual([]);
+    expect(q.questions).toHaveLength(8);
   });
 
   it("puts uploaded notes in front of the model", async () => {
     ai = true;
     addCatalogCourse("chinese-101");
-    generateText.mockResolvedValueOnce({ output: model(4) });
+    quizModel();
     await startQuiz("chinese-101", 4);
     expect(generateText.mock.calls[0]![0].prompt).toContain("Mandarin");
+  });
+});
+
+describe("what a quiz does to the map, the history and the rank", () => {
+  const NM = "network-management";
+  const stateOf = (id: string) => getCourse(NM).concepts.find((c) => c.id === id)!.state;
+  /** Takes a full quiz, one question per concept, getting right exactly the concepts named. */
+  async function take(rightNames: string[]) {
+    ai = true;
+    quizModel();
+    const n = getCourse(NM).concepts.length;
+    const q = await startQuiz(NM, n);
+    return submitQuiz(q.quizId, q.questions.map((x) => answerWith(x, rightNames.includes(x.concept))));
+  }
+  const names = () => getCourse(NM).concepts.map((c) => c.name);
+
+  it("follows one rule for what a quiz may do to a concept", () => {
+    expect(stateAfterQuiz("not_started", 1, 2)).toBe("developing");
+    expect(stateAfterQuiz("not_started", 0, 1)).toBe("needs_work");
+    expect(stateAfterQuiz("developing", 0, 1)).toBe("developing");
+    expect(stateAfterQuiz("developing", 0, 2)).toBe("needs_work");
+    expect(stateAfterQuiz("developing", 2, 2)).toBe("developing");
+    for (const s of ["needs_work", "provisional", "mastered"] as const) {
+      expect(stateAfterQuiz(s, 2, 2)).toBe(s);
+      expect(stateAfterQuiz(s, 0, 2)).toBe(s);
+    }
+    expect(stateAfterQuiz("not_started", 0, 0)).toBe("not_started");
+  });
+
+  it("moves the course map from the answers, and says what moved", async () => {
+    addCatalogCourse(NM);
+    const c = getCourse(NM).concepts;
+    const r = await take([c[0]!.name, c[2]!.name]);
+    expect(stateOf(c[0]!.id)).toBe("developing");
+    expect(stateOf(c[1]!.id)).toBe("needs_work");
+    expect(stateOf(c[2]!.id)).toBe("developing");
+    expect(c.slice(3).every((x) => stateOf(x.id) === "needs_work")).toBe(true);
+    expect(r.changes.filter((x) => x.to === "developing").map((x) => [x.concept, x.from]).sort()).toEqual([[c[0]!.name, "not_started"], [c[2]!.name, "not_started"]].sort());
+    expect(r.changes).toHaveLength(c.length);
+    expect(r.byConcept.find((x) => x.conceptId === c[2]!.id)).toMatchObject({ right: 1, total: 1 });
+  });
+
+  it("treats a question left blank as no evidence, so it can't flag a concept", async () => {
+    addCatalogCourse(NM);
+    ai = true;
+    quizModel();
+    const c = getCourse(NM).concepts;
+    const q = await startQuiz(NM, c.length);
+    const r = submitQuiz(q.quizId, q.questions.map((x) => (x.concept === c[0]!.name ? answerWith(x, true) : null)));
+    expect(r.score).toBe(1);
+    expect(r.changes.map((x) => x.concept)).toEqual([c[0]!.name]);
+    expect(c.slice(1).every((x) => stateOf(x.id) === "not_started")).toBe(true);
+  });
+
+  it("never moves a concept that was proved by a new-question test, or one with an open misconception", async () => {
+    ai = true;
+    quizModel();
+    const before = Object.fromEntries(getCourse("intro-stats").concepts.map((c) => [c.id, c.state]));
+    const q = await startQuiz("intro-stats", 15);
+    submitQuiz(q.quizId, q.questions.map((x) => answerWith(x, false)));
+    for (const c of getCourse("intro-stats").concepts) if (["mastered", "provisional", "needs_work"].includes(before[c.id]!)) expect(c.state).toBe(before[c.id]);
+  });
+
+  it("gives rank points once per concept answered right, and none for retaking the same ones", async () => {
+    addCatalogCourse(NM);
+    const n = names();
+    const start = getRewards().points;
+    const first = await take([n[0]!, n[1]!]);
+    expect(first.pointsGained).toBe(50);
+    expect(getRewards().points).toBe(start + 50);
+    expect(getRewards(NM).breakdown).toContainEqual({ label: "Concepts answered right in a quiz", count: 2, each: 25, points: 50 });
+    expect((await take([n[0]!, n[2]!])).pointsGained).toBe(25);
+    expect((await take([n[0]!, n[1]!])).pointsGained).toBe(0);
+    expect(getCourseRanks().find((r) => r.courseId === NM)!.points).toBe(75);
+    expect(getRewards().points).toBe(start + 75);
+  });
+
+  it("saves the quiz to History and reopens it as an audit", async () => {
+    addCatalogCourse(NM);
+    const n = names();
+    const r = await take([n[0]!]);
+    const ev = getHistory().find((e) => e.id === r.quizId)!;
+    expect(ev).toMatchObject({ title: `Quiz on Network Management: 1 of ${n.length}`, tone: "bad", href: `/course/${NM}/quiz/${r.quizId}` });
+    expect(ev.quizPct).toBe(13);
+    // Every other event is an attempt with an evidence record, which the History page looks up. A quiz must not be one of them.
+    expect(getHistory().filter((e) => e.quizPct === undefined).every((e) => { try { return Boolean(getEvidenceAttempt(e.id)); } catch { return false; } })).toBe(true);
+    expect(() => getEvidenceAttempt(r.quizId)).toThrow();
+    expect(ev.detail).toContain(n[0]!);
+    const audit = getQuizAudit(r.quizId);
+    expect(audit).toMatchObject({ score: 1, total: n.length, courseId: NM, pointsGained: 25 });
+    expect(audit.items[1]).toMatchObject({ picked: expect.any(Number), correct: expect.any(Number), explanation: expect.stringMatching(/^Because /) });
+    expect(audit.changes).toHaveLength(n.length);
+    expect(() => getQuizAudit("q999")).toThrow(NotFoundError);
+  });
+
+  it("quizzes one concept when asked, and in a full quiz drops questions about concepts that don't exist", async () => {
+    addCatalogCourse(NM);
+    const c = getCourse(NM).concepts;
+    ai = true;
+    quizModel();
+    const q = await startQuiz(NM, undefined, c[1]!.id);
+    expect(q.questions.map((x) => x.concept)).toEqual([c[1]!.name, c[1]!.name, c[1]!.name, c[1]!.name]);
+    await expect(startQuiz(NM, undefined, "nope")).rejects.toBeInstanceOf(NotFoundError);
+    quizModel((x, k) => (x.concept === c[0]!.name && k === 0 ? { ...x, concept: "Made up concept" } : x));
+    expect((await startQuiz(NM, c.length)).questions).toHaveLength(c.length - 1);
   });
 });

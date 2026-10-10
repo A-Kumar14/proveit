@@ -25,7 +25,7 @@ const Next = z.object({
 const ASK = `You are a spoken tutor. The student is explaining a concept out loud.
 - Ask ONE short follow-up that digs into something the student actually said, or asks for a concrete example of it.
 - Never state the correct answer, never hint at it, never say whether they are right.
-- Do not bring in ideas the student has not said, such as terms or setups from the course material. Only dig into their own words.
+- Build on what they said. You may ask them to apply their own idea to a case they have not mentioned, which is how you find out whether it holds. Never name the correct idea, and never use terms from the course material that they have not used.
 - Course material is below only so you can tell what is worth probing. Do not quote it.
 - Plain spoken language, one or two sentences, no lists.
 - Set done to true only after the student has covered the idea with enough detail to judge.`;
@@ -45,7 +45,7 @@ export async function nextTurn(input: ConverseInput): Promise<ConverseResult> {
   if (asked >= MAX_FOLLOWUPS) return { kind: "done" };
   if (!aiEnabled()) return offline(input.turns, asked);
   const { output } = await generateText({
-    model: model(),
+    model: model({ fast: true }),
     system: ASK,
     output: Output.object({ schema: Next }),
     prompt: `Concept question: ${a.question}\nCourse material: ${a.correct}\nFollow-ups asked so far: ${asked} of ${MAX_FOLLOWUPS}\n\nConversation:\n${transcript(input.turns)}`,
@@ -86,7 +86,7 @@ export async function audit(input: ConverseInput): Promise<AuditResult> {
   }
 
   const { output } = await generateText({
-    model: model(),
+    model: model({ fast: true }),
     system: AUDIT,
     output: Output.object({ schema: Audit }),
     prompt: `Question: ${a.question}\nCourse material: ${a.correct}\nKnown misconceptions: ${a.misconceptions.map((m) => m.gap).join(" | ")}\n\nConversation:\n${transcript(input.turns)}`,

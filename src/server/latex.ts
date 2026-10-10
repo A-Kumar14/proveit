@@ -15,7 +15,10 @@ export function esc(s: string): string {
     .trim()
     .replace(/[\\&%$#_{}~^]/g, (c) => ({
       "\\": "\\textbackslash{}", "~": "\\textasciitilde{}", "^": "\\textasciicircum{}",
-    } as Record<string, string>)[c] ?? `\\${c}`);
+    } as Record<string, string>)[c] ?? `\\${c}`)
+    // Straight quotes print as two closing quotes in LaTeX, so open them properly.
+    .replace(/(^|[\s(\[])"/g, "$1``").replace(/"/g, "''")
+    .replace(/(^|[\s(\[])'/g, "$1`");
 }
 
 const PREAMBLE = `\\documentclass[11pt]{article}

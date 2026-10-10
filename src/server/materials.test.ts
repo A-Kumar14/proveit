@@ -54,6 +54,15 @@ describe("course files", () => {
     expect(courseMaterial("intro-stats", 5_000).length).toBeLessThan(5_100);
   });
 
+  it("shares the budget between files when there is too much, so the last file isn't the one cut", async () => {
+    await addMaterial("intro-stats", file("first.txt", "text/plain", "AAAA ".repeat(5000)));
+    await addMaterial("intro-stats", file("second.txt", "text/plain", "BBBB ".repeat(5000)));
+    const text = courseMaterial("intro-stats", 12_000);
+    expect(text).toContain("Uploaded file: first.txt");
+    expect(text).toContain("Uploaded file: second.txt");
+    expect(text).toContain("BBBB");
+  });
+
   it("has the model read a PDF, and says so when no key is set", async () => {
     await expect(addMaterial("intro-stats", file("a.pdf", "application/pdf"))).rejects.toThrow(/no AI key/);
     ai = true;

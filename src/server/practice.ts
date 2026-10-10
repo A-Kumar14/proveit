@@ -5,10 +5,17 @@ import { aiEnabled, model } from "./ai";
 import { AUTHORED } from "./content";
 import { compile, keyTex, notesTex, paperTex, type Notes, type Paper } from "./latex";
 import { courseMaterial } from "./materials";
+import { splitByConcept } from "./parallel";
 import { getCourse, getMisconceptionLog } from "./store";
 import type { MasteryState, PracticeDoc, PracticeResult } from "@proveit/lib/schemas";
 
+/** Course text sent with a paper or notes request. More barely changes the result and slows the model. */
+const NOTES_CHARS = 30_000;
+/** The model writes about 100 tokens a second, so a paper is written in parallel parts, each about half the size. */
+const PARALLEL_PAPER = 2;
+const PARALLEL_NOTES = 4;
 const QUESTIONS = 10;
+const MODEL_TIMEOUT_MS = 90_000;
 const MARKS = 5;
 
 export type Weak = {
@@ -40,12 +47,6 @@ function plan(concepts: Weak[]): Weak[] {
   return [...weak, ...weak, ...rest].slice(0, QUESTIONS);
 }
 
-const PaperOut = z.object({
-  title: z.string(),
-  questions: z.array(z.object({ concept: z.string(), prompt: z.string(), marks: z.number().int().min(1).max(10) })),
-  key: z.array(z.object({ answer: z.string(), marking: z.string() })),
-});
-
 function offlinePaper(w: ReturnType<typeof getWeakness>): Paper {
   const seen = new Map<string, number>();
   const questions: Paper["questions"] = [];
@@ -66,22 +67,37 @@ function offlinePaper(w: ReturnType<typeof getWeakness>): Paper {
   return { title: "Sample question paper", courseName: w.courseName, questions, key };
 }
 
+const PaperPart = z.object({
+  questions: z.array(z.object({ concept: z.string(), prompt: z.string(), marks: z.number().int().min(1).max(10) })),
+  key: z.array(z.object({ answer: z.string(), marking: z.string() })),
+});
+
+const PAPER_SYSTEM = (n: number) => `You write part of a sample exam paper and its answer key for one course.
+- Exactly ${n} open-ended questions, ${MARKS} marks each. For each concept listed, write exactly the number of questions it says. When a concept has two, make them test it from different angles.
+- For a concept with listed mistakes, write at least one question that a student with that mistake would get wrong.
+- "key" has one entry per question in the same order. "answer" is the correct answer. "marking" is one short sentence saying what earns the marks.
+- Use only the course material given, including courseNotes. No outside facts. Plain text, no LaTeX, no markdown.
+- Never write Chinese characters, because the PDF font can't show them. Write Mandarin in pinyin with tone marks, such as nǐ hǎo.`;
+
 async function buildPaper(courseId: string): Promise<Paper> {
   const w = getWeakness(courseId);
   if (!aiEnabled()) return offlinePaper(w);
-  const { output } = await generateText({
-    model: model(),
-    system: `You write a sample exam paper and its answer key for one course.
-- Exactly ${QUESTIONS} open-ended questions, ${MARKS} marks each, at least 6 of them on concepts marked weak. Cover each weak concept before repeating one.
-- For a weak concept with listed mistakes, write at least one question that a student with that mistake would get wrong.
-- "key" has one entry per question in the same order. "answer" is the correct answer. "marking" says what earns the marks.
-- Use only the course material given, including courseNotes. No outside facts. Plain text, no LaTeX, no markdown.
-- Write any non-Latin script in Latin letters, such as pinyin for Chinese, because the PDF font can't show other scripts.`,
-    output: Output.object({ schema: PaperOut }),
-    prompt: JSON.stringify({ course: w.courseName, courseNotes: courseMaterial(courseId, 20_000), concepts: w.concepts.map((c) => ({ name: c.name, about: c.desc, weak: c.weak, courseMaterial: c.material, mistakes: c.mistakes.map((m) => ({ name: m.name, whatIsWrong: m.gap })) })) }),
-  });
-  if (output.questions.length === 0 || output.key.length !== output.questions.length) throw new Error("the model returned a paper whose key doesn't match");
-  return { title: output.title.trim() || "Sample question paper", courseName: w.courseName, questions: output.questions, key: output.key };
+  const notes = courseMaterial(courseId, NOTES_CHARS);
+  const parts = splitByConcept(plan(w.concepts), PARALLEL_PAPER);
+  const written = await Promise.all(parts.map(async (slots) => {
+    const wanted = new Map<string, { c: Weak; n: number }>();
+    for (const c of slots) wanted.set(c.id, { c, n: (wanted.get(c.id)?.n ?? 0) + 1 });
+    const { output } = await generateText({
+      model: model({ fast: true }),
+      system: PAPER_SYSTEM(slots.length),
+      output: Output.object({ schema: PaperPart }),
+      abortSignal: AbortSignal.timeout(MODEL_TIMEOUT_MS),
+      prompt: JSON.stringify({ course: w.courseName, courseNotes: notes, concepts: [...wanted.values()].map(({ c, n }) => ({ name: c.name, about: c.desc, questions: n, weak: c.weak, courseMaterial: c.material, mistakes: c.mistakes.map((m) => ({ name: m.name, whatIsWrong: m.gap })) })) }),
+    });
+    if (output.questions.length === 0 || output.key.length !== output.questions.length) throw new Error("the model returned a paper whose key doesn't match");
+    return output;
+  }));
+  return { title: "Sample question paper", courseName: w.courseName, questions: written.flatMap((x) => x.questions), key: written.flatMap((x) => x.key) };
 }
 
 const SectionsOut = z.object({ sections: z.array(z.object({ concept: z.string(), summary: z.string(), points: z.array(z.string()).max(5) })) });
@@ -96,17 +112,20 @@ async function buildNotes(courseId: string): Promise<Notes> {
   });
   let sections = offline();
   if (aiEnabled()) {
-    const { output } = await generateText({
-      model: model(),
+    const notes = courseMaterial(courseId, NOTES_CHARS);
+    const chunks = splitByConcept(ordered, PARALLEL_NOTES);
+    const outputs = await Promise.all(chunks.map(async (chunk) => (await generateText({
+      model: model({ fast: true }),
       system: `You write study notes for one course, one section per concept, in the order given.
 - "summary" is two or three plain sentences. "points" has up to 5 short facts or steps.
 - Use only the course material given, including courseNotes. Where none is given, stay within the description. No outside facts, no LaTeX, no markdown.
-- Write any non-Latin script in Latin letters, such as pinyin for Chinese, because the PDF font can't show other scripts.`,
+- Never write Chinese characters, because the PDF font can't show them. Write Mandarin in pinyin with tone marks, such as nǐ hǎo.`,
       output: Output.object({ schema: SectionsOut }),
-      prompt: JSON.stringify({ course: w.courseName, courseNotes: courseMaterial(courseId, 20_000), concepts: ordered.map((c) => ({ name: c.name, about: c.desc, courseMaterial: c.material })) }),
-    });
+      abortSignal: AbortSignal.timeout(MODEL_TIMEOUT_MS),
+      prompt: JSON.stringify({ course: w.courseName, courseNotes: notes, concepts: chunk.map((c) => ({ name: c.name, about: c.desc, courseMaterial: c.material })) }),
+    })).output));
     // Keep the concept order and names from the course, in case the model reorders or renames.
-    const byName = new Map(output.sections.map((s) => [s.concept, s]));
+    const byName = new Map(outputs.flatMap((o) => o.sections).map((s) => [s.concept, s]));
     sections = sections.map((s) => byName.get(s.concept) ?? s);
   }
   return { title: "Study notes", courseName: w.courseName, sections, mistakes };
@@ -123,11 +142,18 @@ async function toDoc(label: string, name: string, tex: string): Promise<{ doc: P
 
 const result = (parts: { doc: PracticeDoc; error: string | null }[]): PracticeResult => ({ docs: parts.map((p) => p.doc), pdfError: parts.find((p) => p.error)?.error ?? null });
 
+/** Logs where the time went, in development, so a slow document points at the model or at the PDF compile. */
+const timed = async <T>(label: string, run: () => Promise<T>): Promise<T> => {
+  const t = performance.now();
+  try { return await run(); } finally { if (process.env.NODE_ENV !== "production") console.info(`[practice] ${label} ${((performance.now() - t) / 1000).toFixed(1)}s`); }
+};
+
 export async function samplePaper(courseId: string): Promise<PracticeResult> {
-  const p = await buildPaper(courseId);
-  return result(await Promise.all([toDoc("Question paper", "question-paper", paperTex(p)), toDoc("Answer key", "answer-key", keyTex(p))]));
+  const p = await timed("paper: model", () => buildPaper(courseId));
+  return result(await timed("paper: compile", () => Promise.all([toDoc("Question paper", "question-paper", paperTex(p)), toDoc("Answer key", "answer-key", keyTex(p))])));
 }
 
 export async function studyNotes(courseId: string): Promise<PracticeResult> {
-  return result([await toDoc("Notes", "study-notes", notesTex(await buildNotes(courseId)))]);
+  const n = await timed("notes: model", () => buildNotes(courseId));
+  return result([await timed("notes: compile", () => toDoc("Notes", "study-notes", notesTex(n)))]);
 }
