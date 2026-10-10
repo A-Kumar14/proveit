@@ -675,12 +675,18 @@ export function getHistory(): HistoryEvent[] {
     const base = `/course/${a.courseId}`;
     if (a.kind === "transfer" && a.outcome === "pass") return { id: a.id, at: a.createdAt, title: `Passed the new question on ${c.name}`, detail: "Now provisionally mastered", tone: "good" as const, href: `${base}/result/${a.id}` };
     if (a.kind === "transfer" && a.outcome === "fail" && a.evaluation?.verdict === "incorrect") return { id: a.id, at: a.createdAt, title: `Missed the new question on ${c.name}`, detail: `Caught: ${a.evaluation.misconceptionName}`, tone: "bad" as const, href: `${base}/diagnosis/${a.id}` };
-    if (a.kind === "transfer" && a.outcome === "fail") return { id: a.id, at: a.createdAt, title: `Tried the new question on ${c.name}`, detail: "Needs more evidence", tone: "warn" as const, href: `${base}/lesson/${a.parentAttemptId ?? a.rootAttemptId}` };
+    if (a.kind === "transfer" && a.outcome === "fail") {
+      const parent = a.parentAttemptId ? attempt(a.parentAttemptId) : null;
+      const href = parent?.evaluation?.verdict === "correct"
+        ? `${base}/transfer/${parent.id}`
+        : `${base}/lesson/${parent?.id ?? a.rootAttemptId}`;
+      return { id: a.id, at: a.createdAt, title: `Tried the new question on ${c.name}`, detail: "Needs more evidence", tone: "warn" as const, href };
+    }
     const v = a.evaluation?.verdict;
     const verb = a.kind === "clarification" ? "Clarified" : "Answered";
     if (v === "incorrect") return { id: a.id, at: a.createdAt, title: `${verb} ${c.name}`, detail: `Caught: ${a.evaluation?.misconceptionName}`, tone: "bad" as const, href: `${base}/diagnosis/${a.id}` };
     if (v === "correct") return { id: a.id, at: a.createdAt, title: `${verb} ${c.name}`, detail: "No misconception found", tone: "good" as const, href: `${base}/diagnosis/${a.id}` };
-    return { id: a.id, at: a.createdAt, title: `${verb} ${c.name}`, detail: "Needed one more answer", tone: "warn" as const, href: `${base}/practice/${c.id}` };
+    return { id: a.id, at: a.createdAt, title: `${verb} ${c.name}`, detail: "Needed one more answer", tone: "warn" as const, href: `${base}/practice/${c.id}?clarify=${a.id}` };
   });
 }
 
