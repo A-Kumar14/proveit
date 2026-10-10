@@ -11,3 +11,13 @@ export function orNotFound<T>(read: () => T): T {
     throw e;
   }
 }
+
+
+export async function orNotFoundAsync<T>(read: () => Promise<T>): Promise<T> {
+  try {
+    return await read();
+  } catch (e) {
+    if (e instanceof NotFoundError) notFound();
+    throw e;
+  }
+}

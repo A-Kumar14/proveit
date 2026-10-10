@@ -72,5 +72,6 @@ export const api = {
   submitQuiz: (quizId: string, answers: (number | null)[]) => post("/api/quiz/submit", { quizId, answers }, QuizResult),
   clarify: (attemptId: string) => post("/api/clarify", { attemptId }, ClarifyResult),
   transfer: (attemptId: string, answer: string) => post("/api/transfer", { attemptId, answer }, TransferResult),
-  review: (courseId: string, conceptId: string, answer: string) => post("/api/review/submit", { courseId, conceptId, answer }, ReviewSubmitResult),
+  review: (courseId: string, conceptId: string, answer: string, learningSpecRevision?: number) =>
+    post("/api/review/submit", { courseId, conceptId, answer, learningSpecRevision }, ReviewSubmitResult),
 };

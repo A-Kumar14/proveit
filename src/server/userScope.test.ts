@@ -94,7 +94,7 @@ describe("account state isolation", () => {
   it("retains request identity through interleaved grading and failures", async () => {
     let release!: () => void;
     const wait = new Promise<void>(r => { release = r; });
-    const judge = vi.spyOn(evaluator, "judgeAnswer").mockImplementation(async (_id, answer) => {
+    const judge = vi.spyOn(evaluator, "judgeAnswerForSpec").mockImplementation(async (_spec, answer) => {
       const user = scopedUserId();
       if (answer === "A") await wait;
       else release();

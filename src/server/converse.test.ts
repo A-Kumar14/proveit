@@ -5,7 +5,11 @@ let ai = false;
 vi.mock("ai", () => ({ generateText: (...a: unknown[]) => generateText(...a), Output: { object: (o: unknown) => o } }));
 vi.mock("./ai", () => ({ aiEnabled: () => ai, model: () => "mock-model" }));
 const judgeAnswer = vi.fn();
-vi.mock("./evaluator", () => ({ judgeAnswer: (...a: unknown[]) => judgeAnswer(...a), judgeTransfer: vi.fn() }));
+vi.mock("./evaluator", () => ({
+  judgeAnswerForSpec: (...a: unknown[]) => judgeAnswer(...a),
+  judgeTransferForSpec: vi.fn(),
+  judgeReviewForSpec: vi.fn(),
+}));
 
 import { audit, nextTurn } from "./converse";
 import type { Turn } from "@proveit/lib/schemas";
