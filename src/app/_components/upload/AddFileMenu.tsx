@@ -13,8 +13,8 @@ const DEMO: { label: string; name: string; check: UploadCheck }[] = [
 ];
 
 /** Opens the file picker and posts the image to the upload check. The demo items only render in DEMO_MODE. */
-export function AddFileMenu({ conceptId, demo, disabled, onChecked, onError }: {
-  conceptId: string; demo: boolean; disabled?: boolean; onChecked: (c: Checked) => void; onError: (message: string) => void;
+export function AddFileMenu({ conceptId, demo, disabled, onChecked, onError, buttonClassName }: {
+  conceptId: string; demo: boolean; disabled?: boolean; onChecked: (c: Checked) => void; onError: (message: string) => void; buttonClassName?: string;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
@@ -39,7 +39,7 @@ export function AddFileMenu({ conceptId, demo, disabled, onChecked, onError }: {
       <button
         type="button" aria-haspopup="menu" aria-expanded={open} disabled={disabled || busy}
         onClick={() => (demo ? setOpen((o) => !o) : input.current?.click())}
-        className="flex cursor-pointer items-center gap-1.5 rounded-sm border border-line bg-surface px-2.5 py-[7px] text-xs font-semibold text-ink-2 hover:bg-surface-hover disabled:opacity-50"
+        className={buttonClassName ?? "flex cursor-pointer items-center gap-1.5 rounded-sm border border-line bg-surface px-2.5 py-[7px] text-xs font-semibold text-ink-2 hover:bg-surface-hover disabled:opacity-50"}
       >
         <Paperclip size={14} strokeWidth={2} aria-hidden />{busy ? "Checking..." : "Add file"}
       </button>
