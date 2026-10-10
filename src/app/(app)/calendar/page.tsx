@@ -33,7 +33,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/calenda
         <section aria-label="Month" className="flex min-w-0 flex-1 flex-col gap-3">
           <div className="flex items-center justify-between">
             <div>
-              <div className="eyebrow">{connected ? `${calendar.provider} · synced ${calendar.syncedAt ? ago(calendar.syncedAt) : "just now"}` : events.some((e) => e.id.startsWith("sample-")) ? "Sample calendar" : "No calendar connected"}</div>
+              <div className="eyebrow">{connected ? `${calendar.provider} · synced ${calendar.syncedAt ? ago(calendar.syncedAt) : "just now"}` : "No calendar connected"}</div>
               <h1 className="m-0 mt-1 text-[22px] font-semibold">{first.toLocaleDateString("en-US", { month: "long", year: "numeric" })}</h1>
             </div>
             <div className="flex items-center gap-1.5">
