@@ -263,4 +263,38 @@ describe("course-grounded ConceptLearningSpec generation", () => {
     expect(a.revision).toBe(1);
     expect(listGeneratedLearningSpecs(id)).toHaveLength(1);
   });
+
+  it("discards stale in-flight generation when course material changes", async () => {
+    const { id, conceptId } = makeRuntimeCourse();
+    let releaseFirst!: () => void;
+    const firstWait = new Promise<void>((resolve) => { releaseFirst = resolve; });
+    let calls = 0;
+    mocked.generateText.mockImplementation(async (options: unknown) => {
+      const prompt = JSON.parse((options as { prompt: string }).prompt) as PromptShape;
+      calls++;
+      if (calls === 1) await firstWait;
+      return { output: draft(prompt.sources[0]!.id) };
+    });
+
+    const stale = ensureConceptLearningSpec(id, conceptId);
+    await vi.waitFor(() => expect(mocked.generateText).toHaveBeenCalledTimes(1));
+
+    saveMaterial(
+      id,
+      { name: "new-lecture.md", mime: "text/markdown", size: 90 },
+      "Updated lecture material: the cell membrane controls movement across the cell boundary.",
+      "text",
+    );
+    const current = ensureConceptLearningSpec(id, conceptId);
+    await vi.waitFor(() => expect(mocked.generateText).toHaveBeenCalledTimes(2));
+    const currentSpec = await current;
+
+    releaseFirst();
+    const staleCallerResult = await stale;
+
+    expect(staleCallerResult).toEqual(currentSpec);
+    expect(currentSpec.revision).toBe(1);
+    expect(listGeneratedLearningSpecs(id)).toEqual([currentSpec]);
+    expect(mocked.generateText).toHaveBeenCalledTimes(2);
+  });
 });
