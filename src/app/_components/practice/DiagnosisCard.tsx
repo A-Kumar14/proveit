@@ -64,7 +64,7 @@ export function DiagnosisCard({ a, trail = [] }: { a: AttemptView; trail?: Evide
             </div>}
       </Section>
       <EvidenceTrail rows={trail} />
-      <CardFooter left="Levels come from your attempts. Open the trail above to see the evidence behind this diagnosis." />
+      <CardFooter left="Levels come from your attempts. The trail above shows the evidence behind this diagnosis." />
       {wrong && !e.evidenceQuote && (
         <div className="flex items-center gap-1.5 px-[18px] pb-3.5 text-[11px] text-ink-faint"><AlertTriangle size={12} aria-hidden />No single phrase stood out, so nothing is highlighted.</div>
       )}
