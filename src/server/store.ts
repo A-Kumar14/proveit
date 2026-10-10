@@ -160,8 +160,13 @@ export function removeAddedCourse(id: string): boolean {
   const data = db();
   const i = data.samples.findIndex((c) => c.id === id && c.runtime);
   if (i < 0) return false;
+  const removed = data.samples[i]!;
   data.samples.splice(i, 1);
   data.attempts = data.attempts.filter((attempt) => attempt.courseId !== id);
+  for (const concept of removed.concepts) {
+    data.taskDone.delete(concept.id);
+    data.taskDone.delete(`review:${concept.id}`);
+  }
   delete data.peakByCourse[id];
   persistLearning();
   return true;
@@ -201,8 +206,6 @@ const conceptFor = (courseId: string, conceptId: string): Concept => {
   if (!c) throw new NotFoundError(`concept ${conceptId}`);
   return c;
 };
-/** Legacy helper for built-in dashboard-only paths. New mastery paths should use conceptFor(courseId, conceptId). */
-const concept = (id: string) => conceptFor(db().course.id, id);
 const newId = () => `a${++db().seq}`;
 
 const specFor = (courseId: string, conceptId: string, revision?: number): ConceptLearningSpec => {
