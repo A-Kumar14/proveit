@@ -381,6 +381,12 @@ export async function ensureConceptLearningSpec(
       desc: concept.desc,
     };
     const generated = await generate(context, sources, revision);
+
+    // Course files can change while the model is working. Never publish content grounded in a
+    // fingerprint that is already stale; join/start generation for the current material instead.
+    const refreshed = groundingSources(courseId, concept.name, concept.desc).fingerprint;
+    if (refreshed !== fingerprint) return ensureConceptLearningSpec(courseId, conceptId);
+
     return saveGeneratedLearningSpec(generated, fingerprint);
   })();
 
