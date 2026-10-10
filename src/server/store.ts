@@ -493,7 +493,7 @@ export function getTransferChallenge(attemptId: string): TransferChallengeView {
   const c = concept(source.conceptId);
   const au = AUTHORED[c.id];
   if (!au || source.evaluation?.verdict !== "correct") throw new NotFoundError(`no direct transfer challenge for ${attemptId}`);
-  if (latestConclusiveForConcept(c.id)?.id !== source.id) throw new InvalidAttemptLinkError("transfer source is stale");
+  if (latestConclusiveForConcept(c.id)?.id !== source.id) throw new NotFoundError(`stale transfer challenge ${attemptId}`);
   if (db().attempts.some((a) => a.rootAttemptId === source.rootAttemptId && a.kind === "transfer" && a.outcome === "pass")) {
     throw new NotFoundError(`transfer already passed for ${attemptId}`);
   }
