@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ConceptLearningSpec } from "@proveit/lib/conceptLearningSpec";
 
 const ensureSpec = vi.fn();
@@ -111,7 +111,7 @@ function runtimeCourse() {
 
 beforeEach(() => {
   delete process.env.OPENROUTER_API_KEY;
-  delete process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+  process.env.GOOGLE_GENERATIVE_AI_API_KEY = "test-key";
   (globalThis as { __proveit?: unknown; __proveitLearningSpecs?: unknown }).__proveit = undefined;
   (globalThis as { __proveitLearningSpecs?: unknown }).__proveitLearningSpecs = undefined;
   ensureSpec.mockReset();
@@ -134,6 +134,10 @@ beforeEach(() => {
       ? { verdict: "pass", quote: null, misconceptionId: null, feedback: null, votes: { agree: 3, of: 3 } }
       : { verdict: "fail", quote: "stores DNA", misconceptionId: "membrane_stores_dna", feedback: "Recheck the membrane's role.", votes: { agree: 3, of: 3 } }
   );
+});
+
+afterEach(() => {
+  delete process.env.GOOGLE_GENERATIVE_AI_API_KEY;
 });
 
 describe("runtime course mastery", () => {
