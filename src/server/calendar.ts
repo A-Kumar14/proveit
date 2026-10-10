@@ -1,6 +1,6 @@
 import "server-only";
 import { lookup } from "node:dns/promises";
-import { loadJson, saveJson } from "./persistence";
+import { deleteJson, loadJson, saveJson } from "./persistence";
 import { isIP } from "node:net";
 import ical, { type VEvent } from "node-ical";
 
@@ -25,9 +25,34 @@ export type CalendarState = {
 type Held = CalendarState & { url: string | null };
 const g = globalThis as unknown as { __proveitCal?: Held };
 
+function demoCalendar(): Held {
+  const now = new Date();
+  const at = (offset: number, hour: number, minute = 0) => new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset, hour, minute);
+  const event = (id: string, title: string, offset: number, h1: number, m1: number, h2: number, m2: number, kind: CalKind = "other"): CalEvent => ({
+    id: `demo-${id}`, title, start: at(offset, h1, m1).toISOString(), end: at(offset, h2, m2).toISOString(), allDay: false, kind,
+  });
+  return {
+    mode: "ics", provider: "Demo calendar", syncedAt: Date.now(), url: "demo",
+    events: [
+      event("stats-lecture-1", "Intro Statistics lecture", 1, 10, 0, 10, 50, "class"),
+      event("office-hours", "Statistics office hours", 1, 17, 0, 18, 0),
+      event("cafe", "Shift at the campus cafe", 2, 17, 0, 21, 0),
+      event("finance", "Personal Finance seminar", 3, 14, 0, 15, 15, "class"),
+      event("stats-lecture-2", "Intro Statistics lecture", 4, 10, 0, 10, 50, "class"),
+      event("study-group", "Study group", 4, 19, 0, 20, 0),
+    ],
+  };
+}
+
 function restoreCalendar(): Held {
   const saved = loadJson<Held>("calendar");
-  if (!saved || (saved.mode !== "ics" && saved.mode !== "none")) return { mode: "none", provider: null, syncedAt: null, events: [], url: null };
+  if (!saved) {
+    if (process.env.PROVEIT_DEMO_SEED === "0") return { mode: "none", provider: null, syncedAt: null, events: [], url: null };
+    const seeded = demoCalendar();
+    saveJson("calendar", seeded);
+    return seeded;
+  }
+  if (saved.mode !== "ics" && saved.mode !== "none") return { mode: "none", provider: null, syncedAt: null, events: [], url: null };
   return { mode: saved.mode, provider: saved.provider ?? null, syncedAt: saved.syncedAt ?? null, events: Array.isArray(saved.events) ? saved.events : [], url: saved.url ?? null };
 }
 const held = (): Held => (g.__proveitCal ??= restoreCalendar());
@@ -133,6 +158,11 @@ export async function connectCalendar(raw: string): Promise<CalendarState> {
 export async function refreshCalendar(): Promise<CalendarState> {
   const h = held();
   if (h.mode !== "ics" || !h.url) throw new CalendarError("No calendar is connected yet.");
+  if (h.url === "demo") {
+    h.syncedAt = Date.now();
+    persistCalendar();
+    return getCalendarState();
+  }
   h.events = await pull(h.url);
   h.syncedAt = Date.now();
   persistCalendar();
@@ -143,6 +173,11 @@ export function disconnectCalendar(): CalendarState {
   Object.assign(held(), { mode: "none", url: null, provider: null, syncedAt: null, events: [] });
   persistCalendar();
   return getCalendarState();
+}
+
+export function resetDemoCalendar(): void {
+  deleteJson("calendar");
+  delete g.__proveitCal;
 }
 
 // ---- reading ----

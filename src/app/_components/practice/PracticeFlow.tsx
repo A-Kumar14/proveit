@@ -20,7 +20,7 @@ import type { QuestionView } from "@proveit/server/store";
 type Turn = { answer: string; followUp: string };
 
 export function PracticeFlow({ courseId, question, resume, uploads, modeParam }: {
-  courseId: string; question: QuestionView; resume?: { attemptId: string; answer: string; followUp: string }; uploads: { enabled: boolean }; modeParam?: string;
+  courseId: string; question: QuestionView; resume?: { attemptId: string; answer: string; followUp: string }; uploads: { enabled: boolean; demo: boolean }; modeParam?: string;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -89,7 +89,7 @@ export function PracticeFlow({ courseId, question, resume, uploads, modeParam }:
         leading={(
           <>
             {uploads.enabled && <AddFileMenu
-              iconOnly conceptId={question.conceptId} disabled={status === "evaluating"}
+              iconOnly conceptId={question.conceptId} demo={uploads.demo} disabled={status === "evaluating"}
               onError={(m) => { setError(m); }}
               onChecked={({ name, check }) => { setError(null); setUpload({ name, ok: check.is_student_work && check.relevant, summary: check.summary, reason: check.reason || "That upload doesn't look like your own work on this question." }); }}
             />}

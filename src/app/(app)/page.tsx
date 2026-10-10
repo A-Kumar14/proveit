@@ -9,9 +9,10 @@ import { CourseTicker } from "@proveit/app/_components/dashboard/CourseTicker";
 import { TickerCard } from "@proveit/app/_components/dashboard/TickerCard";
 import { TodoCard } from "@proveit/app/_components/dashboard/TodoCard";
 import { RankCard } from "@proveit/app/_components/dashboard/RankCard";
+import { DemoResetButton } from "@proveit/app/_components/dashboard/DemoResetButton";
 import { RankChip } from "@proveit/app/_components/dashboard/RankChip";
 import { getScheduledTodos, getSchedule } from "@proveit/server/schedule";
-import { getDashboard, getRewards, listCourses } from "@proveit/server/store";
+import { getCourse, getDashboard, getRewards, listCourses } from "@proveit/server/store";
 
 export const dynamic = "force-dynamic";
 
@@ -20,15 +21,16 @@ export default async function Dashboard({ searchParams }: PageProps<"/">) {
   const head = getDashboard();
   const courses = listCourses();
   const rewards = getRewards();
+  const demo = courses.find((c) => c.id === "intro-stats");
   return (
     <AppShell
       active="dashboard"
       crumbs={[{ label: head.greeting }, { label: head.dateLabel }]}
-      right={<div className="flex items-center gap-3"><RankChip r={rewards} /><Link href="/?add=1" className={buttonStyles({ size: "md" })}><Plus size={13} strokeWidth={2.4} aria-hidden />Add a course</Link></div>}
+      right={<div className="flex items-center gap-3"><RankChip r={rewards} /><DemoResetButton /><Link href="/?add=1" className={buttonStyles({ size: "md" })}><Plus size={13} strokeWidth={2.4} aria-hidden />Add a course</Link></div>}
     >
       <div className="min-h-0 flex-1 overflow-y-auto px-7 py-6">
         <div className="flex flex-col gap-8">
-          <RankCard r={rewards} previewable={false} />
+          <RankCard r={rewards} previewable />
 
           <section aria-labelledby="courses-heading" className="flex flex-col gap-3">
             <div className="flex items-baseline justify-between">
@@ -45,7 +47,7 @@ export default async function Dashboard({ searchParams }: PageProps<"/">) {
 
         </div>
       </div>
-      {add && <AddCourseModal />}
+      {add && demo && <AddCourseModal demoCourseId={demo.id} demoConcepts={getCourse(demo.id).total} />}
       {connect && <ConnectCalendarModal closeHref="/" />}
     </AppShell>
   );
