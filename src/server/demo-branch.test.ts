@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { getCalendarState } from "./calendar";
 import { closePersistenceForTests } from "./persistence";
-import { getEvidenceTrail, getHistory, getRewards, listCourses } from "./store";
+import { clarify, getAttempt, getCourse, getDashboard, getEvidenceTrail, getFiles, getHistory, getMisconceptionLog, getQuestion, getRemediation, getResult, getReviewChallenge, getReviewResult, getReviews, getRewards, getTodos, listCourses } from "./store";
 import { getReviewQueue } from "./schedule";
 import { demoStateForTests } from "../test/demo-state";
 
@@ -53,6 +53,27 @@ describe("isolated demo-data branch", () => {
     const calendar = getCalendarState();
     expect(calendar).toMatchObject({ mode: "ics", provider: "Demo calendar" });
     expect(calendar.events.length).toBeGreaterThanOrEqual(6);
+
+    const course = getCourse("intro-stats");
+    expect(new Set(course.concepts.map((c) => c.state))).toEqual(expect.objectContaining(new Set(["mastered", "developing", "needs_work", "provisional", "not_started"])));
+    expect(getDashboard().recentlyCaught.length).toBeGreaterThanOrEqual(2);
+    expect(getDashboard().risk?.concept).toContain("CI interpretation");
+    expect(getTodos().some((g) => g.courseId === "personal-finance")).toBe(true);
+    expect(getFiles("intro-stats").files.length).toBeGreaterThan(0);
+    expect(getFiles("linear-algebra").files.length).toBeGreaterThan(0);
+
+    const log = getMisconceptionLog("intro-stats");
+    expect(log.some((m) => m.name === "Parameter probability trap" && m.open)).toBe(true);
+    expect(log.some((m) => m.concept === "Standard error" && !m.open)).toBe(true);
+
+    expect(getQuestion("intro-stats", "cii").prompt.length).toBeGreaterThan(20);
+    expect(getAttempt("a1").evaluation.verdict).toBe("incorrect");
+    expect(getRemediation("a1").lesson.explanation.length).toBeGreaterThan(20);
+    expect(getResult("a3")).toMatchObject({ conceptName: "Standard error", next: "provisional" });
+    expect(getReviewResult("a5")).toMatchObject({ conceptName: "Population vs. sample", next: "mastered" });
+    expect(getReviews(new Date()).due.some((r) => r.id === "se")).toBe(true);
+    expect(getReviewChallenge("intro-stats", "se", new Date()).conceptName).toBe("Standard error");
+    expect(clarify("a6").followUp).toContain("two ingredients");
   });
 
   it("reloads the same seeded state from SQLite rather than rebuilding a different sample", () => {
