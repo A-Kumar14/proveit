@@ -1248,7 +1248,7 @@ function tasksFor(c: Course, _active: boolean): Task[] {
 export function getTodos(): TodoGroup[] {
   const { course, samples } = db();
   return [course, ...samples]
-    .filter((c) => !isCompleted(c) && c.concepts.some((concept) => canPractice(c, concept)))
+    .filter((c) => !isCompleted(c) && (!c.runtime || c.concepts.some((concept) => canPractice(c, concept))))
     .map((c) => {
     const all = tasksFor(c, c === course);
     const open = all.filter((t) => !t.done).sort((a, b) => taskRank(a) - taskRank(b));
