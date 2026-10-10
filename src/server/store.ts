@@ -512,7 +512,8 @@ export function getQuestion(courseId: string, conceptId: string): QuestionView {
 
 /** Generate runtime-course content on demand, then return the same question view used for authored content. */
 export async function ensureQuestion(courseId: string, conceptId: string): Promise<QuestionView> {
-  await ensureConceptLearningSpec(courseId, conceptId);
+  const course = courseFor(courseId);
+  if (course.runtime) await ensureConceptLearningSpec(courseId, conceptId);
   return getQuestion(courseId, conceptId);
 }
 
@@ -534,8 +535,14 @@ export async function assess(input: AssessInput): Promise<AssessResult> {
     throw new InvalidAttemptLinkError("follow-up parent is stale");
   }
 
-  // Clarifications stay on the exact learning-spec revision that produced the original diagnosis.
-  const spec = parent ? specForAttempt(parent) : await ensureConceptLearningSpec(input.courseId, input.conceptId);
+  // Clarifications stay on the exact revision that produced the original diagnosis.
+  // Built-in concepts remain fail-closed unless they have canonical authored content; only runtime courses generate on demand.
+  const course = courseFor(input.courseId);
+  const spec = parent
+    ? specForAttempt(parent)
+    : course.runtime
+      ? await ensureConceptLearningSpec(input.courseId, input.conceptId)
+      : specFor(input.courseId, input.conceptId);
   const previousState = c.state;
   const judged = input.imageSummary ? `${input.answer}\n\n[Student's attached work, transcribed] ${input.imageSummary}` : input.answer;
   const j = await judgeAnswerForSpec(spec, judged, parent ? answerContext(parent) : undefined);
