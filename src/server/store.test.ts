@@ -299,6 +299,25 @@ describe("review queue, history and misconception log", () => {
     expect(() => getFiles("nope")).toThrow(NotFoundError);
     expect(() => getMisconceptionLog("nope")).toThrow(NotFoundError);
   });
+  it("does not reuse an old transfer pass to mark a newly reopened misconception as repaired", async () => {
+    const first = await run(WRONG);
+    const repaired = await submitTransfer(first.attemptId, RIGHT_TRANSFER);
+    if (repaired.result !== "pass") throw new Error("expected pass");
+
+    await run(WRONG);
+    expect(state("cii")).toBe("needs_work");
+    expect(getMisconceptionLog("intro-stats")[0]).toMatchObject({ open: true });
+
+    const correct = await run("Over repeated samples, about 95% of intervals made by the method contain the true mean.");
+    expect(correct.evaluation.verdict).toBe("correct");
+    expect(state("cii")).toBe("developing");
+    expect(getMisconceptionLog("intro-stats")[0]).toMatchObject({ open: true, note: "Open until you pass a new question" });
+
+    const repass = await submitTransfer(correct.attemptId, RIGHT_TRANSFER);
+    if (repass.result !== "pass") throw new Error("expected second pass");
+    expect(getMisconceptionLog("intro-stats")[0]).toMatchObject({ open: false });
+  });
+
 });
 
 describe("course completion", () => {
