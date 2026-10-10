@@ -466,7 +466,7 @@ export function getDashboard(): DashboardView {
   const bad = cs.find((c) => c.state === "needs_work");
   // Seeded needs-work concepts have no attempt yet, so fall back to the authored misconception name.
   const lastBad = (id: string) =>
-    latestConfirmedIncorrect(id)?.evaluation?.misconceptionName ?? primaryMisconception(id)?.name ?? null;
+    latestConfirmedIncorrect(id, course.id)?.evaluation?.misconceptionName ?? primaryMisconceptionFor(course.id, id)?.name ?? null;
   const next = nextConcept();
   const hour = now.getHours();
   const caught = [...attempts].reverse().filter((a) =>
@@ -476,7 +476,7 @@ export function getDashboard(): DashboardView {
   );
   const seen = new Set<string>();
   const recentlyCaught = caught.filter((a) => (seen.has(a.conceptId) ? false : (seen.add(a.conceptId), true))).slice(0, 3).map((a) => {
-    const c = concept(a.conceptId);
+    const c = conceptFor(a.courseId, a.conceptId);
     return { misconception: a.evaluation!.misconceptionName!, concept: c.name, repaired: c.evidence.transferPassed && (c.state === "provisional" || c.state === "mastered") };
   });
   return {
@@ -1173,14 +1173,14 @@ export function listCourses(): CourseRow[] {
   const { course, samples } = db();
   return [course, ...samples].map((c) => {
     const bad = c.concepts.find((x) => x.state === "needs_work");
-    const last = bad && (latestConfirmedIncorrect(bad.id)?.evaluation?.misconceptionName ?? primaryMisconception(bad.id)?.name ?? null);
+    const last = bad && (latestConfirmedIncorrect(bad.id, c.id)?.evaluation?.misconceptionName ?? primaryMisconceptionFor(c.id, bad.id)?.name ?? null);
     return {
       id: c.id, name: c.name, pct: coursePct(c.concepts),
       proven: c.concepts.filter((x) => x.state === "mastered").length, total: c.concepts.length,
       needsWork: c.concepts.filter((x) => x.state === "needs_work").length,
       inProgress: c.concepts.filter((x) => x.state === "developing" || x.state === "provisional").length,
       notStarted: c.concepts.filter((x) => x.state === "not_started").length,
-      next: (c === course ? nextConcept() : null)?.name ?? c.concepts.find((x) => x.state !== "mastered")?.name ?? null,
+      next: nextConceptFor(c)?.name ?? c.concepts.find((x) => x.state !== "mastered")?.name ?? null,
       completed: isCompleted(c), manual: c.completedOverride !== null,
       openMisconception: last || null,
     };
@@ -1210,12 +1210,11 @@ export class TaskLockedError extends Error {}
 
 export const taskRank = (t: Task) => (t.kind === "review" ? 1 : t.state === "needs_work" ? 0 : t.state === "developing" ? 2 : 3);
 
-function tasksFor(c: Course, active: boolean): Task[] {
-  if (c.runtime) return [];
+function tasksFor(c: Course, _active: boolean): Task[] {
   const today = isoDay(new Date());
   return c.concepts.flatMap((x): Task[] => {
     const provedByWork = x.state === "provisional" || x.state === "mastered";
-    const href = active && testable(x) ? practiceHref(x) : null;
+    const href = canPractice(c, x) ? practiceHrefFor(c.id, x) : null;
     const practice: Task = {
       id: x.id, title: x.name, courseId: c.id, courseName: c.name, state: x.state, kind: "practice",
       done: provedByWork || db().taskDone.has(x.id), doneBy: provedByWork ? "progress" : db().taskDone.has(x.id) ? "you" : null, href,
@@ -1230,7 +1229,7 @@ function tasksFor(c: Course, active: boolean): Task[] {
 /** Tasks grouped by course, open ones first by urgency. Completed courses drop out. */
 export function getTodos(): TodoGroup[] {
   const { course, samples } = db();
-  return [course, ...samples].filter((c) => !isCompleted(c) && !c.runtime).map((c) => {
+  return [course, ...samples].filter((c) => !isCompleted(c)).map((c) => {
     const all = tasksFor(c, c === course);
     const open = all.filter((t) => !t.done).sort((a, b) => taskRank(a) - taskRank(b));
     return { courseId: c.id, courseName: c.name, open, done: all.filter((t) => t.done), total: all.length, doneCount: all.filter((t) => t.done).length };
@@ -1259,7 +1258,7 @@ export function getCourseEvents(): CalEvent[] {
     if (c.examDate) out.push({ id: `quiz:${c.id}`, title: c.deadline.replace(/^Quiz /, `${c.name} quiz, `), start: new Date(`${c.examDate}T00:00:00`).toISOString(), end: new Date(`${c.examDate}T23:59:59`).toISOString(), allDay: true, kind: "quiz", href: `/course/${c.id}` });
     for (const x of c.concepts) {
       if (!x.nextReview || !(x.state === "provisional" || x.state === "mastered")) continue;
-      out.push({ id: `review:${x.id}`, title: `Review ${x.name}`, start: new Date(`${x.nextReview}T00:00:00`).toISOString(), end: new Date(`${x.nextReview}T23:59:59`).toISOString(), allDay: true, kind: "review", href: "/review" });
+      out.push({ id: `review:${x.id}`, title: `Review ${x.name}`, start: new Date(`${x.nextReview}T00:00:00`).toISOString(), end: new Date(`${x.nextReview}T23:59:59`).toISOString(), allDay: true, kind: "review", href: `/course/${c.id}/review/${x.id}` });
     }
   }
   return out;
