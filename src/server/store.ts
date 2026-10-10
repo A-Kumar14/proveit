@@ -23,7 +23,9 @@ type Attempt = {
   answer: string; imageName?: string; evaluation: Evaluation | null; passed: boolean;
   previousState: MasteryState; failedTransfers: number; createdAt: number;
 };
-type Db = { course: { id: string; name: string; deadline: string; concepts: Concept[]; edges: [string, string][] }; attempts: Attempt[]; provenDays: Set<string>; seq: number };
+type Course = { id: string; name: string; deadline: string; concepts: Concept[]; edges: [string, string][]; files: CourseFile[] };
+/** `course` is the one being worked on. `samples` are finished courses that only fill the sidebar and map views. */
+type Db = { course: Course; samples: Course[]; attempts: Attempt[]; provenDays: Set<string>; seq: number };
 
 const app = (answers: number, sound: number, transferPassed = false) => ({ answers, sound, transferPassed });
 const M: Skill[] = [{ label: "Application", pct: 90 }, { label: "New-question test", pct: 85 }];
@@ -50,11 +52,36 @@ function seed(): Db {
         c("pv", "p-value", "p-value", U4, "How surprising your data would be if the null were true.", 420, 165, "not_started", null, app(0, 0)),
         c("err", "Type I / Type II errors", "Error types", U4, "The two ways a test can be wrong, and the trade-off between them.", 420, 258, "not_started", null, app(0, 0)),
       ],
+      files: [{ name: "OpenStax Introductory Statistics 2e", kind: "Textbook, CC BY 4.0", detail: "Source for all 12 concepts and the misconceptions they carry." }],
       edges: [["pop", "par"], ["par", "se"], ["var", "se"], ["var", "par"], ["se", "moe"], ["size", "moe"], ["clt", "cic"], ["moe", "cic"], ["cic", "cii"], ["cic", "pv"], ["nul", "pv"], ["pv", "err"]],
     },
+    samples: [sampleCompletedCourse()],
     attempts: [],
     provenDays: new Set(),
     seq: 0,
+  };
+}
+
+/** Sample data so the Completed group has something in it. Every concept is Mastered, so it never needs practice. */
+function sampleCompletedCourse(): Course {
+  const done = (id: string, name: string, short: string, unit: string, desc: string, x: number, y: number): Concept => ({
+    id, name, short, unit, desc, x, y, state: "mastered", skills: M, evidence: app(3, 3, true), nextReview: null,
+  });
+  const U1 = "01 VECTORS", U2 = "02 MATRICES", U3 = "03 SYSTEMS", U4 = "04 EIGEN";
+  return {
+    id: "linear-algebra", name: "Linear Algebra", deadline: "Completed Aug 14",
+    concepts: [
+      done("la-vec", "Vectors and span", "Vectors", U1, "Combine vectors and describe everything they can reach.", 60, 72),
+      done("la-ind", "Linear independence", "Independence", U1, "Tell when a set of vectors adds no new direction.", 60, 165),
+      done("la-mat", "Matrix operations", "Matrices", U2, "Add, scale and multiply matrices, and know when each is defined.", 180, 72),
+      done("la-inv", "Inverses", "Inverses", U2, "Undo a matrix, and know when that is impossible.", 180, 165),
+      done("la-sys", "Solving systems", "Systems", U3, "Row reduce to find every solution of a linear system.", 300, 72),
+      done("la-det", "Determinants", "Determinants", U3, "Read invertibility and area scaling from one number.", 300, 165),
+      done("la-eig", "Eigenvalues", "Eigenvalues", U4, "Find the directions a matrix only stretches.", 420, 72),
+      done("la-dia", "Diagonalization", "Diagonalize", U4, "Rewrite a matrix in the basis of its eigenvectors.", 420, 165),
+    ],
+    edges: [["la-vec", "la-ind"], ["la-vec", "la-mat"], ["la-ind", "la-inv"], ["la-mat", "la-sys"], ["la-inv", "la-det"], ["la-sys", "la-eig"], ["la-det", "la-dia"], ["la-eig", "la-dia"]],
+    files: [{ name: "Sample syllabus.pdf", kind: "Sample", detail: "Placeholder so the completed-course sidebar group has data to show." }],
   };
 }
 
@@ -78,6 +105,13 @@ const attempt = (id: string) => {
   const a = db().attempts.find((x) => x.id === id);
   if (!a) throw new NotFoundError(`attempt ${id}`);
   return a;
+};
+/** Any course, including finished samples. Use assertCourse for anything that needs the active course. */
+const courseFor = (id: string): Course => {
+  const { course, samples } = db();
+  const found = course.id === id ? course : samples.find((c) => c.id === id);
+  if (!found) throw new NotFoundError(`course ${id}`);
+  return found;
 };
 const assertCourse = (id: string) => {
   if (db().course.id !== id) throw new NotFoundError(`course ${id}`);
@@ -149,9 +183,9 @@ const ctaFor = (c: Concept): ConceptView["cta"] => {
 };
 
 export function getCourse(courseId: string): CourseView {
-  assertCourse(courseId);
-  const { course } = db();
-  const next = nextConcept();
+  const course = courseFor(courseId);
+  const active = course === db().course;
+  const next = active ? nextConcept() : null;
   return {
     id: course.id, name: course.name, deadline: course.deadline,
     pct: coursePct(course.concepts),
@@ -159,7 +193,7 @@ export function getCourse(courseId: string): CourseView {
     provisional: course.concepts.filter((c) => c.state === "provisional").length,
     total: course.concepts.length,
     needsWork: course.concepts.filter((c) => c.state === "needs_work").length,
-    concepts: course.concepts.map((c) => ({ id: c.id, name: c.name, short: c.short, unit: c.unit, desc: c.desc, x: c.x, y: c.y, state: c.state, dims: dimsFor(c), evidence: evidenceText(c), cta: ctaFor(c) })),
+    concepts: course.concepts.map((c) => ({ id: c.id, name: c.name, short: c.short, unit: c.unit, desc: c.desc, x: c.x, y: c.y, state: c.state, dims: dimsFor(c), evidence: evidenceText(c), cta: active ? ctaFor(c) : { label: "Course completed", href: null } })),
     edges: course.edges,
     nextUp: next ? { id: next.id, name: next.name } : null,
   };
@@ -168,9 +202,10 @@ export function getCourse(courseId: string): CourseView {
 /** A course is completed once every concept is Mastered. Provisional does not count. */
 export type SidebarView = { courses: { id: string; name: string; pct: number; completed: boolean }[]; streak: number; practiceHref: string | null; reviewsDue: number };
 export function getSidebar(): SidebarView {
-  const { course } = db();
+  const { course, samples } = db();
   const next = nextConcept();
-  return { courses: [{ id: course.id, name: course.name, pct: coursePct(course.concepts), completed: course.concepts.every((c) => c.state === "mastered") }], streak: streak(), practiceHref: next ? practiceHref(next) : null, reviewsDue: dueConcepts().length };
+  const row = (c: Course) => ({ id: c.id, name: c.name, pct: coursePct(c.concepts), completed: c.concepts.every((x) => x.state === "mastered") });
+  return { courses: [course, ...samples].map(row), streak: streak(), practiceHref: next ? practiceHref(next) : null, reviewsDue: dueConcepts().length };
 }
 
 export type DashboardView = {
@@ -391,15 +426,16 @@ export type ReviewBase = {
 const masteryOf = (c: Concept) => (c.skills?.length ? Math.round(c.skills.reduce((n, s) => n + s.pct, 0) / c.skills.length) : 0);
 
 export function getReviewBase(courseId: string): ReviewBase {
-  assertCourse(courseId);
-  const { course, attempts } = db();
+  const course = courseFor(courseId);
+  const active = course === db().course;
+  const { attempts } = db();
   const concepts = course.concepts.flatMap((c) => {
     const status = cardStatus(c.state);
     return status ? [{ name: c.name, mastery: masteryOf(c), status }] : [];
   });
   const count = (s: string) => concepts.filter((c) => c.status === s).length;
   const d = getDashboard();
-  const next = nextConcept();
+  const next = active ? nextConcept() : null;
   const facts = course.concepts.filter((c) => c.state === "needs_work" || c.state === "developing").map((c) => {
     const last = [...attempts].reverse().find((a) => a.conceptId === c.id && a.evaluation?.verdict === "incorrect");
     return { concept: c.name, misconception: last?.evaluation?.misconceptionName ?? (c.state === "needs_work" ? AUTHORED[c.id]?.misconception.name ?? null : null), quote: last?.evaluation?.evidenceQuote ?? null };
@@ -408,15 +444,15 @@ export function getReviewBase(courseId: string): ReviewBase {
     attemptCount: course.concepts.reduce((n, c) => n + c.evidence.answers, 0),
     headline: `${count("mastered")} mastered, ${count("transfer-pending")} awaiting a transfer test, ${count("reteaching")} to reteach`,
     concepts,
-    riskConcept: d.risk?.concept ?? null,
+    riskConcept: active ? d.risk?.concept ?? null : null,
     riskName: course.concepts.find((c) => c.state === "needs_work")?.name ?? null,
     nextHref: next ? practiceHref(next) : null,
     facts,
     fallback: {
       misconceptions: facts.map((f) => ({ concept: f.concept, misconception: f.misconception })),
-      biggestRisk: { reason: d.risk?.reason ?? "No open misconceptions right now." },
-      recommendation: d.recommendation,
-      nextActions: d.nextActions.map((a) => a.label),
+      biggestRisk: { reason: active ? d.risk?.reason ?? "No open misconceptions right now." : "No open misconceptions. Every concept is mastered." },
+      recommendation: active ? d.recommendation : "This course is complete. Come back for reviews when they are due.",
+      nextActions: active ? d.nextActions.map((a) => a.label) : [],
     },
   };
 }
@@ -450,8 +486,8 @@ export function getHistory(): HistoryEvent[] {
 
 export type MisconceptionEntry = { key: string; name: string; concept: string; quote: string | null; open: boolean; note: string; href: string };
 export function getMisconceptionLog(courseId: string): MisconceptionEntry[] {
-  assertCourse(courseId);
-  const { course, attempts } = db();
+  const course = courseFor(courseId);
+  const { attempts } = db();
   return course.concepts.flatMap((c) => {
     const au = AUTHORED[c.id];
     if (!au) return [];
@@ -469,9 +505,6 @@ export function getMisconceptionLog(courseId: string): MisconceptionEntry[] {
 
 export type CourseFile = { name: string; kind: string; detail: string };
 export function getFiles(courseId: string): { courseName: string; files: CourseFile[] } {
-  assertCourse(courseId);
-  return {
-    courseName: db().course.name,
-    files: [{ name: "OpenStax Introductory Statistics 2e", kind: "Textbook, CC BY 4.0", detail: `Source for all ${db().course.concepts.length} concepts and the misconceptions they carry.` }],
-  };
+  const course = courseFor(courseId);
+  return { courseName: course.name, files: course.files };
 }

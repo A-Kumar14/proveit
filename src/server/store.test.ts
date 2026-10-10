@@ -149,3 +149,27 @@ describe("course completion", () => {
     expect(getSidebar().courses[0]).toMatchObject({ completed: true, pct: 100 });
   });
 });
+
+describe("sample completed course", () => {
+  it("shows up as completed in the sidebar while Intro Statistics stays in progress", () => {
+    const rows = getSidebar().courses;
+    expect(rows.find((c) => c.id === "intro-stats")?.completed).toBe(false);
+    expect(rows.find((c) => c.id === "linear-algebra")).toMatchObject({ completed: true, pct: 100, name: "Linear Algebra" });
+  });
+
+  it("opens as a read-only map, and cannot be practiced", async () => {
+    const c = getCourse("linear-algebra");
+    expect(c).toMatchObject({ proven: 8, total: 8, needsWork: 0, nextUp: null });
+    expect(c.concepts.every((x) => x.cta.href === null)).toBe(true);
+    await expect(assess({ courseId: "linear-algebra", conceptId: "la-vec", answer: "anything at all here" })).rejects.toThrow(NotFoundError);
+  });
+
+  it("does not leak Intro Statistics' risk into the sample's review", () => {
+    const base = getReviewBase("linear-algebra");
+    expect(base.riskConcept).toBeNull();
+    expect(base.nextHref).toBeNull();
+    expect(base.concepts).toHaveLength(8);
+    expect(getMisconceptionLog("linear-algebra")).toEqual([]);
+    expect(getFiles("linear-algebra").files[0]?.kind).toBe("Sample");
+  });
+});

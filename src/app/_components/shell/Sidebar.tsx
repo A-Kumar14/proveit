@@ -71,7 +71,7 @@ export function Sidebar({ data, active, courseId }: { data: SidebarView; active:
         <div className="flex flex-col gap-0.5">
           <div className="eyebrow px-2.5 pb-1 text-ink-faint">In {course.name}</div>
           <NavLink href={`${base}/tutor`} on={active === "tutor"}><MessageSquare {...icon} />Tutor</NavLink>
-          {data.practiceHref && <NavLink href={data.practiceHref} on={active === "practice"}><Mic {...icon} />Practice</NavLink>}
+          {data.practiceHref && !course.completed && <NavLink href={data.practiceHref} on={active === "practice"}><Mic {...icon} />Practice</NavLink>}
           <NavLink href={`${base}/misconceptions`} on={active === "misconceptions"}><TriangleAlert {...icon} />Misconception log</NavLink>
           <NavLink href={`${base}/files`} on={active === "files"}><FolderOpen {...icon} />Course files</NavLink>
         </div>
