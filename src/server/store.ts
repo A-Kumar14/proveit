@@ -198,6 +198,13 @@ const diagnosisOverturned = (diagnosis: Attempt) =>
     descendsFrom(a, diagnosis.id),
   );
 
+const confirmedIncorrectForRoot = (rootAttemptId: string) =>
+  [...db().attempts].reverse().find((a) =>
+    a.rootAttemptId === rootAttemptId &&
+    a.evaluation?.verdict === "incorrect" &&
+    !diagnosisOverturned(a),
+  ) ?? null;
+
 const latestConfirmedIncorrect = (conceptId: string) =>
   [...db().attempts].reverse().find((a) =>
     a.conceptId === conceptId &&
@@ -555,7 +562,7 @@ export function getResult(attemptId: string): ResultView {
   const c = concept(a.conceptId);
   const { course, attempts } = db();
   const diagnoses = attempts.filter((x) => x.rootAttemptId === a.rootAttemptId && x.evaluation?.verdict === "incorrect");
-  const confirmed = [...diagnoses].reverse().find((x) => !diagnosisOverturned(x)) ?? null;
+  const confirmed = confirmedIncorrectForRoot(a.rootAttemptId);
   const hadOverturnedDiagnosis = diagnoses.length > 0 && !confirmed;
   const diagnosed = confirmed?.evaluation?.misconceptionName ?? null;
   const earlierMisses = transferMissesFor(a.rootAttemptId, a.createdAt);
@@ -576,8 +583,8 @@ export function getResult(attemptId: string): ResultView {
     provenLabel: `${proven} proven + ${prov} provisional`,
     points: [
       { label: "Proved the concept", points: POINTS.proved },
-      { label: "Repaired a misconception", points: POINTS.repaired },
-      ...(a.failedTransfers === 0 ? [{ label: "Passed on the first try", points: POINTS.firstTry }] : []),
+      ...(confirmed ? [{ label: "Repaired a misconception", points: POINTS.repaired }] : []),
+      ...(earlierMisses === 0 ? [{ label: "Passed on the first try", points: POINTS.firstTry }] : []),
     ],
   };
 }
@@ -809,9 +816,13 @@ export type Rewards = Standing & {
 export function getRewards(): Rewards {
   const { course, samples, attempts } = db();
   const concepts = [course, ...samples].flatMap((c) => c.concepts);
-  const passed = attempts.filter((a) => a.kind === "transfer" && a.passed);
-  const repairedConcepts = new Set(passed.map((a) => a.conceptId));
-  const firstTryConcepts = new Set(passed.filter((a) => a.failedTransfers === 0).map((a) => a.conceptId));
+  const passed = attempts.filter((a) => a.kind === "transfer" && a.outcome === "pass");
+  const repairedConcepts = new Set(
+    passed.filter((a) => confirmedIncorrectForRoot(a.rootAttemptId)).map((a) => a.conceptId),
+  );
+  const firstTryConcepts = new Set(
+    passed.filter((a) => transferMissesFor(a.rootAttemptId, a.createdAt) === 0).map((a) => a.conceptId),
+  );
   const rows = [
     { label: "Concepts mastered", count: concepts.filter((c) => c.state === "mastered").length, each: POINTS.mastered },
     { label: "Concepts proved with a new question", count: concepts.filter((c) => c.state === "provisional").length, each: POINTS.proved },
