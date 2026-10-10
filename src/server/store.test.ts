@@ -68,6 +68,17 @@ describe("evidence lineage", () => {
     await expect(assess({ courseId: "intro-stats", conceptId: "cii", answer: WRONG, followUpTo: "missing" })).rejects.toThrow(NotFoundError);
   });
 
+  it("rejects a stale clarification parent after newer evaluated evidence exists in the episode", async () => {
+    const first = await run("Not sure yet");
+    const second = await assess({ courseId: "intro-stats", conceptId: "cii", answer: "Still not sure yet", followUpTo: first.attemptId });
+    expect(second.evaluation.verdict).toBe("uncertain");
+    await expect(assess({
+      courseId: "intro-stats", conceptId: "cii",
+      answer: "I meant the long-run method, not this one interval.",
+      followUpTo: first.attemptId,
+    })).rejects.toThrow(InvalidAttemptLinkError);
+  });
+
   it("uses the diagnosed misconception to ask a discriminating dispute question", async () => {
     const first = await run(WRONG);
     const q = clarify(first.attemptId).followUp;
@@ -106,6 +117,15 @@ describe("correct-answer transfer path", () => {
   it("does not let an incorrect first answer skip remediation and jump to transfer", async () => {
     const first = await run(WRONG);
     expect(() => getTransferChallenge(first.attemptId)).toThrow(NotFoundError);
+  });
+
+  it("rejects an old correct attempt after newer conclusive evidence changes the concept", async () => {
+    const first = await run("Over repeated samples, about 95% of intervals made by the method contain the true mean.");
+    expect(getTransferChallenge(first.attemptId).attemptId).toBe(first.attemptId);
+    await run(WRONG);
+    expect(() => getTransferChallenge(first.attemptId)).toThrow(InvalidAttemptLinkError);
+    await expect(submitTransfer(first.attemptId, RIGHT_TRANSFER)).rejects.toThrow(InvalidAttemptLinkError);
+    expect(state("cii")).toBe("needs_work");
   });
 
   it("treats a successful dispute clarification as an overturned diagnosis, not a repaired misconception", async () => {
