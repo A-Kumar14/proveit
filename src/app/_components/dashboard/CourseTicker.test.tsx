@@ -11,7 +11,7 @@ const course = (over: Partial<CourseRow> = {}): CourseRow => ({ id: "stats", nam
 
 describe("CourseTicker", () => {
   it("renders one live copy and two hidden copies of every card", () => {
-    const { container } = render(<CourseTicker count={1}><TickerCard c={course()} /></CourseTicker>);
+    const { container } = render(<CourseTicker count={4}><TickerCard c={course()} /></CourseTicker>);
     expect(container.querySelectorAll("li")).toHaveLength(3);
     const dups = container.querySelectorAll('[data-copy="dup"]');
     expect(dups).toHaveLength(2);
@@ -19,8 +19,15 @@ describe("CourseTicker", () => {
     expect(screen.getAllByRole("link", { name: "Intro Statistics" })).toHaveLength(1);
   });
 
-  it("lets the student pause and resume the scrolling", async () => {
+  it("lays out one to three cards still, without a copy", () => {
     const { container } = render(<CourseTicker count={1}><TickerCard c={course()} /></CourseTicker>);
+    expect(container.querySelectorAll("li")).toHaveLength(1);
+    expect(container.querySelector(".ticker")).toBeNull();
+    expect(screen.queryByRole("button", { name: /scrolling/ })).toBeNull();
+  });
+
+  it("lets the student pause and resume the scrolling", async () => {
+    const { container } = render(<CourseTicker count={4}><TickerCard c={course()} /></CourseTicker>);
     const region = container.querySelector(".ticker")!;
     expect(region.getAttribute("data-paused")).toBe("false");
     await userEvent.click(screen.getByRole("button", { name: "Pause scrolling" }));

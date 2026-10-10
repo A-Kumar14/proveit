@@ -18,6 +18,8 @@ Checks: `pnpm typecheck`, `pnpm lint`, `pnpm test`.
 
 Set `GOOGLE_GENERATIVE_AI_API_KEY` to use Gemini for grading (3 independent checks vote), the upload check and the streamed mastery review. With no key, regex judges in `src/server/content.ts` cover the CI interpretation and standard error concepts so the demo path is repeatable. Uploads stay hidden without a key unless `NEXT_PUBLIC_DEMO_MODE=1`.
 
+The app starts empty by default. Every concept is not started, there are no sample courses or calendar events, and rank is 0, so progress comes only from attempts. Set `PROVEIT_DATA=demo` to start with made-up progress and sample content. Restart the dev server after changing it.
+
 ## Where things live
 
 | Path | What |

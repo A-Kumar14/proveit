@@ -1,4 +1,5 @@
 import "server-only";
+import { demoData } from "./mode";
 import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 import ical, { type VEvent } from "node-ical";
@@ -152,7 +153,7 @@ export function sampleEvents(now = new Date()): CalEvent[] {
 
 export function getCalendarState(): CalendarState {
   const h = held();
-  return { mode: h.mode, provider: h.provider, syncedAt: h.syncedAt, events: h.mode === "ics" ? h.events : sampleEvents() };
+  return { mode: h.mode, provider: h.provider, syncedAt: h.syncedAt, events: h.mode === "ics" ? h.events : demoData() ? sampleEvents() : [] };
 }
 
 // ---- free time ----

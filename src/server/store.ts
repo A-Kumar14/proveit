@@ -2,6 +2,7 @@ import "server-only";
 import { cardStatus, type AssessInput, type AssessResult, type AttemptKind, type AttemptOutcome, type Evaluation, type MasteryState, type ReviewText, type TransferResult } from "@proveit/lib/schemas";
 import { toneForPct, type Tone } from "@proveit/lib/mastery";
 import { AUTHORED } from "./content";
+import { demoData } from "./mode";
 import { judgeAnswer, judgeTransfer, type AnswerContext } from "./evaluator";
 import type { CalEvent } from "./calendar";
 import { POINTS, STREAK_CAP, standing, TIERS, type Standing } from "@proveit/lib/rewards";
@@ -40,7 +41,7 @@ function seed(): Db {
   const c = (id: string, name: string, short: string, unit: string, desc: string, x: number, y: number, state: MasteryState, skills: Skill[] | null, evidence: Concept["evidence"]): Concept =>
     ({ id, name, short, unit, desc, x, y, state, skills, evidence, nextReview: null });
   const U1 = "01 SAMPLING", U2 = "02 DISTRIBUTIONS", U3 = "03 CONFIDENCE INTERVALS", U4 = "04 HYPOTHESIS TESTING";
-  return {
+  const data: Db = {
     course: {
       id: "intro-stats", name: "Intro Statistics", deadline: "Quiz Thursday, Oct 15",
       concepts: [
@@ -69,6 +70,11 @@ function seed(): Db {
     peakPoints: 0,
     seq: 0,
   };
+  if (!demoData()) {
+    for (const x of data.course.concepts) Object.assign(x, { state: "not_started", skills: null, evidence: app(0, 0), nextReview: null });
+    data.samples = [];
+  }
+  return data;
 }
 
 /** Sample courses so the sidebar, Courses page and dashboard have more than one course. They can be opened but not practiced. */
