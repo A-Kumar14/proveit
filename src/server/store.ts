@@ -257,21 +257,22 @@ const rootHasPassedTransfer = (rootAttemptId: string) =>
   db().attempts.some((a) => a.rootAttemptId === rootAttemptId && a.kind === "transfer" && a.outcome === "pass");
 
 /** Successful-review streak after the latest transfer proof. A new transfer after relearning resets spacing. */
-const reviewPassesSinceLatestTransfer = (conceptId: string) => {
+const reviewPassesSinceLatestTransfer = (conceptId: string, courseId?: string) => {
   const attempts = db().attempts;
+  const sameConcept = (a: Attempt) => a.conceptId === conceptId && (!courseId || a.courseId === courseId);
   let latestTransfer = -1;
   for (let i = attempts.length - 1; i >= 0; i--) {
     const a = attempts[i]!;
-    if (a.conceptId === conceptId && a.kind === "transfer" && a.outcome === "pass") {
+    if (sameConcept(a) && a.kind === "transfer" && a.outcome === "pass") {
       latestTransfer = i;
       break;
     }
   }
-  return attempts.slice(latestTransfer + 1).filter((a) => a.conceptId === conceptId && a.kind === "review" && a.outcome === "pass").length;
+  return attempts.slice(latestTransfer + 1).filter((a) => sameConcept(a) && a.kind === "review" && a.outcome === "pass").length;
 };
 
-const reviewGapDays = (conceptId: string) => {
-  const passed = reviewPassesSinceLatestTransfer(conceptId);
+const reviewGapDays = (conceptId: string, courseId?: string) => {
+  const passed = reviewPassesSinceLatestTransfer(conceptId, courseId);
   return passed === 0 ? 7 : passed === 1 ? 14 : 30;
 };
 
@@ -303,9 +304,10 @@ const confirmedIncorrectForRoot = (rootAttemptId: string) =>
     !diagnosisOverturned(a),
   ) ?? null;
 
-const latestConfirmedIncorrect = (conceptId: string) =>
+const latestConfirmedIncorrect = (conceptId: string, courseId?: string) =>
   [...db().attempts].reverse().find((a) =>
     a.conceptId === conceptId &&
+    (!courseId || a.courseId === courseId) &&
     a.evaluation?.verdict === "incorrect" &&
     !diagnosisOverturned(a),
   ) ?? null;
@@ -313,14 +315,19 @@ const latestConfirmedIncorrect = (conceptId: string) =>
 const latestEvaluatedInRoot = (rootAttemptId: string) =>
   [...db().attempts].reverse().find((a) => a.rootAttemptId === rootAttemptId && a.evaluation) ?? null;
 
-const latestAttemptForConcept = (conceptId: string) =>
-  [...db().attempts].reverse().find((a) => a.conceptId === conceptId) ?? null;
+const latestAttemptForConcept = (conceptId: string, courseId?: string) =>
+  [...db().attempts].reverse().find((a) => a.conceptId === conceptId && (!courseId || a.courseId === courseId)) ?? null;
 
-const rootIsCurrentForConcept = (conceptId: string, rootAttemptId: string) =>
-  latestAttemptForConcept(conceptId)?.rootAttemptId === rootAttemptId;
+const rootIsCurrentForConcept = (conceptId: string, rootAttemptId: string, courseId?: string) =>
+  latestAttemptForConcept(conceptId, courseId)?.rootAttemptId === rootAttemptId;
 
-const latestConclusiveForConcept = (conceptId: string) =>
-  [...db().attempts].reverse().find((a) => a.conceptId === conceptId && a.evaluation && a.evaluation.verdict !== "uncertain") ?? null;
+const latestConclusiveForConcept = (conceptId: string, courseId?: string) =>
+  [...db().attempts].reverse().find((a) =>
+    a.conceptId === conceptId &&
+    (!courseId || a.courseId === courseId) &&
+    a.evaluation &&
+    a.evaluation.verdict !== "uncertain"
+  ) ?? null;
 
 export const coursePct = (cs: Concept[]) =>
   Math.round(((cs.filter((c) => c.state === "mastered").length + 0.5 * cs.filter((c) => c.state === "provisional").length) / cs.length) * 100);
@@ -339,7 +346,8 @@ const dueConcepts = () => {
   return db().course.concepts.filter((c) => c.nextReview && c.nextReview <= today && (c.state === "provisional" || c.state === "mastered"));
 };
 
-const testable = (c: Concept) => c.id in AUTHORED;
+const testableIn = (courseId: string, c: Concept) => Boolean(getLearningSpec(courseId, c.id));
+const testable = (c: Concept) => testableIn(db().course.id, c);
 const upsertSkill = (c: Concept, s: Skill) => {
   const skills = c.skills ?? [];
   c.skills = skills.some((x) => x.label === s.label) ? skills.map((x) => (x.label === s.label ? s : x)) : [...skills, s];
@@ -349,7 +357,8 @@ function nextConcept(): Concept | null {
   const cs = db().course.concepts.filter(testable);
   return cs.find((c) => c.state === "needs_work") ?? cs.find((c) => c.state === "developing") ?? cs.find((c) => c.state === "not_started") ?? null;
 }
-const practiceHref = (c: Concept) => `/course/${db().course.id}/practice/${c.id}`;
+const practiceHrefFor = (courseId: string, c: Concept) => `/course/${courseId}/practice/${c.id}`;
+const practiceHref = (c: Concept) => practiceHrefFor(db().course.id, c);
 
 // ---- views ----
 
