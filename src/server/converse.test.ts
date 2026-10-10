@@ -48,7 +48,7 @@ describe("nextTurn", () => {
 
 describe("audit", () => {
   it("offline, ties the off item to the graded quote and the course material", async () => {
-    judgeAnswer.mockResolvedValue({ verdict: "incorrect", quote: "95% probability that the true mean is inside my interval", votes: null });
+    judgeAnswer.mockResolvedValue({ verdict: "incorrect", quote: "95% probability that the true mean is inside my interval", misconceptionId: "parameter_probability_trap", votes: null });
     const r = await audit({ ...base, turns: [Q, { role: "student", text: WRONG }] });
     expect(r.verdict).toBe("incorrect");
     expect(r.off[0]!.quote).toBe("95% probability that the true mean is inside my interval");
@@ -58,7 +58,7 @@ describe("audit", () => {
 
   it("with a model, drops quotes the student never said", async () => {
     ai = true;
-    judgeAnswer.mockResolvedValue({ verdict: "incorrect", quote: null, votes: null });
+    judgeAnswer.mockResolvedValue({ verdict: "incorrect", quote: null, misconceptionId: "parameter_probability_trap", votes: null });
     generateText.mockResolvedValueOnce({ output: {
       right: [{ quote: "made up", note: "n" }, { quote: "the true mean", note: "It is fixed." }],
       off: [{ quote: "also invented", note: "n", fix: "f" }, { quote: "95% probability", note: "n", fix: "f" }],

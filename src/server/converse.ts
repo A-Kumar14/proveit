@@ -76,7 +76,7 @@ export async function audit(input: ConverseInput): Promise<AuditResult> {
 
   if (!aiEnabled()) {
     if (evaluation.verdict === "incorrect" && evaluation.evidenceQuote) {
-      return { ...base, right: [], off: [{ quote: evaluation.evidenceQuote, note: evaluation.gapSentence ?? a.misconception.gap, fix: a.correct }], missing: [] };
+      return { ...base, right: [], off: [{ quote: evaluation.evidenceQuote, note: evaluation.gapSentence ?? a.misconceptions[0]?.gap ?? a.correct, fix: a.correct }], missing: [] };
     }
     if (evaluation.verdict === "correct") {
       const first = input.turns.find((t) => t.role === "student")!.text;
@@ -89,7 +89,7 @@ export async function audit(input: ConverseInput): Promise<AuditResult> {
     model: model(),
     system: AUDIT,
     output: Output.object({ schema: Audit }),
-    prompt: `Question: ${a.question}\nCourse material: ${a.correct}\nKnown misconception: ${a.misconception.gap}\n\nConversation:\n${transcript(input.turns)}`,
+    prompt: `Question: ${a.question}\nCourse material: ${a.correct}\nKnown misconceptions: ${a.misconceptions.map((m) => m.gap).join(" | ")}\n\nConversation:\n${transcript(input.turns)}`,
   });
   // A quote the student never said is dropped, so the audit can't invent evidence.
   const real = (q: string) => q.trim().length > 0 && said.includes(q);
