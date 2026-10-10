@@ -52,7 +52,7 @@ export default function ReviewPage() {
                   <div className="mt-1 text-xs text-ink-3">{row.because}</div>
                   {row.slot && <div className="mt-0.5 text-[11px] text-ink-muted">Suggested <time dateTime={row.slot.start} suppressHydrationWarning>{when(row.slot.start)}</time></div>}
                 </div>
-                {row.href ? <Link href={row.href} className={buttonStyles({ size: "sm" })}>{row.pressure === "review" ? "Review now" : "Start"}</Link> : <span className="pt-1 text-[11px] text-ink-faint">Not in demo</span>}
+                {row.href ? <Link href={row.href} className={buttonStyles({ size: "sm" })}>{row.pressure === "review" ? "Review now" : "Start"}</Link> : <span className="pt-1 text-[11px] text-ink-faint">Not authored yet</span>}
               </li>
             ))}
           </ol>
