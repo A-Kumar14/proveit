@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { disconnectCalendar, getCalendarState } from "./calendar";
 import { assess, getCourse, getRewards, getTodos, listCourses } from "./store";
+import { getReviewQueue } from "./schedule";
 import { demoStateForTests } from "../test/demo-state";
 
 const RIGHT = "The 95% describes the method. Over many repeated samples, about 95% of the intervals built this way contain the true mean.";
@@ -29,6 +30,7 @@ describe("real runtime state", () => {
     expect(getRewards().points).toBe(0);
     expect(getTodos().flatMap((g) => g.done)).toEqual([]);
     expect(getCalendarState()).toMatchObject({ mode: "none", events: [] });
+    expect(getReviewQueue(new Date(2026, 9, 10, 8, 0))).toEqual([]);
   });
 
   it("moves a concept only because of an answer", async () => {
