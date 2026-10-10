@@ -6,6 +6,7 @@ import { judgeAnswer, judgeReview, judgeTransfer, type AnswerContext } from "./e
 import { loadJson, saveJson } from "./persistence";
 import type { CalEvent } from "./calendar";
 import { POINTS, STREAK_CAP, standing, TIERS, type Standing } from "@proveit/lib/rewards";
+import { demoStateForTests } from "../test/demo-state";
 
 /**
  * The course catalog stays in code for the hackathon, while learner state is persisted through
@@ -72,6 +73,7 @@ function initialState(): Db {
 
 type StoredLearning = {
   concepts: Record<string, Pick<Concept, "state" | "skills" | "evidence" | "nextReview">>;
+  samples: Course[];
   attempts: Attempt[];
   provenDays: string[];
   taskDone: string[];
@@ -80,15 +82,94 @@ type StoredLearning = {
   completedOverride: boolean | null;
 };
 
+function demoRuntimeState(): Db {
+  const data = demoStateForTests() as Db;
+  const now = new Date();
+  const day = (offset: number) => {
+    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
+  const cii = data.course.concepts.find((c) => c.id === "cii")!;
+  const se = data.course.concepts.find((c) => c.id === "se")!;
+  se.state = "provisional";
+  se.skills = [{ label: "Application", pct: 85 }, { label: "New-question test", pct: 90 }, { label: "Retention", pct: 55 }];
+  se.evidence = app(3, 2, true);
+  se.nextReview = day(0);
+
+  const ciAnswer = "It means there's a 95% probability that the true population mean is inside our interval.";
+  const seWrong = "The bigger sample has more standard error because there is more data that can vary.";
+  const sePass = "The standard error is cut in half because n is four times larger and sqrt(4) = 2.";
+  const base = Date.now() - 2 * 24 * 60 * 60_000;
+  data.attempts = [
+    {
+      id: "a1", courseId: "intro-stats", conceptId: "cii", kind: "initial", outcome: "incorrect",
+      parentAttemptId: null, rootAttemptId: "a1", answer: ciAnswer, previousState: "developing", createdAt: base,
+      evaluation: {
+        verdict: "incorrect", errorType: "conceptual", misconceptionId: "parameter_probability_trap", misconceptionName: "Parameter probability trap",
+        evidenceQuote: "95% probability that the true population mean is inside our interval", gapSentence: "The population mean is fixed after the interval is calculated; the 95% describes the repeated method.",
+        skills: cii.skills ?? [], votes: { agree: 3, of: 3 }, followUp: null,
+        recommendation: "Fix the interpretation gap, then prove it on a different confidence-interval question.",
+      },
+    },
+    {
+      id: "a2", courseId: "intro-stats", conceptId: "se", kind: "initial", outcome: "incorrect",
+      parentAttemptId: null, rootAttemptId: "a2", answer: seWrong, previousState: "developing", createdAt: base + 60_000,
+      evaluation: {
+        verdict: "incorrect", errorType: "conceptual", misconceptionId: "more_data_more_error", misconceptionName: "More data means more error",
+        evidenceQuote: "bigger sample has more standard error", gapSentence: "Standard error shrinks as sample size grows.",
+        skills: [{ label: "Application", pct: 25 }], votes: { agree: 3, of: 3 }, followUp: null,
+        recommendation: "Repair the sample-size direction, then try a new setup.",
+      },
+    },
+    {
+      id: "a3", courseId: "intro-stats", conceptId: "se", kind: "transfer", outcome: "pass",
+      parentAttemptId: "a2", rootAttemptId: "a2", answer: sePass, previousState: "needs_work", createdAt: base + 120_000, evaluation: null,
+    },
+    {
+      id: "a4", courseId: "intro-stats", conceptId: "var", kind: "initial", outcome: "correct",
+      parentAttemptId: null, rootAttemptId: "a4", answer: "Different random samples can give different statistics even when the sampling method is unchanged.",
+      previousState: "not_started", createdAt: base + 180_000,
+      evaluation: {
+        verdict: "correct", errorType: "none", misconceptionId: null, misconceptionName: null, evidenceQuote: null, gapSentence: null,
+        skills: [{ label: "Application", pct: 75 }], votes: { agree: 3, of: 3 }, followUp: null,
+        recommendation: "Prove it on a materially different question before calling it mastered.",
+      },
+    },
+  ];
+  data.provenDays = new Set([day(-2), day(-1), day(0)]);
+  data.taskDone = new Set(["pv"]);
+  data.peakPoints = 6000;
+  data.seq = 4;
+  return data;
+}
+
+function snapshotLearning(current: Db): StoredLearning {
+  return {
+    concepts: Object.fromEntries(current.course.concepts.map((c) => [c.id, { state: c.state, skills: c.skills, evidence: c.evidence, nextReview: c.nextReview }])),
+    samples: current.samples,
+    attempts: current.attempts,
+    provenDays: [...current.provenDays],
+    taskDone: [...current.taskDone],
+    peakPoints: current.peakPoints,
+    seq: current.seq,
+    completedOverride: current.course.completedOverride,
+  };
+}
+
 function restoreLearning(): Db {
-  const data = initialState();
   const stored = loadJson<StoredLearning>("learning");
-  if (!stored) return data;
+  if (!stored) {
+    const seeded = demoRuntimeState();
+    saveJson("learning", snapshotLearning(seeded));
+    return seeded;
+  }
+  const data = initialState();
 
   for (const concept of data.course.concepts) {
     const saved = stored.concepts?.[concept.id];
     if (saved) Object.assign(concept, saved);
   }
+  if (Array.isArray(stored.samples)) data.samples = stored.samples;
   if (Array.isArray(stored.attempts)) data.attempts = stored.attempts;
   if (Array.isArray(stored.provenDays)) data.provenDays = new Set(stored.provenDays);
   if (Array.isArray(stored.taskDone)) data.taskDone = new Set(stored.taskDone);
@@ -103,17 +184,7 @@ const g = globalThis as unknown as StoreGlobal;
 const db = (): Db => (g.__proveit ??= process.env.NODE_ENV === "test" && g.__proveitTestSeedFactory ? g.__proveitTestSeedFactory() : restoreLearning());
 
 function persistLearning(): void {
-  const current = db();
-  const snapshot: StoredLearning = {
-    concepts: Object.fromEntries(current.course.concepts.map((c) => [c.id, { state: c.state, skills: c.skills, evidence: c.evidence, nextReview: c.nextReview }])),
-    attempts: current.attempts,
-    provenDays: [...current.provenDays],
-    taskDone: [...current.taskDone],
-    peakPoints: current.peakPoints,
-    seq: current.seq,
-    completedOverride: current.course.completedOverride,
-  };
-  saveJson("learning", snapshot);
+  saveJson("learning", snapshotLearning(db()));
 }
 
 // ---- helpers ----
