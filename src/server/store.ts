@@ -678,14 +678,10 @@ export function getRemediation(attemptId: string): RemediationView {
   if (a.evaluation?.verdict !== "incorrect" || !a.evaluation.misconceptionId) {
     throw new NotFoundError(`nothing to remediate for ${attemptId}`);
   }
-  const remediation = spec.remediations.find((item) => item.misconceptionId === a.evaluation!.misconceptionId);
-  if (!remediation) throw new NotFoundError(`no remediation for ${a.evaluation.misconceptionId}`);
+  const remediation = spec.remediations.find((r) => r.misconceptionId === a.evaluation!.misconceptionId);
+  if (!remediation) throw new NotFoundError(`nothing to remediate for ${attemptId}`);
   return {
-    attemptId,
-    courseId: a.courseId,
-    conceptId: c.id,
-    conceptName: c.name,
-    state: c.state,
+    attemptId, courseId: a.courseId, conceptId: c.id, conceptName: c.name, state: c.state,
     lesson: {
       title: remediation.title,
       said: a.evaluation.evidenceQuote ?? a.answer,
@@ -719,11 +715,7 @@ export function getTransferChallenge(attemptId: string): TransferChallengeView {
     throw new NotFoundError(`transfer already passed for ${attemptId}`);
   }
   return {
-    attemptId: source.id,
-    courseId: source.courseId,
-    conceptId: c.id,
-    conceptName: c.name,
-    state: c.state,
+    attemptId: source.id, courseId: source.courseId, conceptId: c.id, conceptName: c.name, state: c.state,
     transfer: { question: spec.transfer.question, hint: spec.transfer.hint },
   };
 }
@@ -741,7 +733,6 @@ export async function submitTransfer(attemptId: string, answer: string): Promise
   if (rootHasPassedTransfer(parent.rootAttemptId)) {
     throw new InvalidAttemptLinkError("this evidence chain already passed its transfer test");
   }
-
   const before = c.state;
   const judged = await judgeTransferForSpec(spec, answer);
   if (
@@ -765,16 +756,9 @@ export async function submitTransfer(attemptId: string, answer: string): Promise
     c.nextReview = isoDay(addDays(new Date(), 1));
     db().provenDays.add(isoDay(new Date()));
     const rec = recordAttempt({
-      courseId: parent.courseId,
-      conceptId: c.id,
-      kind: "transfer",
-      outcome: "pass",
-      parentAttemptId: parent.id,
+      courseId: parent.courseId, conceptId: c.id, kind: "transfer", outcome: "pass", parentAttemptId: parent.id,
       learningSpecRevision: spec.revision,
-      answer,
-      evaluation: null,
-      previousState: before,
-      createdAt: Date.now(),
+      answer, evaluation: null, previousState: before, createdAt: Date.now(),
     });
     return { result: "pass", resultAttemptId: rec.id };
   }
@@ -788,51 +772,27 @@ export async function submitTransfer(attemptId: string, answer: string): Promise
     c.state = "needs_work";
     c.evidence.transferPassed = false;
     evaluation = {
-      verdict: "incorrect",
-      errorType: "conceptual",
-      misconceptionId: diagnosed.id,
-      misconceptionName: diagnosed.name,
-      evidenceQuote: judged.quote && answer.includes(judged.quote) ? judged.quote : null,
-      gapSentence: diagnosed.description,
-      skills: (c.skills ?? []).filter((s) => s.label !== "New-question test"),
-      votes: judged.votes,
-      followUp: null,
+      verdict: "incorrect", errorType: "conceptual", misconceptionId: diagnosed.id, misconceptionName: diagnosed.name,
+      evidenceQuote: judged.quote && answer.includes(judged.quote) ? judged.quote : null, gapSentence: diagnosed.description,
+      skills: (c.skills ?? []).filter((skill) => skill.label !== "New-question test"),
+      votes: judged.votes, followUp: null,
       recommendation: "The new setup exposed the same underlying gap. Repair that idea, then prove it again on another setup.",
     };
   } else {
     followUp = judged.feedback ?? "Give one more precise sentence that addresses every part of the question.";
     evaluation = {
-      verdict: "uncertain",
-      errorType: "uncertain",
-      misconceptionId: null,
-      misconceptionName: null,
-      evidenceQuote: null,
-      gapSentence: null,
-      skills: (c.skills ?? []).filter((s) => s.label !== "New-question test"),
-      votes: judged.votes,
-      followUp,
-      recommendation: "There is not enough evidence to name a misconception yet.",
+      verdict: "uncertain", errorType: "uncertain", misconceptionId: null, misconceptionName: null,
+      evidenceQuote: null, gapSentence: null,
+      skills: (c.skills ?? []).filter((skill) => skill.label !== "New-question test"),
+      votes: judged.votes, followUp, recommendation: "There is not enough evidence to name a misconception yet.",
     };
   }
-
   const rec = recordAttempt({
-    courseId: parent.courseId,
-    conceptId: c.id,
-    kind: "transfer",
-    outcome: "fail",
-    parentAttemptId: parent.id,
+    courseId: parent.courseId, conceptId: c.id, kind: "transfer", outcome: "fail", parentAttemptId: parent.id,
     learningSpecRevision: spec.revision,
-    answer,
-    evaluation,
-    previousState: before,
-    createdAt: Date.now(),
+    answer, evaluation, previousState: before, createdAt: Date.now(),
   });
-  return {
-    result: "fail",
-    failedAttemptId: rec.id,
-    nextAttemptId: evaluation.verdict === "incorrect" ? rec.id : null,
-    followUp,
-  };
+  return { result: "fail", failedAttemptId: rec.id, nextAttemptId: evaluation.verdict === "incorrect" ? rec.id : null, followUp };
 }
 
 export type ResultView = {
@@ -848,8 +808,8 @@ const RANK: MasteryState[] = ["mastered", "provisional", "developing", "needs_wo
 export function getResult(attemptId: string): ResultView {
   const a = attempt(attemptId);
   if (a.kind !== "transfer" || a.outcome !== "pass") throw new NotFoundError(`no result for ${attemptId}`);
-  const course = courseFor(a.courseId);
   const c = conceptFor(a.courseId, a.conceptId);
+  const course = courseFor(a.courseId);
   const { attempts } = db();
   const diagnoses = attempts.filter((x) => x.rootAttemptId === a.rootAttemptId && x.evaluation?.verdict === "incorrect");
   const confirmed = confirmedIncorrectForRoot(a.rootAttemptId);
@@ -860,17 +820,13 @@ export function getResult(attemptId: string): ResultView {
   const proven = course.concepts.filter((x) => x.state === "mastered").length;
   const prov = course.concepts.filter((x) => x.state === "provisional").length;
   return {
-    courseId: a.courseId,
-    courseName: course.name,
-    conceptName: c.name,
-    previous: a.previousState,
-    next: "provisional",
+    courseId: a.courseId, courseName: course.name, conceptName: c.name, previous: a.previousState, next: "provisional",
     diagnosisLabel: diagnosed ? "Misconception found" : "Diagnosis",
     misconception: diagnosed ?? (hadOverturnedDiagnosis ? "Not confirmed after clarification" : "None detected"),
     intervention: diagnosed ? "1 short lesson" : hadOverturnedDiagnosis ? "Clarified the diagnosis" : "No remediation needed",
     transferText: earlierMisses === 0 ? "Correct on first try" : `Correct after ${earlierMisses} earlier ${earlierMisses === 1 ? "miss" : "misses"}`,
     nextReview: c.nextReview ? `${c.nextReview === isoDay(addDays(new Date(), 1)) ? "Tomorrow, " : ""}${shortDate(new Date(`${c.nextReview}T00:00:00`))}` : "Not scheduled",
-    recommendation: nxt ? `${nxt.name} is next. You're one new question away from proving it.` : "You've covered every concept that currently has mastery content.",
+    recommendation: nxt ? `${nxt.name} is next. You're one new question away from proving it.` : "You've covered every concept currently available in this course.",
     nextConcept: nxt ? { name: nxt.name, href: practiceHrefFor(course.id, nxt) } : null,
     segments: [...course.concepts].map((x) => x.state).sort((p, q) => RANK.indexOf(p) - RANK.indexOf(q)),
     coursePct: coursePct(course.concepts),
