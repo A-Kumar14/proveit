@@ -203,9 +203,6 @@ const conceptFor = (courseId: string, conceptId: string): Concept => {
 };
 /** Legacy helper for built-in dashboard-only paths. New mastery paths should use conceptFor(courseId, conceptId). */
 const concept = (id: string) => conceptFor(db().course.id, id);
-const assertCourse = (id: string) => {
-  if (db().course.id !== id) throw new NotFoundError(`course ${id}`);
-};
 const newId = () => `a${++db().seq}`;
 
 const specFor = (courseId: string, conceptId: string, revision?: number): ConceptLearningSpec => {
@@ -219,8 +216,6 @@ const misconceptionForSpec = (spec: ConceptLearningSpec, misconceptionId: string
   misconceptionId ? spec.misconceptions.find((m) => m.id === misconceptionId) ?? null : null;
 const primaryMisconceptionFor = (courseId: string, conceptId: string) =>
   getLearningSpec(courseId, conceptId)?.misconceptions[0] ?? null;
-const primaryMisconception = (conceptId: string) =>
-  primaryMisconceptionFor(db().course.id, conceptId);
 
 function clarificationPromptFor(a: Attempt): string {
   if (a.evaluation?.followUp) return a.evaluation.followUp;
@@ -357,7 +352,6 @@ const dueConcepts = () => {
 
 const testableIn = (courseId: string, c: Concept) => Boolean(getLearningSpec(courseId, c.id));
 const canPractice = (course: Course, c: Concept) => course.runtime === true || testableIn(course.id, c);
-const testable = (c: Concept) => testableIn(db().course.id, c);
 const upsertSkill = (c: Concept, skill: Skill) => {
   const skills = c.skills ?? [];
   c.skills = skills.some((x) => x.label === skill.label)
