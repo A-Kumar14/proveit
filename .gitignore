@@ -20,6 +20,9 @@
 # production
 /build
 
+# local ProveIt SQLite state
+/.data/
+
 # misc
 .DS_Store
 *.pem
