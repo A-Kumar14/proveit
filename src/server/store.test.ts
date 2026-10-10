@@ -225,6 +225,19 @@ describe("repair and transfer", () => {
     expect(getHistory()).toHaveLength(before);
     expect(state("cii")).toBe("provisional");
   });
+  it("closes an evidence episode after transfer passes so old diagnoses cannot be clarified later", async () => {
+    const first = await run(WRONG);
+    const pass = await submitTransfer(first.attemptId, RIGHT_TRANSFER);
+    if (pass.result !== "pass") throw new Error("expected pass");
+    expect(() => clarify(first.attemptId)).toThrow(InvalidAttemptLinkError);
+    await expect(assess({
+      courseId: "intro-stats", conceptId: "cii",
+      answer: "I meant the long-run method, not this one interval.",
+      followUpTo: first.attemptId,
+    })).rejects.toThrow(InvalidAttemptLinkError);
+    expect(state("cii")).toBe("provisional");
+  });
+
 
   it("only offers a result page for a passed transfer", async () => {
     const { attemptId } = await run(WRONG);
