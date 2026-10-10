@@ -26,6 +26,8 @@ export type Authored = {
     figure: "ci-intervals" | null;
   };
   transfer: { question: string; hint: string; rubric: string; judge: (answer: string) => TransferSeed };
+  /** Delayed retrieval uses a fresh surface form instead of replaying the transfer question. */
+  review: { question: string; hint: string; rubric: string; judge: (answer: string) => TransferSeed };
   skillOnWrong: { label: string; pct: number };
   skillOnRight: { label: string; pct: number };
 };
@@ -44,8 +46,8 @@ const ciWrong = [
   /probability[^.!?]*?95\s*(?:%|percent)[^.!?]*/i,
 ];
 const rejectsCiProbability = (s: string) =>
-  /(?:does\s+not|doesn't|do\s+not|don't|not)\s+(?:mean\s+)?(?:that\s+)?(?:there(?:'s|\s+is)\s+)?(?:a\s+)?95\s*(?:%|percent)\s*(?:probability|chance|likelihood)/i.test(s) ||
-  /(?:there(?:'s|\s+is)\s+)?no\s+95\s*(?:%|percent)\s*(?:probability|chance|likelihood)/i.test(s);
+  /(?:does\s+not|doesn't|do\s+not|don't|not)\s+(?:(?:mean|have)\s+)?(?:that\s+)?(?:there(?:'s|\s+is)\s+)?(?:a\s+)?95\s*(?:%|percent)\s*(?:probability|chance|likelihood)/i.test(s) ||
+  /(?:there(?:'s|\s+is)\s+|(?:it|interval|range)\s+(?:has|have)\s+)?no\s+95\s*(?:%|percent)\s*(?:probability|chance|likelihood)/i.test(s);
 
 export const AUTHORED: Record<string, Authored> = {
   cii: {
@@ -88,6 +90,23 @@ export const AUTHORED: Record<string, Authored> = {
           /(either (contains|contain|does|is)|already (been )?(calculated|computed|built)|no (95\s*%|probability|chance)|not (a )?95\s*%|describes? the (method|procedure)|the method|long.?run)/i.test(a);
         if (pass) return { verdict: "pass", quote: null, misconceptionId: null, feedback: null };
         return { verdict: "uncertain", quote: null, misconceptionId: null, feedback: "Answer both parts: the long-run count out of 100, and what the 95% means for one interval after it is calculated." };
+      },
+    },
+    review: {
+      question: "A report says: “A 95% confidence interval from 12.4 to 16.8 means there is a 95% chance the true mean lies in that range.” Is that interpretation valid? Explain what the 95% actually refers to.",
+      hint: "Separate what is random across repeated samples from what is fixed after one interval is calculated.",
+      rubric: "Passes only if the student rejects the 95% probability claim for the realized interval AND explains that 95% is the long-run coverage of the interval-building method over repeated samples.",
+      judge: (a) => {
+        const quote = firstMatch(a, ciWrong);
+        const explicitlyRejectsProbability = rejectsCiProbability(a);
+        // A contradictory answer still fails even if it also calls some other part of the report "wrong".
+        if (quote && !explicitlyRejectsProbability) return { verdict: "fail", quote, misconceptionId: "parameter_probability_trap", feedback: "The true mean is fixed once the interval is calculated; focus on what the 95% says about the repeated method." };
+        const rejectsClaim = explicitlyRejectsProbability || /\b(?:invalid|wrong|incorrect|misleading|not valid|not correct)\b/i.test(a);
+        const method = /(method|procedure|long.?run|repeat|repeated|many (?:samples|studies|intervals))/i.test(a);
+        const pass = /\b95\b/.test(a) && rejectsClaim && method;
+        return pass
+          ? { verdict: "pass", quote: null, misconceptionId: null, feedback: null }
+          : { verdict: "uncertain", quote: null, misconceptionId: null, feedback: "Say whether the report's probability claim is valid, then explain what 95% describes over repeated samples." };
       },
     },
     skillOnWrong: { label: "Interpretation", pct: 30 },
@@ -138,6 +157,23 @@ export const AUTHORED: Record<string, Authored> = {
         ]);
         if (wrong) return { verdict: "fail", quote: wrong, misconceptionId: "more_data_more_error", feedback: "A larger n reduces standard error; use the square-root change in n." };
         return { verdict: "uncertain", quote: null, misconceptionId: null, feedback: "State the factor change in standard error and connect it explicitly to the square root of the four-times-larger sample." };
+      },
+    },
+    review: {
+      question: "Two studies estimate the same population mean with the same population spread. Study A has n = 64 and Study B has n = 256. Which study has the smaller standard error, and by what factor? Explain why.",
+      hint: "Compare the sample sizes first, then apply the square root in the standard-error formula.",
+      rubric: "Passes only if the student identifies Study B (n=256) as having the smaller standard error, says it is one-half of Study A's, and explains that 256/64=4 so the square-root factor is 2.",
+      judge: (a) => {
+        const pass = /(?:\bstudy\s*b\b|\b256\b)/i.test(a) &&
+          /(half|one[- ]?half|1\s*\/\s*2|halve|two times smaller|factor of 2)/i.test(a) &&
+          /(square root|sqrt|√)/i.test(a);
+        if (pass) return { verdict: "pass", quote: null, misconceptionId: null, feedback: null };
+        const wrong = firstMatch(a, [
+          /(?:study\s*)?a[^.!?]*?(?:smaller|lower)\s+(?:standard error|se\b)[^.!?]*/i,
+          /(?:standard error|se)\s+(?:(?:is|gets|becomes|will be)\s+)?(?:double|doubles|twice|larger|bigger|higher|more)[^.!?]*/i,
+        ]);
+        if (wrong) return { verdict: "fail", quote: wrong, misconceptionId: "more_data_more_error", feedback: "A larger sample reduces standard error; compare the square roots of 64 and 256." };
+        return { verdict: "uncertain", quote: null, misconceptionId: null, feedback: "Name the study, state the factor change, and connect it to the square-root-of-n rule." };
       },
     },
     skillOnWrong: { label: "Application", pct: 25 },

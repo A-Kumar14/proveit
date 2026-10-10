@@ -73,7 +73,7 @@ const because = (pressure: QueuePressure, start: string, due: boolean) => {
  */
 export function getReviewQueue(now = new Date()): QueueRow[] {
   const { events } = getSchedule();
-  const { due, upcoming } = getReviews();
+  const { due, upcoming } = getReviews(now);
   const openCourses = new Set(listCourses().filter((c) => !c.completed).map((c) => c.name));
   const reviews: QueueRow[] = [...due, ...upcoming].filter((r) => openCourses.has(r.courseName)).map((r) => {
     const start = r.due ? dayStart(now).toISOString() : new Date(`${r.day}T00:00:00`).toISOString();

@@ -3,11 +3,13 @@ import { AssistantCard } from "../chat/AssistantCard";
 export function TransferQuestionCard({
   question, hint, showHint, hintsEnabled, onToggleHint,
   description = "The setup is different. The idea underneath is the one you just fixed. Repeating the first question would only check memory.",
+  label = "New question · same idea",
+  headline = "Now prove it transfers.",
 }: {
-  question: string; hint: string; showHint: boolean; hintsEnabled: boolean; onToggleHint: () => void; description?: string;
+  question: string; hint: string; showHint: boolean; hintsEnabled: boolean; onToggleHint: () => void; description?: string; label?: string; headline?: string;
 }) {
   return (
-    <AssistantCard ariaLabel="Transfer question" label="New question · same idea" headline="Now prove it transfers.">
+    <AssistantCard ariaLabel={label} label={label} headline={headline}>
       <div className="flex flex-col gap-2 px-[18px] py-3">
         <p className="m-0 text-xs text-ink-muted">{description}</p>
         <p className="m-0 text-base font-semibold leading-normal">{question}</p>

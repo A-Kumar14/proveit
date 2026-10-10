@@ -65,6 +65,20 @@ export const TransferResult = z.discriminatedUnion("result", [
 ]);
 export type TransferResult = z.infer<typeof TransferResult>;
 
+export const ReviewSubmitInput = z.object({
+  courseId: z.string(),
+  conceptId: z.string(),
+  answer: z.string().trim().min(1, "Write an answer first.").max(4000),
+});
+export type ReviewSubmitInput = z.infer<typeof ReviewSubmitInput>;
+
+export const ReviewSubmitResult = z.discriminatedUnion("result", [
+  z.object({ result: z.literal("pass"), resultAttemptId: z.string() }),
+  z.object({ result: z.literal("fail"), failedAttemptId: z.string(), nextAttemptId: z.string() }),
+  z.object({ result: z.literal("uncertain"), attemptId: z.string(), followUp: z.string() }),
+]);
+export type ReviewSubmitResult = z.infer<typeof ReviewSubmitResult>;
+
 export const ApiError = z.object({ error: z.string() });
 
 // ---- courses ----
@@ -162,6 +176,7 @@ export const PracticeDoc = z.object({
 export const PracticeResult = z.object({ docs: z.array(PracticeDoc), pdfError: z.string().nullable() });
 export type PracticeDoc = z.infer<typeof PracticeDoc>;
 export type PracticeResult = z.infer<typeof PracticeResult>;
+
 
 // ---- tutor chat ----
 

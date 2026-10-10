@@ -4,7 +4,7 @@ const generateText = vi.fn();
 vi.mock("ai", () => ({ generateText: (...a: unknown[]) => generateText(...a), Output: { object: (o: unknown) => o } }));
 vi.mock("./ai", () => ({ aiEnabled: () => true, model: () => "mock-model" }));
 
-import { judgeAnswer, judgeTransfer } from "./evaluator";
+import { judgeAnswer, judgeReview, judgeTransfer } from "./evaluator";
 
 const ANSWER = "It means there's a 95% probability that the true population mean is inside our interval.";
 const reply = (...outputs: object[]) => outputs.forEach((output) => generateText.mockResolvedValueOnce({ output }));
@@ -95,5 +95,24 @@ describe("judgeTransfer with Gemini", () => {
   it("returns uncertain on a three-way split", async () => {
     reply(transferPass, transferBad, transferUncertain);
     expect(await judgeTransfer("cii", "x")).toMatchObject({ verdict: "uncertain", misconceptionId: null });
+  });
+});
+
+
+describe("judgeReview with Gemini", () => {
+  it("uses the delayed-review rubric rather than replaying the transfer prompt", async () => {
+    reply(transferPass, transferPass, transferUncertain);
+    const result = await judgeReview("cii", "The report is invalid; 95% is the long-run method.");
+    expect(result).toMatchObject({ verdict: "pass", votes: { agree: 2, of: 3 } });
+    const prompt = generateText.mock.calls[0]?.[0]?.prompt as string;
+    expect(prompt).toContain("Delayed review question");
+    expect(prompt).toContain("A report says");
+    expect(prompt).not.toContain("100 researchers");
+  });
+
+  it("will not attach an invented misconception to a delayed-review failure", async () => {
+    const invented = { verdict: "fail", misconceptionId: "invented", evidenceQuote: "95% chance", feedback: "Nope." };
+    reply(invented, invented, transferUncertain);
+    expect(await judgeReview("cii", "95% chance")).toMatchObject({ verdict: "fail", misconceptionId: null, quote: null });
   });
 });
