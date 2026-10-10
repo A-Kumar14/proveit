@@ -138,3 +138,14 @@ describe("review queue, history and misconception log", () => {
     expect(() => getMisconceptionLog("nope")).toThrow(NotFoundError);
   });
 });
+
+describe("course completion", () => {
+  it("is completed only when every concept is mastered", () => {
+    expect(getSidebar().courses[0]?.completed).toBe(false);
+    const db = (globalThis as unknown as { __proveit: { course: { concepts: { state: string }[] } } }).__proveit;
+    db.course.concepts.forEach((c) => (c.state = "provisional"));
+    expect(getSidebar().courses[0]?.completed).toBe(false);
+    db.course.concepts.forEach((c) => (c.state = "mastered"));
+    expect(getSidebar().courses[0]).toMatchObject({ completed: true, pct: 100 });
+  });
+});

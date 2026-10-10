@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BarChart3, Flame, FolderOpen, History, LayoutDashboard, MessageSquare, Mic, Plus, RotateCcw, Settings, TriangleAlert } from "lucide-react";
+import { BarChart3, CircleCheck, ChevronRight, Flame, FolderOpen, History, LayoutDashboard, MessageSquare, Mic, Plus, RotateCcw, Settings, TriangleAlert } from "lucide-react";
 import { cn } from "@proveit/lib/cn";
 import type { SidebarView } from "@proveit/server/store";
 
@@ -17,6 +17,8 @@ function NavLink({ href, on, children }: { href: string; on: boolean; children: 
 
 export function Sidebar({ data, active, courseId }: { data: SidebarView; active: NavKey; courseId?: string }) {
   const course = data.courses.find((c) => c.id === courseId);
+  const inProgress = data.courses.filter((c) => !c.completed);
+  const completed = data.courses.filter((c) => c.completed);
   const base = course ? `/course/${course.id}` : "";
   return (
     <nav aria-label="Sidebar" className="flex w-[232px] shrink-0 flex-col gap-3.5 overflow-y-auto border-r border-line bg-surface-sidebar px-3.5 py-4">
@@ -38,17 +40,32 @@ export function Sidebar({ data, active, courseId }: { data: SidebarView; active:
 
       <div className="flex flex-col gap-0.5">
         <div className="flex items-center justify-between px-2.5 pb-1">
-          <div className="eyebrow text-ink-faint">Courses</div>
+          <div className="eyebrow text-ink-faint">In progress</div>
           <Link href="/?add=1" aria-label="New course" className="flex items-center gap-1 text-xs font-medium text-ink-muted no-underline hover:text-ink"><Plus size={12} strokeWidth={2} aria-hidden />New</Link>
         </div>
-        {data.courses.map((c) => (
+        {inProgress.map((c) => (
           <NavLink key={c.id} href={`/course/${c.id}`} on={active === "map" && c.id === courseId}>
             <span className={cn("size-2 rounded-full", dotFor(c.pct))} aria-hidden />
             <span className="flex-1">{c.name}</span>
             <span className="text-[11px] font-normal text-ink-faint">{c.pct}%</span>
           </NavLink>
         ))}
+        {inProgress.length === 0 && <div className="px-2.5 py-1 text-xs text-ink-faint">Nothing in progress.</div>}
       </div>
+
+      {completed.length > 0 && (
+        <details className="group flex flex-col gap-0.5" open={completed.some((c) => c.id === courseId)}>
+          <summary className="eyebrow flex cursor-pointer list-none items-center gap-1 px-2.5 pb-1 text-ink-faint [&::-webkit-details-marker]:hidden">
+            <ChevronRight size={12} strokeWidth={2} className="transition-transform group-open:rotate-90" aria-hidden />Completed ({completed.length})
+          </summary>
+          {completed.map((c) => (
+            <NavLink key={c.id} href={`/course/${c.id}`} on={active === "map" && c.id === courseId}>
+              <CircleCheck size={14} strokeWidth={2} className="text-mastered" aria-hidden />
+              <span className="flex-1">{c.name}</span>
+            </NavLink>
+          ))}
+        </details>
+      )}
 
       {course && (
         <div className="flex flex-col gap-0.5">

@@ -165,11 +165,12 @@ export function getCourse(courseId: string): CourseView {
   };
 }
 
-export type SidebarView = { courses: { id: string; name: string; pct: number }[]; streak: number; practiceHref: string | null; reviewsDue: number };
+/** A course is completed once every concept is Mastered. Provisional does not count. */
+export type SidebarView = { courses: { id: string; name: string; pct: number; completed: boolean }[]; streak: number; practiceHref: string | null; reviewsDue: number };
 export function getSidebar(): SidebarView {
   const { course } = db();
   const next = nextConcept();
-  return { courses: [{ id: course.id, name: course.name, pct: coursePct(course.concepts) }], streak: streak(), practiceHref: next ? practiceHref(next) : null, reviewsDue: dueConcepts().length };
+  return { courses: [{ id: course.id, name: course.name, pct: coursePct(course.concepts), completed: course.concepts.every((c) => c.state === "mastered") }], streak: streak(), practiceHref: next ? practiceHref(next) : null, reviewsDue: dueConcepts().length };
 }
 
 export type DashboardView = {
