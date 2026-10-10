@@ -26,7 +26,7 @@ export function ReviewFlow({ r }: { r: ReviewChallengeView }) {
     setStatus("evaluating");
     setError(null);
     try {
-      const res = await api.review(r.courseId, r.conceptId, answer);
+      const res = await api.review(r.courseId, r.conceptId, answer, r.learningSpecRevision);
       if (res.result === "pass") return router.push(`/course/${r.courseId}/review-result/${res.resultAttemptId}`);
       if (res.result === "fail") return router.push(`/course/${r.courseId}/diagnosis/${res.nextAttemptId}`);
       setUncertain((rows) => [...rows, { answer, followUp: res.followUp }]);
