@@ -69,6 +69,8 @@ export const ReviewSubmitInput = z.object({
   courseId: z.string(),
   conceptId: z.string(),
   answer: z.string().trim().min(1, "Write an answer first.").max(4000),
+  /** Optional pin to the exact challenge revision shown to the learner. */
+  learningSpecRevision: z.number().int().positive().optional(),
 });
 export type ReviewSubmitInput = z.infer<typeof ReviewSubmitInput>;
 

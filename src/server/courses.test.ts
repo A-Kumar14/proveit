@@ -30,7 +30,7 @@ describe("curated courses", () => {
     const c = getCourse("personal-finance-101");
     expect(c.concepts.length).toBeGreaterThanOrEqual(8);
     expect(c.concepts.every((x) => x.state === "not_started")).toBe(true);
-    expect(c.concepts[0]!.cta).toEqual({ label: "Quiz me on this", href: `/course/personal-finance-101/practice/quiz?concept=${c.concepts[0]!.id}` });
+    expect(c.concepts[0]!.cta).toEqual({ label: "Study with the tutor", href: "/course/personal-finance-101/tutor" });
     expect(new Set(c.concepts.map((x) => x.id)).size).toBe(c.concepts.length);
     expect(courseSpec("personal-finance-101")!.material).toContain("emergency fund");
   });

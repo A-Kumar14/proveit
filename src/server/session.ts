@@ -1,5 +1,5 @@
 import "server-only";
-import { AUTHORED } from "./content";
+import { getLearningSpec } from "./learningSpecStore";
 import { courseMaterial } from "./materials";
 import { getQuestion } from "./store";
 
@@ -25,9 +25,10 @@ Rules
 /** The tutor's brief for one concept. Course truth comes from the server, so the browser can't plant it. */
 export function sessionSystem(courseId: string, conceptId: string): string {
   const q = getQuestion(courseId, conceptId);
-  const a = AUTHORED[conceptId];
+  // Authored and generated concepts both have a spec, and it carries what is true and the mistakes to watch for.
+  const spec = getLearningSpec(courseId, conceptId);
   const notes = courseMaterial(courseId, 20_000);
-  const watch = a ? a.misconceptions.map((m) => `- ${m.name}: ${m.gap}`).join("\n") : "";
+  const watch = spec ? spec.misconceptions.map((m) => `- ${m.name}: ${m.description}`).join("\n") : "";
   return `${SYSTEM}
 
 You already opened the conversation with: "${sessionOpening(courseId, conceptId)}"
@@ -36,7 +37,7 @@ The concept: ${q.conceptName}
 The question they will be asked when they choose to be checked: "${q.prompt}"
 
 For you only:
-${a ? `What is true: ${a.correct}\nMistakes students often make here:\n${watch}` : "No reference answer is written for this concept. Stay within the course material."}${notes ? `\n\nCourse material:\n"""\n${notes}\n"""` : ""}`;
+${spec ? `What is true: ${spec.assessment.correctAnswer}\nMistakes students often make here:\n${watch}` : "No reference answer is written for this concept. Stay within the course material."}${notes ? `\n\nCourse material:\n"""\n${notes}\n"""` : ""}`;
 }
 
 /** The first thing the tutor says. It's fixed text, so the screen opens at once and the student speaks first. */
