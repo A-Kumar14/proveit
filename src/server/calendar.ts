@@ -47,6 +47,7 @@ function demoCalendar(): Held {
 function restoreCalendar(): Held {
   const saved = loadJson<Held>("calendar");
   if (!saved) {
+    if (process.env.PROVEIT_DEMO_SEED === "0") return { mode: "none", provider: null, syncedAt: null, events: [], url: null };
     const seeded = demoCalendar();
     saveJson("calendar", seeded);
     return seeded;
