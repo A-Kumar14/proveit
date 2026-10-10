@@ -26,10 +26,12 @@ Set `GOOGLE_GENERATIVE_AI_API_KEY` to use Gemini for grading (3 independent chec
 | `src/server/content.ts` | Hand-authored questions, misconceptions, lessons and transfer rubrics. |
 | `src/server/evaluator.ts` | Gemini voting judges, with the heuristic fallback. |
 | `src/lib/schemas.ts` | Zod contracts shared by routes and the client. |
-| `src/app/api/*` | Route handlers: assess, clarify, transfer, mastery-review, upload/check. |
-| `src/app/_components/*` | UI, grouped by shell, chat, mastery, practice, upload, voice, settings. |
+| `src/app/api/*` | Route handlers: assess, clarify, transfer, mastery-review, upload/check, courses/complete. |
+| `src/app/_components/*` | UI, grouped by shell, chat, mastery, practice, courses, upload, voice, settings. |
 | `design-handoff` source | `mastery-ui-handoff.zip` holds the approved reference screens. |
 
 ## Not built yet
 
-Review queue, History, Misconception log, Course files, Add a course, sketch and camera in voice mode. Anything unfinished is hidden, not stubbed.
+Course upload (the Add a course modal only opens the demo course), a free-text tutor chat, real persistence, and a way for a concept to reach Mastered after a delayed review. Anything unfinished is hidden or visibly disabled, not stubbed. See `CHECKLIST.md` for the full list.
+
+The Linear Algebra course is sample data so the Completed group has something in it. A course is completed when you mark it on the Courses page, or when every concept is Mastered.
