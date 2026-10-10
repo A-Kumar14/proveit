@@ -1,7 +1,8 @@
 import "server-only";
-import type { AssessInput, AssessResult, Evaluation, MasteryState, TransferResult } from "@proveit/lib/schemas";
+import { cardStatus, type AssessInput, type AssessResult, type Evaluation, type MasteryState, type ReviewText, type TransferResult } from "@proveit/lib/schemas";
 import { toneForPct, type Tone } from "@proveit/lib/mastery";
 import { AUTHORED } from "./content";
+import { judgeAnswer, judgeTransfer } from "./evaluator";
 
 /**
  * In-memory stand-in for the real data layer. Every exported function is the seam the backend
@@ -224,16 +225,17 @@ export function getQuestion(courseId: string, conceptId: string): QuestionView {
 
 // ---- assess / diagnose ----
 
-export function assess(input: AssessInput): AssessResult {
+export async function assess(input: AssessInput): Promise<AssessResult> {
   assertCourse(input.courseId);
   const c = concept(input.conceptId);
   const a = AUTHORED[c.id];
   if (!a) throw new NotFoundError(`no content for ${c.id}`);
   const previousState = c.state;
-  const j = a.judge(input.answer);
+  const judged = input.imageSummary ? `${input.answer}\n\n[Student's attached work, transcribed] ${input.imageSummary}` : input.answer;
+  const j = await judgeAnswer(c.id, judged);
   const base: Evaluation = {
     verdict: j.verdict, errorType: "none", misconceptionId: null, misconceptionName: null, evidenceQuote: null, gapSentence: null,
-    skills: [], votes: null, followUp: null, recommendation: "",
+    skills: [], votes: j.votes, followUp: null, recommendation: "",
   };
   let evaluation: Evaluation;
   if (j.verdict === "uncertain") {
@@ -292,14 +294,14 @@ export function getRemediation(attemptId: string): RemediationView {
   };
 }
 
-export function submitTransfer(attemptId: string, answer: string): TransferResult {
+export async function submitTransfer(attemptId: string, answer: string): Promise<TransferResult> {
   const parent = attempt(attemptId);
   const c = concept(parent.conceptId);
   const au = AUTHORED[c.id];
   if (!au) throw new NotFoundError(`no content for ${c.id}`);
   const before = c.state;
   c.evidence.answers++;
-  if (au.transfer.judge(answer)) {
+  if (await judgeTransfer(c.id, answer)) {
     c.evidence.sound++;
     c.evidence.transferPassed = true;
     upsertSkill(c, au.skillOnRight);
@@ -311,13 +313,13 @@ export function submitTransfer(attemptId: string, answer: string): TransferResul
     db().attempts.push(rec);
     return { result: "pass", resultAttemptId: rec.id };
   }
-  const j = au.judge(answer);
-  if (j.verdict === "incorrect") return { result: "fail", nextAttemptId: rediagnose(parent, c.id, answer, j.quote), followUp: null };
+  const j = await judgeAnswer(c.id, answer);
+  if (j.verdict === "incorrect") return { result: "fail", nextAttemptId: rediagnose(parent, c.id, answer, j.quote, j.votes), followUp: null };
   return { result: "fail", nextAttemptId: null, followUp: "Not there yet. Open the lesson again, then say in your own words what it means for one calculated case." };
 }
 
 /** A failed transfer that restates the misconception becomes a fresh diagnosis; counters carry over. */
-function rediagnose(parent: Attempt, conceptId: string, answer: string, quote: string | null): string {
+function rediagnose(parent: Attempt, conceptId: string, answer: string, quote: string | null, votes: Evaluation["votes"]): string {
   const au = AUTHORED[conceptId]!;
   const c = concept(conceptId);
   const rec: Attempt = {
@@ -325,7 +327,7 @@ function rediagnose(parent: Attempt, conceptId: string, answer: string, quote: s
     evaluation: {
       verdict: "incorrect", errorType: "conceptual", misconceptionId: au.misconception.id, misconceptionName: au.misconception.name,
       evidenceQuote: quote && answer.includes(quote) ? quote : null, gapSentence: au.misconception.gap,
-      skills: (c.skills ?? []).filter((s) => s.label !== "New-question test"), votes: null, followUp: null,
+      skills: (c.skills ?? []).filter((s) => s.label !== "New-question test"), votes, followUp: null,
       recommendation: "Same idea, one more pass. Read the lesson again, then try another setup.",
     },
     passed: false, previousState: c.state, failedTransfers: parent.failedTransfers + 1, createdAt: Date.now(),
@@ -363,5 +365,49 @@ export function getResult(attemptId: string): ResultView {
     segments: [...course.concepts].map((x) => x.state).sort((p, q) => RANK.indexOf(p) - RANK.indexOf(q)),
     coursePct: coursePct(course.concepts),
     provenLabel: `${proven} proven + ${prov} provisional`,
+  };
+}
+
+// ---- mastery review ----
+
+export type ReviewBase = {
+  headline: string;
+  concepts: { name: string; mastery: number; status: "mastered" | "reteaching" | "transfer-pending" }[];
+  riskConcept: string | null;
+  nextHref: string | null;
+  /** What the model is asked to improve on, and what the UI shows when no model runs. */
+  fallback: ReviewText;
+  /** Facts handed to the model so it can't invent any. */
+  facts: { concept: string; misconception: string | null; quote: string | null }[];
+};
+
+const masteryOf = (c: Concept) => (c.skills?.length ? Math.round(c.skills.reduce((n, s) => n + s.pct, 0) / c.skills.length) : 0);
+
+export function getReviewBase(courseId: string): ReviewBase {
+  assertCourse(courseId);
+  const { course, attempts } = db();
+  const concepts = course.concepts.flatMap((c) => {
+    const status = cardStatus(c.state);
+    return status ? [{ name: c.name, mastery: masteryOf(c), status }] : [];
+  });
+  const count = (s: string) => concepts.filter((c) => c.status === s).length;
+  const d = getDashboard();
+  const next = nextConcept();
+  const facts = course.concepts.filter((c) => c.state === "needs_work" || c.state === "developing").map((c) => {
+    const last = [...attempts].reverse().find((a) => a.conceptId === c.id && a.evaluation?.verdict === "incorrect");
+    return { concept: c.name, misconception: last?.evaluation?.misconceptionName ?? (c.state === "needs_work" ? AUTHORED[c.id]?.misconception.name ?? null : null), quote: last?.evaluation?.evidenceQuote ?? null };
+  });
+  return {
+    headline: `${count("mastered")} mastered, ${count("transfer-pending")} awaiting a transfer test, ${count("reteaching")} to reteach`,
+    concepts,
+    riskConcept: d.risk?.concept ?? null,
+    nextHref: next ? practiceHref(next) : null,
+    facts,
+    fallback: {
+      misconceptions: facts.map((f) => ({ concept: f.concept, misconception: f.misconception })),
+      biggestRisk: { reason: d.risk?.reason ?? "No open misconceptions right now." },
+      recommendation: d.recommendation,
+      nextActions: d.nextActions.map((a) => a.label),
+    },
   };
 }

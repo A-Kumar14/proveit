@@ -1,22 +1,28 @@
+import { VoiceSession } from "@proveit/app/_components/voice/VoiceSession";
 import { AppShell } from "@proveit/app/_components/shell/AppShell";
 import { PracticeFlow } from "@proveit/app/_components/practice/PracticeFlow";
+import { aiEnabled } from "@proveit/server/ai";
 import { orNotFound } from "@proveit/server/page";
 import { clarify, getAttempt, getQuestion } from "@proveit/server/store";
 
 export const dynamic = "force-dynamic";
 
 export default async function PracticePage({ params, searchParams }: PageProps<"/course/[courseId]/practice/[conceptId]">) {
+  const demo = process.env.NEXT_PUBLIC_DEMO_MODE === "1";
   const { courseId, conceptId } = await params;
-  const { clarify: clarifyId } = await searchParams;
+  const { clarify: clarifyId, mode } = await searchParams;
+  const modeParam = typeof mode === "string" ? mode : undefined;
   const { q, resume } = orNotFound(() => {
     const q = getQuestion(courseId, conceptId);
     const prior = typeof clarifyId === "string" ? getAttempt(clarifyId) : null;
     const resume = prior && prior.conceptId === conceptId ? { attemptId: prior.id, answer: prior.answer, followUp: clarify(prior.id).followUp } : undefined;
     return { q, resume };
   });
+  const uploads = { enabled: aiEnabled() || demo, demo };
+  if (modeParam === "speak") return <VoiceSession courseId={courseId} question={q} typeHref={`/course/${courseId}/practice/${conceptId}?mode=type`} uploads={uploads} />;
   return (
     <AppShell active="practice" courseId={courseId} state={q.state} crumbs={[{ label: q.courseName, href: `/course/${courseId}` }, { label: q.conceptName }]} right={q.prompt}>
-      <PracticeFlow key={resume?.attemptId ?? "new"} courseId={courseId} question={q} resume={resume} />
+      <PracticeFlow key={resume?.attemptId ?? "new"} courseId={courseId} question={q} resume={resume} uploads={uploads} modeParam={modeParam} />
     </AppShell>
   );
 }

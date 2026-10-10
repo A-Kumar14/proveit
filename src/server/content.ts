@@ -1,5 +1,7 @@
 /** Hand-authored content for the concepts that run end to end (pitch doc, phase 1). */
 export type Authored = {
+  /** Course-material truth the evaluator grades against. */
+  correct: string;
   question: string;
   misconception: { id: string; name: string; gap: string };
   /** Demo heuristic. The Gemini evaluator replaces this behind the same return shape. */
@@ -11,7 +13,7 @@ export type Authored = {
     rule: string | null;
     figure: "ci-intervals" | null;
   };
-  transfer: { question: string; hint: string; judge: (answer: string) => boolean };
+  transfer: { question: string; hint: string; rubric: string; judge: (answer: string) => boolean };
   skillOnWrong: { label: string; pct: number };
   skillOnRight: { label: string; pct: number };
 };
@@ -32,6 +34,7 @@ const ciWrong = [
 
 export const AUTHORED: Record<string, Authored> = {
   cii: {
+    correct: "A 95% confidence level describes the method. Over many repeated samples about 95% of the intervals built this way contain the true mean. Once one interval is calculated, the mean is fixed, so that interval either contains it or does not.",
     question: "Explain what a 95% confidence interval means.",
     misconception: {
       id: "parameter_probability_trap",
@@ -56,6 +59,7 @@ export const AUTHORED: Record<string, Authored> = {
       question:
         "100 researchers each take their own sample and build a 95% confidence interval the same way. About how many intervals should contain the true mean? What does that tell you about one interval after it's calculated?",
       hint: "Think about the 10 bars in the lesson, then scale up to 100.",
+      rubric: "Passes only if the student says about 95 of 100 intervals contain the true mean AND that any one already-calculated interval either contains it or does not (no 95% probability for that single interval; the 95% describes the method).",
       judge: (a) =>
         /\b95\b/.test(a) &&
         /(either (contains|contain|does|is)|already (been )?(calculated|computed|built)|no (95\s*%|probability|chance)|not (a )?95\s*%|describes? the (method|procedure)|the method|long.?run)/i.test(a),
@@ -64,6 +68,7 @@ export const AUTHORED: Record<string, Authored> = {
     skillOnRight: { label: "Interpretation", pct: 85 },
   },
   se: {
+    correct: "Standard error equals the spread divided by the square root of n, so a larger sample gives a smaller standard error.",
     question: "Researcher A samples 25 students and Researcher B samples 400 from the same school. Whose sample mean has the smaller standard error, and why?",
     misconception: {
       id: "more_data_more_error",
@@ -90,6 +95,7 @@ export const AUTHORED: Record<string, Authored> = {
     transfer: {
       question: "A pollster goes from 100 respondents to 400. By what factor does the standard error change, and why?",
       hint: "The sample is 4 times bigger. What do you do to 4 to get the factor?",
+      rubric: "Passes only if the student says the standard error is cut in half (factor of 1/2) AND explains it with the square root of the sample size (sqrt(4) = 2).",
       judge: (a) => /(half|1\s*\/\s*2|halve|divided by 2|factor of 2|2\s*x|two times)/i.test(a) && /(square root|sqrt|√)/i.test(a),
     },
     skillOnWrong: { label: "Application", pct: 25 },

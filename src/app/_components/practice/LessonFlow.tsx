@@ -10,10 +10,12 @@ import { AssistantCard } from "../chat/AssistantCard";
 import { MicroLessonCard } from "./MicroLessonCard";
 import { TransferQuestionCard } from "./TransferQuestionCard";
 import { api } from "@proveit/lib/api";
+import { useSettings } from "@proveit/lib/settings";
 import type { RemediationView } from "@proveit/server/store";
 
 export function LessonFlow({ r }: { r: RemediationView }) {
   const router = useRouter();
+  const [settings] = useSettings();
   const [step, setStep] = useState<"learn" | "try">("learn");
   const [lessonOpen, setLessonOpen] = useState(false);
   const [hint, setHint] = useState(false);
@@ -53,7 +55,7 @@ export function LessonFlow({ r }: { r: RemediationView }) {
           <>
             <UserBubble>Got it, give me a new question</UserBubble>
             <AssistantMessage>
-              <TransferQuestionCard question={r.transfer.question} hint={r.transfer.hint} showHint={hint} onToggleHint={() => setHint((h) => !h)} />
+              <TransferQuestionCard question={r.transfer.question} hint={r.transfer.hint} showHint={hint} hintsEnabled={settings.showHints} onToggleHint={() => setHint((h) => !h)} />
             </AssistantMessage>
             {misses.map((m, i) => (
               <div key={i} className="contents">
