@@ -2,9 +2,9 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { existsSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { getCalendarState } from "./calendar";
+import { getCalendarState, resetDemoCalendar } from "./calendar";
 import { closePersistenceForTests } from "./persistence";
-import { clarify, getAttempt, getCourse, getDashboard, getEvidenceTrail, getFiles, getHistory, getMisconceptionLog, getQuestion, getRemediation, getResult, getReviewChallenge, getReviewResult, getReviews, getRewards, getTodos, listCourses } from "./store";
+import { clarify, getAttempt, getCourse, getDashboard, getEvidenceTrail, getFiles, getHistory, getMisconceptionLog, getQuestion, getRemediation, getResult, getReviewChallenge, getReviewResult, getReviews, getRewards, getTodos, listCourses, resetDemoLearning } from "./store";
 import { getReviewQueue } from "./schedule";
 import { demoStateForTests } from "../test/demo-state";
 
@@ -84,5 +84,15 @@ describe("isolated demo-data branch", () => {
     g.__proveitCal = undefined;
     closePersistenceForTests();
     expect({ courses: listCourses(), history: getHistory(), points: getRewards().points }).toEqual(first);
+  });
+
+  it("resets both demo databases back to the canonical seeded state", () => {
+    expect(getHistory().length).toBeGreaterThan(0);
+    expect(getCalendarState().events.length).toBeGreaterThan(0);
+    resetDemoLearning();
+    resetDemoCalendar();
+    expect(getHistory().length).toBeGreaterThanOrEqual(6);
+    expect(getRewards().points).toBeGreaterThanOrEqual(6000);
+    expect(getCalendarState()).toMatchObject({ mode: "ics", provider: "Demo calendar" });
   });
 });
