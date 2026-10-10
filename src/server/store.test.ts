@@ -87,6 +87,18 @@ describe("evidence lineage", () => {
       followUpTo: first.attemptId,
     })).rejects.toThrow(InvalidAttemptLinkError);
   });
+  it("rejects clarification from an older episode after a newer episode starts", async () => {
+    const old = await run(WRONG);
+    const newer = await run("Not sure about this new attempt yet");
+    expect(newer.evaluation.verdict).toBe("uncertain");
+    expect(() => clarify(old.attemptId)).toThrow(InvalidAttemptLinkError);
+    await expect(assess({
+      courseId: "intro-stats", conceptId: "cii",
+      answer: "I meant the long-run method, not this one interval.",
+      followUpTo: old.attemptId,
+    })).rejects.toThrow(InvalidAttemptLinkError);
+  });
+
 
   it("uses the diagnosed misconception to ask a discriminating dispute question", async () => {
     const first = await run(WRONG);
@@ -153,6 +165,14 @@ describe("correct-answer transfer path", () => {
     await expect(submitTransfer(first.attemptId, RIGHT_TRANSFER)).rejects.toThrow(InvalidAttemptLinkError);
     expect(state("cii")).toBe("needs_work");
   });
+  it("rejects an old direct-transfer source even when the newer episode is only uncertain", async () => {
+    const old = await run("Over repeated samples, about 95% of intervals made by the method contain the true mean.");
+    const newer = await run("Not sure about this new attempt yet");
+    expect(newer.evaluation.verdict).toBe("uncertain");
+    expect(() => getTransferChallenge(old.attemptId)).toThrow(NotFoundError);
+    await expect(submitTransfer(old.attemptId, RIGHT_TRANSFER)).rejects.toThrow(InvalidAttemptLinkError);
+  });
+
 
   it("treats a successful dispute clarification as an overturned diagnosis, not a repaired misconception", async () => {
     const first = await run(WRONG);
