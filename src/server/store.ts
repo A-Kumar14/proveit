@@ -3,7 +3,7 @@ import { cardStatus, type AssessInput, type AssessResult, type AttemptKind, type
 import { toneForPct, type Tone } from "@proveit/lib/mastery";
 import { AUTHORED } from "./content";
 import { judgeAnswer, judgeReview, judgeTransfer, type AnswerContext } from "./evaluator";
-import { loadJson, saveJson } from "./persistence";
+import { deleteJson, loadJson, saveJson } from "./persistence";
 import type { CalEvent } from "./calendar";
 import { POINTS, STREAK_CAP, standing, TIERS, type Standing } from "@proveit/lib/rewards";
 import { demoStateForTests } from "../test/demo-state";
@@ -209,6 +209,11 @@ const db = (): Db => (g.__proveit ??= process.env.NODE_ENV === "test" && g.__pro
 
 function persistLearning(): void {
   saveJson("learning", snapshotLearning(db()));
+}
+
+export function resetDemoLearning(): void {
+  deleteJson("learning");
+  g.__proveit = undefined;
 }
 
 // ---- helpers ----
