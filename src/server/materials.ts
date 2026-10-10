@@ -50,20 +50,32 @@ export function listMaterials(courseId: string): Material[] {
   return held().items.filter((m) => m.courseId === courseId).sort((a, b) => b.addedAt - a.addedAt);
 }
 
-/** Reads one uploaded file into the course. Text files are read as is, PDFs and images by the model. */
-export async function addMaterial(courseId: string, file: File): Promise<Material> {
-  getCourse(courseId);
+/** Turns one uploaded file into text. Text files are read as is, PDFs and images by the model. */
+export async function readMaterial(file: File): Promise<{ text: string; readBy: Material["readBy"] }> {
   const kind = materialKind(file);
   if (!kind) throw new MaterialError(`${file.name} isn't supported. Use markdown, text, PDF or an image.`);
   if (file.size > MAX_MATERIAL_BYTES) throw new MaterialError(`${file.name} is over 10 MB.`);
   const raw = kind === "text" ? await file.text() : await readWithAi(file);
   const text = raw.replace(/\u0000/g, "").trim().slice(0, MAX_TEXT);
   if (!text || text === "NO_CONTENT") throw new MaterialError(`I couldn't find any study text in ${file.name}.`);
+  return { text, readBy: kind === "text" ? "text" : "ai" };
+}
+
+/** Stores text as a file of the course. */
+export function saveMaterial(courseId: string, meta: { name: string; mime: string; size: number }, text: string, readBy: Material["readBy"]): Material {
+  getCourse(courseId);
   const h = held();
-  const m: Material = { id: `m${Date.now().toString(36)}${(++h.seq).toString(36)}`, courseId, name: file.name.slice(0, 200), mime: file.type || "text/plain", size: file.size, addedAt: Date.now(), text, words: words(text), readBy: kind === "text" ? "text" : "ai" };
+  const m: Material = { id: `m${Date.now().toString(36)}${(++h.seq).toString(36)}`, courseId, name: meta.name.slice(0, 200), mime: meta.mime || "text/plain", size: meta.size, addedAt: Date.now(), text: text.slice(0, MAX_TEXT), words: words(text), readBy };
   h.items.push(m);
   save();
   return m;
+}
+
+/** Reads one uploaded file and adds it to the course. */
+export async function addMaterial(courseId: string, file: File): Promise<Material> {
+  getCourse(courseId);
+  const { text, readBy } = await readMaterial(file);
+  return saveMaterial(courseId, { name: file.name, mime: file.type, size: file.size }, text, readBy);
 }
 
 export function removeMaterial(courseId: string, id: string): boolean {
@@ -91,7 +103,8 @@ function authoredNotes(courseId: string): string {
 export function courseMaterial(courseId: string, budget = 24_000): string {
   const parts: string[] = [];
   const spec = courseSpec(courseId);
-  if (spec) parts.push(`# Course notes\n${spec.material}`);
+  // Courses built from uploads keep their text as files, so only curated courses carry notes of their own.
+  if (spec?.source === "catalog") parts.push(`# Course notes\n${spec.material}`);
   const authored = authoredNotes(courseId);
   if (authored) parts.push(`# Course notes\n${authored}`);
   for (const m of listMaterials(courseId)) parts.push(`# Uploaded file: ${m.name}\n${m.text}`);

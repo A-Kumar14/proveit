@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 
 // Accounts are on only when both Clerk keys exist. Without them every route stays open, so local work needs no setup.
 const enabled = Boolean(process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY && process.env.CLERK_SECRET_KEY);
-const isPublic = createRouteMatcher(["/sign-in(.*)", "/sign-up(.*)", "/api/integrations/(.*)/callback"]);
+const isPublic = createRouteMatcher(["/sign-in(.*)", "/sign-up(.*)"]);
 
 export default enabled
   ? clerkMiddleware(async (auth, req) => { if (!isPublic(req)) await auth.protect(); })

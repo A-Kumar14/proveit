@@ -2,8 +2,10 @@ import Link from "next/link";
 import { AppShell } from "@proveit/app/_components/shell/AppShell";
 import { ListPage } from "@proveit/app/_components/shell/ListPage";
 import { AccountActions } from "@proveit/app/_components/account/AccountActions";
+import { ConnectedApps } from "@proveit/app/_components/apps/ConnectedApps";
 import { TierBadge } from "@proveit/app/_components/dashboard/TierBadge";
-import { authEnabled, currentProfile } from "@proveit/server/auth";
+import { authEnabled, currentProfile, currentUserId } from "@proveit/server/auth";
+import { connectionStatus } from "@proveit/server/integrations";
 import { getRewards, listCourses } from "@proveit/server/store";
 
 export const dynamic = "force-dynamic";
@@ -11,7 +13,8 @@ export const dynamic = "force-dynamic";
 const fmt = (n: number) => n.toLocaleString("en-US");
 const initials = (name: string) => name.split(/\s+/).map((p) => p[0]).slice(0, 2).join("").toUpperCase();
 
-export default async function AccountPage() {
+export default async function AccountPage({ searchParams }: PageProps<"/account">) {
+  const { connected, integration_error: integrationError } = await searchParams;
   const enabled = authEnabled();
   const profile = await currentProfile();
   const rank = getRewards();
@@ -55,6 +58,7 @@ export default async function AccountPage() {
             <div key={k} className="flex items-center justify-between gap-3 border-t border-line px-4 py-3 text-[13px] first:border-t-0"><span className="text-ink-muted">{k}</span><span className="font-semibold">{v}</span></div>
           ))}
         </section>
+        <ConnectedApps apps={connectionStatus(await currentUserId())} notice={{ connected: typeof connected === "string" ? connected : undefined, error: typeof integrationError === "string" ? integrationError : undefined }} />
       </ListPage>
     </AppShell>
   );

@@ -10,13 +10,15 @@ import { TickerCard } from "@proveit/app/_components/dashboard/TickerCard";
 import { TodoCard } from "@proveit/app/_components/dashboard/TodoCard";
 import { RankCard } from "@proveit/app/_components/dashboard/RankCard";
 import { RankChip } from "@proveit/app/_components/dashboard/RankChip";
+import { currentUserId } from "@proveit/server/auth";
+import { connectionStatus } from "@proveit/server/integrations";
 import { getScheduledTodos, getSchedule } from "@proveit/server/schedule";
 import { getCourseRanks, getDashboard, getRewards, listCourses } from "@proveit/server/store";
 
 export const dynamic = "force-dynamic";
 
 export default async function Dashboard({ searchParams }: PageProps<"/">) {
-  const { add, connect } = await searchParams;
+  const { add, connect, connected, integration_error: integrationError } = await searchParams;
   const head = getDashboard();
   const courses = listCourses();
   const rewards = getRewards();
@@ -46,7 +48,7 @@ export default async function Dashboard({ searchParams }: PageProps<"/">) {
 
         </div>
       </div>
-      {add && <AddCourseModal />}
+      {add && <AddCourseModal apps={connectionStatus(await currentUserId())} notice={{ connected: typeof connected === "string" ? connected : undefined, error: typeof integrationError === "string" ? integrationError : undefined }} />}
       {connect && <ConnectCalendarModal closeHref="/" />}
     </AppShell>
   );

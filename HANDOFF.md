@@ -105,14 +105,23 @@ Server components read from `store` / `schedule`. Browser mutations go `lib/api.
 - Courses/to-dos/calendar/rank UI.
 - iCal connection with SSRF protections.
 - SQLite-backed local learner/calendar persistence.
+- Practice hub (`/course/[id]/practice`): sample paper plus answer key and study notes as LaTeX-built PDFs (`tectonic`, local only), and an 8-question quiz with a score and review. Quizzes never change mastery or rank.
+- Overall rank on the dashboard, and a rank per course on the same ladder (`getRewards(courseId?)`, `getCourseRanks()`).
+- Browse courses (`/courses/browse`): five curated courses written as markdown in `content/courses/`. Adding one creates a runtime course (`CourseSpec`, persisted under `added_courses`). Runtime courses have a map, tutor, notes, paper and quiz, but no diagnose loop, because they have no authored questions or misconceptions.
+- Course files upload (`/course/[id]/files`): md, txt, PDF and images become extra context (`server/materials.ts`). PDFs and images are read by the model.
+- Add a course: upload notes (markdown headings keep their structure, other notes go to the model for an outline), browse curated, or import from Granola or Wispr Flow.
+- Granola and Wispr Flow: real MCP OAuth (dynamic client registration) in `server/integrations.ts`, per-user tokens in SQLite, a read-only import agent, connect and disconnect on the Account page. Connect was checked against both live servers up to the sign-in page. The callback and the import itself have not run, because they need real accounts.
+- Accounts with Clerk (`src/proxy.ts`, `/sign-in`, `/sign-up`, `/account`). On only when both Clerk keys are set. Learning progress is still one global state, not per user.
 
 ## Known gaps
 
 - Only CI interpretation and Standard Error are authored end-to-end.
-- Course upload/concept extraction is still disabled.
+- Courses added at runtime have no authored questions, so they skip the diagnose, teach and transfer loop. Generating those from notes needs grounding and review.
 - Transfer/review questions are hand-authored for the current concepts.
 - Source retrieval/citations are not built.
-- No multi-user auth.
+- Clerk gates access, but learner state, files and quizzes are not keyed by user. Two accounts on one server share progress. Only connected-app tokens are per user.
+- Curated course files are read from `content/courses` at runtime. A deploy must include that folder.
+- PDF generation needs `tectonic` on the server, so it works locally and not on Vercel.
 - Hosted durable DB is not wired; SQLite is local persistence.
 - Real Gemini/calendar/mic/camera need presentation-device smoke tests.
 - Calendar scheduling uses server timezone and suggested blocks are not written back.

@@ -215,3 +215,12 @@ export const QuizResult = z.object({
   byConcept: z.array(z.object({ concept: z.string(), right: z.number(), total: z.number() })),
 });
 export type QuizResult = z.infer<typeof QuizResult>;
+
+// ---- connected apps and course creation ----
+
+export const ProviderInput = z.object({ provider: z.enum(["granola", "wispr"]) });
+export const ConnectInput = ProviderInput.extend({ returnTo: z.string().max(300).optional() });
+export const ConnectResult = z.union([z.object({ url: z.string() }), z.object({ connected: z.literal(true) })]);
+export const ImportInput = ProviderInput.extend({ topic: z.string().trim().min(2, "Say what the course is about.").max(120), name: z.string().trim().max(80).optional() });
+export const CreateCourseResult = z.object({ id: z.string(), concepts: z.number(), documents: z.number().optional(), failed: z.array(z.object({ name: z.string(), reason: z.string() })).optional() });
+export type CreateCourseResult = z.infer<typeof CreateCourseResult>;

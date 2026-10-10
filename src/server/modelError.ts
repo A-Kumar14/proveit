@@ -18,3 +18,6 @@ function findStatus(e: unknown, depth = 0): number | null {
   if (typeof o.statusCode === "number") return o.statusCode;
   return findStatus(o.lastError, depth + 1) ?? findStatus(o.cause, depth + 1);
 }
+
+/** A failure of another service that the student can act on. The message is safe to show. */
+export class UpstreamError extends Error {}

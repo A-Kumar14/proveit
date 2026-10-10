@@ -1,25 +1,18 @@
 import Link from "next/link";
-import { Upload } from "lucide-react";
+import { Library } from "lucide-react";
 import { buttonStyles } from "../Button";
+import { AddCourseForm } from "./AddCourseForm";
 import { Modal } from "./Modal";
+import type { AppStatus } from "../apps/useConnect";
 
-/** Course ingestion is still intentionally disabled until file-to-concept extraction is wired. */
-export function AddCourseModal() {
+/** Opened with /?add=1. Three ways in: your own notes, a curated course, or notes pulled from a connected app. */
+export function AddCourseModal({ apps, notice }: { apps: AppStatus[]; notice?: { connected?: string; error?: string } }) {
   return (
     <Modal title="Add a course" closeHref="/">
-      <fieldset disabled className="m-0 flex flex-col gap-2.5 border-0 p-0 opacity-60">
-        <label htmlFor="cname" className="text-[13px] font-semibold">Course name</label>
-        <input id="cname" placeholder="e.g. Linear Algebra" className="rounded-sm border border-line bg-surface px-3 py-2.5 text-sm" />
-        <div className="flex flex-col items-center gap-1.5 rounded-md border-[1.5px] border-dashed border-line bg-surface-subtle px-3.5 py-[18px] text-center">
-          <Upload size={22} strokeWidth={1.8} aria-hidden />
-          <span className="text-[13px] font-semibold">Drop syllabus, slides, or study guides</span>
-          <span className="text-xs text-ink-faint">Course ingestion is the next backend milestone.</span>
-        </div>
-        <label className="flex items-start gap-2 text-xs text-ink-muted"><input type="checkbox" className="mt-0.5 accent-ink" />I have the right to use these files for my own studying.</label>
-      </fieldset>
-      <div className="flex justify-end gap-2">
-        <Link href="/" className={buttonStyles({ variant: "secondary" })}>Cancel</Link>
-        <span aria-disabled className={`${buttonStyles()} cursor-not-allowed opacity-50`}>Build concept map</span>
+      <AddCourseForm apps={apps} notice={notice} />
+      <div className="flex items-center justify-between gap-3 border-t border-line pt-3 text-xs text-ink-muted">
+        <span>No notes of your own? Pick from courses that come with notes.</span>
+        <Link href="/courses/browse" className={buttonStyles({ variant: "secondary", size: "sm" })}><Library size={13} strokeWidth={2} aria-hidden />Browse courses</Link>
       </div>
     </Modal>
   );
