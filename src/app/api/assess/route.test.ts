@@ -15,7 +15,7 @@ describe("POST /api/assess attempt linkage", () => {
     const { attemptId } = await first.json() as { attemptId: string };
     const res = await send({ courseId: "intro-stats", conceptId: "se", answer: "Researcher B has the smaller standard error because n is larger.", followUpTo: attemptId });
     expect(res.status).toBe(409);
-    expect(await res.json()).toMatchObject({ error: expect.stringContaining("follow-up") });
+    expect(await res.json()).toMatchObject({ error: expect.stringContaining("no longer current") });
   });
 
   it("returns 404 for a missing parent and 400 for malformed input", async () => {
