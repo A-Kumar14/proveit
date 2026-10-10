@@ -858,31 +858,40 @@ const masteryOf = (c: Concept) => (c.skills?.length ? Math.round(c.skills.reduce
 
 export function getReviewBase(courseId: string): ReviewBase {
   const course = courseFor(courseId);
-  const active = course === db().course;
   const concepts = course.concepts.flatMap((c) => {
     const status = cardStatus(c.state);
     return status ? [{ name: c.name, mastery: masteryOf(c), status }] : [];
   });
-  const count = (s: string) => concepts.filter((c) => c.status === s).length;
-  const d = getDashboard();
-  const next = active ? nextConcept() : null;
-  const facts = course.concepts.filter((c) => c.state === "needs_work" || c.state === "developing").map((c) => {
-    const last = latestConfirmedIncorrect(c.id, course.id);
-    return { concept: c.name, misconception: last?.evaluation?.misconceptionName ?? (c.state === "needs_work" ? primaryMisconceptionFor(course.id, c.id)?.name ?? null : null), quote: last?.evaluation?.evidenceQuote ?? null };
-  });
+  const count = (status: string) => concepts.filter((c) => c.status === status).length;
+  const next = nextConceptFor(course);
+  const facts = course.concepts
+    .filter((c) => c.state === "needs_work" || c.state === "developing")
+    .map((c) => {
+      const last = latestConfirmedIncorrect(c.id, course.id);
+      return {
+        concept: c.name,
+        misconception: last?.evaluation?.misconceptionName
+          ?? (c.state === "needs_work" ? primaryMisconceptionFor(course.id, c.id)?.name ?? null : null),
+        quote: last?.evaluation?.evidenceQuote ?? null,
+      };
+    });
   return {
     attemptCount: course.concepts.reduce((n, c) => n + c.evidence.answers, 0),
     headline: `${count("mastered")} mastered, ${count("transfer-pending")} awaiting a transfer test, ${count("reteaching")} to reteach`,
     concepts,
-    riskConcept: active ? d.risk?.concept ?? null : null,
+    riskConcept: course.concepts.find((c) => c.state === "needs_work")?.name ?? null,
     riskName: course.concepts.find((c) => c.state === "needs_work")?.name ?? null,
     nextHref: next ? practiceHrefFor(course.id, next) : null,
     facts,
     fallback: {
-      misconceptions: facts.map((f) => ({ concept: f.concept, misconception: f.misconception })),
-      biggestRisk: { reason: active ? d.risk?.reason ?? "No open misconceptions right now." : "No open misconceptions in this course." },
-      recommendation: active ? d.recommendation : isCompleted(course) ? "This course is complete. Come back for reviews when they are due." : next ? `Work on ${next.name} next.` : "Generate mastery content for a concept to start practicing this course.",
-      nextActions: next ? [`Test ${next.name} · ${course.name}`] : [],
+      misconceptions: facts.map((fact) => ({ concept: fact.concept, misconception: fact.misconception })),
+      biggestRisk: { reason: facts[0]?.misconception ? `Open misconception: ${facts[0].misconception}.` : "No open misconceptions right now." },
+      recommendation: isCompleted(course)
+        ? "This course is complete. Come back for reviews when they are due."
+        : next
+          ? `Work on ${next.name} next.`
+          : "Nothing else is ready to test in this course.",
+      nextActions: next ? [`Test ${next.name}`] : [],
     },
   };
 }
@@ -891,72 +900,54 @@ export function getReviewBase(courseId: string): ReviewBase {
 
 export type ReviewItem = { id: string; name: string; courseName: string; when: string; /** ISO day the review lands. */ day: string; due: boolean; href: string | null };
 export function getReviews(now = new Date()): { due: ReviewItem[]; upcoming: ReviewItem[] } {
-  const { course, samples } = db();
   const today = isoDay(now);
-  const items = [course, ...samples].flatMap((owner) =>
-    owner.concepts
+  const items = allCourses().flatMap((course) =>
+    course.concepts
       .filter((c) => c.nextReview && (c.state === "provisional" || c.state === "mastered"))
       .map((c) => {
         const due = c.nextReview! <= today;
         return {
-          id: c.id,
-          name: c.name,
-          courseName: owner.name,
-          day: c.nextReview!,
-          due,
-          href: due && testableIn(owner.id, c) ? `/course/${owner.id}/review/${c.id}` : null,
+          id: c.id, name: c.name, courseName: course.name, day: c.nextReview!, due,
+          href: due && testableIn(course.id, c) ? `/course/${course.id}/review/${c.id}` : null,
           when: due ? "Due now" : shortDate(new Date(`${c.nextReview}T00:00:00`)),
         };
       })
   );
-  return { due: items.filter((i) => i.due), upcoming: items.filter((i) => !i.due) };
+  return { due: items.filter((item) => item.due), upcoming: items.filter((item) => !item.due) };
 }
 
 export type ReviewChallengeView = {
   courseId: string; conceptId: string; conceptName: string; state: MasteryState; dueDay: string;
-  learningSpecRevision: number;
   review: { question: string; hint: string };
 };
 
 const reviewIsDue = (c: Concept, now: Date) =>
   !!c.nextReview && (c.state === "provisional" || c.state === "mastered") && c.nextReview <= isoDay(now);
 
+const reviewSpecFor = (courseId: string, conceptId: string): ConceptLearningSpec => {
+  const proof = [...db().attempts].reverse().find((a) =>
+    a.courseId === courseId &&
+    a.conceptId === conceptId &&
+    a.kind === "transfer" &&
+    a.outcome === "pass"
+  );
+  return specFor(courseId, conceptId, proof?.learningSpecRevision);
+};
+
 export function getReviewChallenge(courseId: string, conceptId: string, now = new Date()): ReviewChallengeView {
   const c = conceptFor(courseId, conceptId);
-  const spec = specFor(courseId, conceptId);
+  const spec = reviewSpecFor(courseId, conceptId);
   if (!reviewIsDue(c, now)) throw new NotFoundError(`no due review for ${conceptId}`);
   return {
-    courseId,
-    conceptId: c.id,
-    conceptName: c.name,
-    state: c.state,
-    dueDay: c.nextReview!,
-    learningSpecRevision: spec.revision,
+    courseId, conceptId: c.id, conceptName: c.name, state: c.state, dueDay: c.nextReview!,
     review: { question: spec.review.question, hint: spec.review.hint },
   };
 }
 
-/** Refresh runtime-course grounding before a review prompt is shown. */
-export async function ensureReviewChallenge(courseId: string, conceptId: string, now = new Date()): Promise<ReviewChallengeView> {
-  await ensureConceptLearningSpec(courseId, conceptId);
-  return getReviewChallenge(courseId, conceptId, now);
-}
-
-export async function submitReview(
-  courseId: string,
-  conceptId: string,
-  answer: string,
-  now = new Date(),
-  learningSpecRevision?: number,
-): Promise<ReviewSubmitResult> {
+export async function submitReview(courseId: string, conceptId: string, answer: string, now = new Date()): Promise<ReviewSubmitResult> {
   const c = conceptFor(courseId, conceptId);
+  const spec = reviewSpecFor(courseId, conceptId);
   if (!reviewIsDue(c, now)) throw new ReviewNotDueError("That review isn't due yet.");
-
-  // A caller that rendered a challenge can pin its exact revision. Otherwise refresh to the current grounded spec.
-  const spec = learningSpecRevision
-    ? specFor(courseId, conceptId, learningSpecRevision)
-    : await ensureConceptLearningSpec(courseId, conceptId);
-
   const previousState = c.state;
   const expectedDay = c.nextReview;
   const expectedLatestAttempt = latestAttemptForConcept(c.id, courseId)?.id ?? null;
@@ -980,15 +971,9 @@ export async function submitReview(
     c.nextReview = isoDay(addDays(now, reviewGapDays(c.id, courseId)));
     db().provenDays.add(isoDay(now));
     const rec = recordAttempt({
-      courseId,
-      conceptId: c.id,
-      kind: "review",
-      outcome: "pass",
+      courseId, conceptId: c.id, kind: "review", outcome: "pass",
       learningSpecRevision: spec.revision,
-      answer,
-      evaluation: null,
-      previousState,
-      createdAt: now.getTime(),
+      answer, evaluation: null, previousState, createdAt: now.getTime(),
     });
     return { result: "pass", resultAttemptId: rec.id };
   }
@@ -1001,54 +986,29 @@ export async function submitReview(
     c.evidence.transferPassed = false;
     c.nextReview = null;
     const evaluation: Evaluation = {
-      verdict: "incorrect",
-      errorType: "conceptual",
-      misconceptionId: diagnosed.id,
-      misconceptionName: diagnosed.name,
-      evidenceQuote: judged.quote && answer.includes(judged.quote) ? judged.quote : null,
-      gapSentence: diagnosed.description,
-      skills: c.skills ?? [],
-      votes: judged.votes,
-      followUp: null,
+      verdict: "incorrect", errorType: "conceptual", misconceptionId: diagnosed.id, misconceptionName: diagnosed.name,
+      evidenceQuote: judged.quote && answer.includes(judged.quote) ? judged.quote : null, gapSentence: diagnosed.description,
+      skills: c.skills ?? [], votes: judged.votes, followUp: null,
       recommendation: "The delayed check exposed the gap again. Repair it, then prove it on a fresh transfer question.",
     };
     const rec = recordAttempt({
-      courseId,
-      conceptId: c.id,
-      kind: "review",
-      outcome: "fail",
+      courseId, conceptId: c.id, kind: "review", outcome: "fail",
       learningSpecRevision: spec.revision,
-      answer,
-      evaluation,
-      previousState,
-      createdAt: now.getTime(),
+      answer, evaluation, previousState, createdAt: now.getTime(),
     });
     return { result: "fail", failedAttemptId: rec.id, nextAttemptId: rec.id };
   }
 
   const followUp = judged.feedback ?? "Give one more precise answer that addresses every part of the review.";
   const evaluation: Evaluation = {
-    verdict: "uncertain",
-    errorType: "uncertain",
-    misconceptionId: null,
-    misconceptionName: null,
-    evidenceQuote: null,
-    gapSentence: null,
-    skills: c.skills ?? [],
-    votes: judged.votes,
-    followUp,
+    verdict: "uncertain", errorType: "uncertain", misconceptionId: null, misconceptionName: null,
+    evidenceQuote: null, gapSentence: null, skills: c.skills ?? [], votes: judged.votes, followUp,
     recommendation: "There is not enough evidence to change mastery yet.",
   };
   const rec = recordAttempt({
-    courseId,
-    conceptId: c.id,
-    kind: "review",
-    outcome: "uncertain",
+    courseId, conceptId: c.id, kind: "review", outcome: "uncertain",
     learningSpecRevision: spec.revision,
-    answer,
-    evaluation,
-    previousState,
-    createdAt: now.getTime(),
+    answer, evaluation, previousState, createdAt: now.getTime(),
   });
   return { result: "uncertain", attemptId: rec.id, followUp };
 }
@@ -1061,8 +1021,8 @@ export type ReviewResultView = {
 export function getReviewResult(attemptId: string): ReviewResultView {
   const a = attempt(attemptId);
   if (a.kind !== "review" || a.outcome !== "pass") throw new NotFoundError(`no review result for ${attemptId}`);
-  const course = courseFor(a.courseId);
   const c = conceptFor(a.courseId, a.conceptId);
+  const course = courseFor(a.courseId);
   const proven = course.concepts.filter((x) => x.state === "mastered").length;
   const provisional = course.concepts.filter((x) => x.state === "provisional").length;
   return {
@@ -1113,15 +1073,16 @@ export function getMisconceptionLog(courseId: string): MisconceptionEntry[] {
         a.conceptId === c.id &&
         a.evaluation?.verdict === "incorrect" &&
         a.evaluation.misconceptionId === m.id &&
-        !diagnosisOverturned(a),
+        !diagnosisOverturned(a)
       );
-      const seededOpen = c.state === "needs_work" && index === 0 && !attempts.some((a) =>
-        a.courseId === courseId && a.conceptId === c.id && a.evaluation?.verdict === "incorrect"
-      );
+      const seededOpen =
+        c.state === "needs_work" &&
+        index === 0 &&
+        !attempts.some((a) => a.courseId === courseId && a.conceptId === c.id && a.evaluation?.verdict === "incorrect");
       if (!last && !seededOpen) return [];
       const repaired = c.evidence.transferPassed && c.state !== "needs_work";
       return [{
-        key: `${c.id}:${m.id}`,
+        key: `${courseId}:${c.id}:${m.id}`,
         name: m.name,
         concept: c.name,
         gap: m.description,
