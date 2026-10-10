@@ -3,7 +3,10 @@
 import type { ConceptView } from "@proveit/server/store";
 import { ConceptNode } from "./ConceptNode";
 
-const shortUnit = (u: string) => u.slice(3).replace("CONFIDENCE INTERVALS", "CONF. INTERVALS").replace("HYPOTHESIS TESTING", "HYPOTHESIS");
+const unitLabel = (u: string) => {
+  const name = u.replace(/^\d+\s*/, "").toLowerCase();
+  return name.charAt(0).toUpperCase() + name.slice(1);
+};
 
 /** Edge look from the two end states: green when both mastered, red dashed into a needs-work node, faint dashed when untouched. */
 function edgeLook(a: ConceptView, b: ConceptView) {
@@ -28,11 +31,12 @@ export function ConceptGraph({ concepts, edges, selectedId, onSelect }: {
   const byId = new Map(concepts.map((c) => [c.id, c]));
   const units = [...new Set(concepts.map((c) => c.unit))];
   return (
-    <div className="relative h-[336px] w-[480px]">
-      <div className="absolute left-0 top-1.5 grid w-[480px] grid-cols-4 text-center text-[10px] tracking-[0.06em] text-ink-faint">
-        {units.map((u) => <span key={u}>{shortUnit(u)}</span>)}
+    <div className="flex flex-col gap-3">
+      <div className="grid text-center text-[11px] text-ink-faint" style={{ gridTemplateColumns: `repeat(${units.length}, minmax(0, 1fr))` }}>
+        {units.map((u) => <span key={u}>{unitLabel(u)}</span>)}
       </div>
-      <svg width="480" height="336" viewBox="0 0 480 336" aria-hidden className="absolute left-0 top-0">
+      <div className="relative aspect-[480/336] w-full">
+      <svg viewBox="0 0 480 336" aria-hidden className="absolute inset-0 size-full">
         {edges.map(([from, to]) => {
           const a = byId.get(from), b = byId.get(to);
           if (!a || !b) return null;
@@ -43,6 +47,7 @@ export function ConceptGraph({ concepts, edges, selectedId, onSelect }: {
       {concepts.map((c) => (
         <ConceptNode key={c.id} id={c.id} name={c.name} short={c.short} x={c.x} y={c.y} state={c.state} selected={c.id === selectedId} onSelect={onSelect} />
       ))}
+      </div>
     </div>
   );
 }

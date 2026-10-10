@@ -21,12 +21,12 @@ export function ConceptNode({ id, name, short, x, y, state, selected, onSelect }
     <>
       <button
         type="button" onClick={() => onSelect(id)} aria-pressed={selected} aria-label={`${name}, ${LOOK[state].label}`}
-        style={{ left: x - 20, top: y - 20 }}
-        className={cn("absolute flex size-10 cursor-pointer items-center justify-center rounded-full border-2 p-0", LOOK[state].node, selected && "outline-2 outline-offset-4 outline-ink")}
+        style={{ left: `${(x / 480) * 100}%`, top: `${(y / 336) * 100}%` }}
+        className={cn("absolute flex size-10 -translate-x-1/2 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border-2 p-0", LOOK[state].node, selected && "outline-2 outline-offset-4 outline-ink")}
       >
         <NodeIcon state={state} />
       </button>
-      <span style={{ left: x - 55, top: y + 26 }} className={cn("pointer-events-none absolute w-[110px] text-center text-[11px]", selected ? "font-semibold text-ink" : "text-ink-muted")}>
+      <span style={{ left: `${(x / 480) * 100}%`, top: `${(y / 336) * 100}%` }} className={cn("pointer-events-none absolute w-[110px] -translate-x-1/2 translate-y-6 text-center text-[11px]", selected ? "font-semibold text-ink" : "text-ink-muted")}>
         {short}
       </span>
     </>

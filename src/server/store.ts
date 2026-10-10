@@ -489,12 +489,12 @@ export function getReviewBase(courseId: string): ReviewBase {
 
 // ---- review queue, history, misconception log, files ----
 
-export type ReviewItem = { id: string; name: string; courseName: string; when: string; due: boolean; href: string | null };
+export type ReviewItem = { id: string; name: string; courseName: string; when: string; /** ISO day the review lands. */ day: string; due: boolean; href: string | null };
 export function getReviews(): { due: ReviewItem[]; upcoming: ReviewItem[] } {
   const { course } = db();
   const today = isoDay(new Date());
   const items = course.concepts.filter((c) => c.nextReview && (c.state === "provisional" || c.state === "mastered")).map((c) => ({
-    id: c.id, name: c.name, courseName: course.name, due: c.nextReview! <= today, href: testable(c) ? practiceHref(c) : null,
+    id: c.id, name: c.name, courseName: course.name, day: c.nextReview!, due: c.nextReview! <= today, href: testable(c) ? practiceHref(c) : null,
     when: c.nextReview! <= today ? "Due now" : shortDate(new Date(`${c.nextReview}T00:00:00`)),
   }));
   return { due: items.filter((i) => i.due), upcoming: items.filter((i) => !i.due) };

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { BarChart3, BookOpen, CalendarDays, CircleCheck, ChevronRight, Flame, FolderOpen, History, LayoutDashboard, MessageSquare, Mic, Plus, RotateCcw, Settings, TriangleAlert } from "lucide-react";
+import { BarChart3, BookOpen, CalendarDays, CircleCheck, ChevronRight, Flame, History, LayoutDashboard, Plus, RotateCcw, Settings } from "lucide-react";
 import { cn } from "@proveit/lib/cn";
 import type { SidebarView } from "@proveit/server/store";
 
@@ -16,10 +16,8 @@ function NavLink({ href, on, children }: { href: string; on: boolean; children: 
 }
 
 export function Sidebar({ data, active, courseId }: { data: SidebarView; active: NavKey; courseId?: string }) {
-  const course = data.courses.find((c) => c.id === courseId);
   const inProgress = data.courses.filter((c) => !c.completed);
   const completed = data.courses.filter((c) => c.completed);
-  const base = course ? `/course/${course.id}` : "";
   return (
     <nav aria-label="Sidebar" className="flex w-[232px] shrink-0 flex-col gap-3.5 overflow-y-auto border-r border-line bg-surface-sidebar px-3.5 py-4">
       <Link href="/" className="flex items-center gap-2.5 px-1 pb-0.5 text-ink no-underline">
@@ -46,7 +44,7 @@ export function Sidebar({ data, active, courseId }: { data: SidebarView; active:
           <Link href="/?add=1" aria-label="New course" className="flex items-center gap-1 text-xs font-medium text-ink-muted no-underline hover:text-ink"><Plus size={12} strokeWidth={2} aria-hidden />New</Link>
         </div>
         {inProgress.map((c) => (
-          <NavLink key={c.id} href={`/course/${c.id}`} on={active === "map" && c.id === courseId}>
+          <NavLink key={c.id} href={`/course/${c.id}`} on={c.id === courseId}>
             <span className={cn("size-2 rounded-full", dotFor(c.pct))} aria-hidden />
             <span className="flex-1">{c.name}</span>
             <span className="text-[11px] font-normal text-ink-faint">{c.pct}%</span>
@@ -61,22 +59,12 @@ export function Sidebar({ data, active, courseId }: { data: SidebarView; active:
             <ChevronRight size={12} strokeWidth={2} className="transition-transform group-open:rotate-90" aria-hidden />Completed ({completed.length})
           </summary>
           {completed.map((c) => (
-            <NavLink key={c.id} href={`/course/${c.id}`} on={active === "map" && c.id === courseId}>
+            <NavLink key={c.id} href={`/course/${c.id}`} on={c.id === courseId}>
               <CircleCheck size={14} strokeWidth={2} className="text-mastered" aria-hidden />
               <span className="flex-1">{c.name}</span>
             </NavLink>
           ))}
         </details>
-      )}
-
-      {course && (
-        <div className="flex flex-col gap-0.5">
-          <div className="eyebrow px-2.5 pb-1 text-ink-faint">In {course.name}</div>
-          <NavLink href={`${base}/tutor`} on={active === "tutor"}><MessageSquare {...icon} />Tutor</NavLink>
-          {data.practiceHref?.startsWith(`/course/${course.id}/`) && <NavLink href={data.practiceHref} on={active === "practice"}><Mic {...icon} />Practice</NavLink>}
-          <NavLink href={`${base}/misconceptions`} on={active === "misconceptions"}><TriangleAlert {...icon} />Misconception log</NavLink>
-          <NavLink href={`${base}/files`} on={active === "files"}><FolderOpen {...icon} />Course files</NavLink>
-        </div>
       )}
 
       <div className="mt-auto flex flex-col gap-2.5">

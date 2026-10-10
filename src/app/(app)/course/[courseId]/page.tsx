@@ -1,39 +1,38 @@
-import { AppShell } from "@proveit/app/_components/shell/AppShell";
-import { Log } from "@proveit/app/_components/shell/Log";
-import { ChipRow } from "@proveit/app/_components/chat/ChipRow";
-import { AssistantMessage } from "@proveit/app/_components/chat/AssistantMessage";
-import { UserBubble } from "@proveit/app/_components/chat/UserBubble";
 import { CourseMapCard } from "@proveit/app/_components/mastery/CourseMapCard";
+import { FilesPanel, MisconceptionPanel, PracticePanel, TutorPanel } from "@proveit/app/_components/course/CoursePanels";
+import { AppShell } from "@proveit/app/_components/shell/AppShell";
 import { orNotFound } from "@proveit/server/page";
-import { getCourse } from "@proveit/server/store";
+import { getCourse, getFiles, getMisconceptionLog, getReviewBase } from "@proveit/server/store";
 
 export const dynamic = "force-dynamic";
 
 export default async function CoursePage({ params }: PageProps<"/course/[courseId]">) {
   const { courseId } = await params;
-  const course = orNotFound(() => getCourse(courseId));
-  const crumbs = [{ label: "Dashboard", href: "/" }, { label: course.name }];
+  const { course, review, log, files } = orNotFound(() => ({
+    course: getCourse(courseId),
+    review: getReviewBase(courseId),
+    log: getMisconceptionLog(courseId),
+    files: getFiles(courseId).files,
+  }));
   const first = course.concepts[0];
-  if (!first) {
-    return (
-      <AppShell active="map" courseId={courseId} crumbs={crumbs}>
-        <Log><div className="rounded-md border border-line p-6 text-sm text-ink-muted">No concepts yet for this course.</div></Log>
-      </AppShell>
-    );
-  }
+  const next = course.nextUp ? course.concepts.find((c) => c.id === course.nextUp!.id) ?? null : null;
   return (
-    <AppShell active="map" courseId={courseId} crumbs={crumbs} right={course.deadline}>
-      <Log>
-        <UserBubble>Show me my {course.name} map</UserBubble>
-        <AssistantMessage>
-          <CourseMapCard course={course} initialId={course.nextUp?.id ?? first.id} />
-        </AssistantMessage>
-      </Log>
-      <ChipRow chips={[
-        ...(course.nextUp ? [{ label: `Test ${course.nextUp.name}`, href: `/course/${courseId}/practice/${course.nextUp.id}` }] : []),
-        { label: "How am I doing?", href: `/course/${courseId}/tutor` },
-        { label: "Misconception log", href: `/course/${courseId}/misconceptions` },
-      ]} />
+    <AppShell active="map" courseId={courseId} crumbs={[{ label: course.name }]} right={course.deadline}>
+      <div className="min-h-0 flex-1 overflow-y-auto px-7 py-6">
+        {first ? (
+          <div className="flex flex-col gap-4">
+            <CourseMapCard course={course} initialId={course.nextUp?.id ?? first.id} />
+            <div className="grid grid-cols-2 items-start gap-4">
+              <TutorPanel courseId={courseId} review={review} />
+              <PracticePanel course={course} next={next} />
+              <MisconceptionPanel courseId={courseId} log={log} />
+              <FilesPanel courseId={courseId} files={files} />
+            </div>
+          </div>
+        ) : (
+          <div className="rounded-md border border-line p-6 text-sm text-ink-muted">No concepts yet for this course.</div>
+        )}
+      </div>
     </AppShell>
   );
 }

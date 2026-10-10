@@ -29,6 +29,13 @@ describe("Sidebar course groups", () => {
     expect(html([stats, algebra], "algebra")).toMatch(/<details[^>]* open/);
   });
 
+  it("keeps tutor, practice, the misconception log and files off the sidebar", () => {
+    const out = html([stats, algebra], "stats");
+    expect(out).not.toContain("Tutor");
+    expect(out).not.toContain("Misconception log");
+    expect(out).not.toContain("Course files");
+  });
+
   it("says so when everything is completed", () => {
     expect(html([algebra])).toContain("Nothing in progress.");
   });
