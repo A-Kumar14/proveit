@@ -2,7 +2,6 @@ import { SwitchToVoice } from "@proveit/app/_components/voice/SwitchToVoice";
 import { VoiceSession } from "@proveit/app/_components/voice/VoiceSession";
 import { AppShell } from "@proveit/app/_components/shell/AppShell";
 import { PracticeFlow } from "@proveit/app/_components/practice/PracticeFlow";
-import { aiEnabled } from "@proveit/server/ai";
 import { orNotFound } from "@proveit/server/page";
 import { clarify, getAttempt, getQuestion } from "@proveit/server/store";
 
@@ -18,7 +17,7 @@ export default async function PracticePage({ params, searchParams }: PageProps<"
     const resume = prior && prior.conceptId === conceptId ? { attemptId: prior.id, answer: prior.answer, followUp: clarify(prior.id).followUp } : undefined;
     return { q, resume };
   });
-  const uploads = { enabled: aiEnabled() };
+  const uploads = { enabled: true, demo: true };
   if (modeParam === "speak") return <VoiceSession courseId={courseId} question={q} typeHref={`/course/${courseId}/practice/${conceptId}?mode=type`} uploads={uploads} />;
   return (
     <AppShell active="practice" courseId={courseId} state={q.state} crumbs={[{ label: q.courseName, href: `/course/${courseId}` }, { label: q.conceptName }]} right={<SwitchToVoice href={`/course/${courseId}/practice/${conceptId}?mode=speak`} />}>
