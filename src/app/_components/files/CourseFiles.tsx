@@ -6,10 +6,10 @@ import { FileText, LoaderCircle, Trash2, Upload } from "lucide-react";
 import { api } from "@proveit/lib/api";
 import { cn } from "@proveit/lib/cn";
 import type { FileUploadResult } from "@proveit/lib/schemas";
+import { UPLOAD_ACCEPT, UPLOAD_TYPES_LABEL } from "@proveit/lib/uploadTypes";
 
 export type FileRow = { id: string; name: string; detail: string; kind: string; removable: boolean };
 
-const ACCEPT = ".md,.markdown,.txt,.pdf,.png,.jpg,.jpeg,.webp,text/markdown,text/plain,application/pdf,image/png,image/jpeg,image/webp";
 
 /** The files a course is built from, plus a drop zone to add more. Added files feed the tutor, notes, paper and quiz. */
 export function CourseFiles({ courseId, files }: { courseId: string; files: FileRow[] }) {
@@ -55,10 +55,10 @@ export function CourseFiles({ courseId, files }: { courseId: string; files: File
         onDrop={(e) => { e.preventDefault(); setOver(false); void send(e.dataTransfer.files); }}
         className={cn("flex flex-col items-center gap-2 rounded-md border-[1.5px] border-dashed px-4 py-6 text-center transition-colors", over ? "border-ink bg-surface-hover" : "border-line bg-surface-subtle")}
       >
-        <input ref={input} type="file" multiple accept={ACCEPT} className="sr-only" tabIndex={-1} aria-label="Choose files to add" onChange={(e) => e.target.files && void send(e.target.files)} />
+        <input ref={input} type="file" multiple accept={UPLOAD_ACCEPT} className="sr-only" tabIndex={-1} aria-label="Choose files to add" onChange={(e) => e.target.files && void send(e.target.files)} />
         {busy ? <LoaderCircle size={22} className="animate-spin" aria-hidden /> : <Upload size={22} strokeWidth={1.8} aria-hidden />}
         <div className="text-[13px] font-semibold">{busy ? "Reading your files..." : "Add notes, slides or readings"}</div>
-        <div className="text-xs text-ink-muted">Markdown, text, PDF or images. Up to 5 files, 10 MB each. They become context for the tutor, notes, practice paper and quiz.</div>
+        <div className="text-xs text-ink-muted">{UPLOAD_TYPES_LABEL}. Up to 5 files, 10 MB each. They become context for the tutor, notes, practice paper and quiz.</div>
         <button type="button" onClick={() => input.current?.click()} disabled={busy} className="mt-1 cursor-pointer rounded-sm border border-line-button bg-surface px-3.5 py-1.5 text-[13px] font-semibold hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-60">Choose files</button>
       </div>
 

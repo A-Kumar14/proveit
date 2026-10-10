@@ -9,8 +9,8 @@ import { cn } from "@proveit/lib/cn";
 import { buttonStyles } from "../Button";
 import { useConnect, type AppStatus } from "../apps/useConnect";
 import { BuildProgress } from "./BuildProgress";
+import { UPLOAD_ACCEPT, UPLOAD_TYPES_LABEL } from "@proveit/lib/uploadTypes";
 
-const ACCEPT = ".md,.markdown,.txt,.pdf,.png,.jpg,.jpeg,.webp,text/markdown,text/plain,application/pdf,image/png,image/jpeg,image/webp";
 const field = "w-full rounded-sm border border-line bg-surface px-3 py-2.5 text-sm outline-none focus:border-ink-faint";
 
 function UploadCourse() {
@@ -80,10 +80,10 @@ function UploadCourse() {
           onDrop={(e) => { e.preventDefault(); setOver(false); add(e.dataTransfer.files); }}
           className={cn("flex flex-col items-center gap-1.5 rounded-md border-[1.5px] border-dashed px-3.5 py-4 text-center", over ? "border-ink bg-surface-hover" : "border-line bg-surface-subtle")}
         >
-          <input ref={input} type="file" multiple accept={ACCEPT} className="sr-only" tabIndex={-1} aria-label="Choose notes" onChange={(e) => { if (e.target.files) add(e.target.files); if (input.current) input.current.value = ""; }} />
+          <input ref={input} type="file" multiple accept={UPLOAD_ACCEPT} className="sr-only" tabIndex={-1} aria-label="Choose notes" onChange={(e) => { if (e.target.files) add(e.target.files); if (input.current) input.current.value = ""; }} />
           <Upload size={20} strokeWidth={1.8} aria-hidden />
           <span className="text-[13px] font-semibold">Drop a syllabus, slides or study notes</span>
-          <span className="text-xs text-ink-faint">Markdown, text, PDF or images. Up to 5 files, 10 MB each. Markdown with ## and ### headings keeps your own structure.</span>
+          <span className="text-xs text-ink-faint">{UPLOAD_TYPES_LABEL}. Up to 5 files, 10 MB each. Markdown with ## and ### headings keeps your own structure.</span>
           <button type="button" onClick={() => input.current?.click()} className="cursor-pointer rounded-sm border border-line-button bg-surface px-3 py-1 text-xs font-semibold hover:bg-surface-hover">Choose files</button>
         </div>
         {files.length > 0 && (

@@ -52,6 +52,11 @@ describe("kindOf", () => {
     expect(kindOf(f("notes.md", ""))).toBe("text");
     expect(kindOf(f("notes.txt", "text/plain"))).toBe("text");
     expect(kindOf(f("slide.png", "image/png"))).toBe("image");
-    expect(kindOf(f("deck.pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation"))).toBeNull();
+    expect(kindOf(f("deck.pptx", "application/vnd.openxmlformats-officedocument.presentationml.presentation"))).toBe("document");
+    expect(kindOf(f("notes.docx", ""))).toBe("document");
+    expect(kindOf(f("grades.csv", "application/vnd.ms-excel"))).toBe("document");
+    expect(kindOf(f("page.html", "text/html"))).toBe("document");
+    expect(kindOf(f("old.doc", "application/msword"))).toBeNull();
+    expect(kindOf(f("app.exe", "application/x-msdownload"))).toBeNull();
   });
 });
