@@ -114,26 +114,29 @@ function contextBlock(context?: AnswerContext): string {
 
 function sourceContext(spec: ConceptLearningSpecType, ids: string[]): object[] {
   const byId = new Map(spec.sources.map((source) => [source.id, source]));
-  return ids.flatMap((id) => {
+  const packet: object[] = [];
+  for (const id of ids) {
     const source = byId.get(id);
-    if (!source) return [];
+    if (!source) continue;
     if (source.kind === "material_excerpt") {
-      return [{
+      packet.push({
         id: source.id,
         kind: source.kind,
         title: source.title,
         locator: source.locator,
         excerpt: source.excerpt,
-      }];
+      });
+    } else {
+      packet.push({
+        id: source.id,
+        kind: source.kind,
+        title: source.title,
+        locator: source.locator,
+        note: "Authored reference label; not a retrieved quotation.",
+      });
     }
-    return [{
-      id: source.id,
-      kind: source.kind,
-      title: source.title,
-      locator: source.locator,
-      note: "Authored reference label; not a retrieved quotation.",
-    }];
-  });
+  }
+  return packet;
 }
 
 function misconceptionContext(spec: ConceptLearningSpecType): object[] {
