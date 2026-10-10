@@ -27,7 +27,9 @@ Real Gemini behavior is still used when a model key is present. The hard-coded a
 
 ## Reset the demo
 
-Stop the dev server, delete:
+Use the **Reset demo** button in the dashboard header. It clears the seeded learner/calendar state and immediately reloads the canonical demo database.
+
+Manual fallback: stop the dev server and delete:
 
 ```
 .data/proveit-demo.sqlite
