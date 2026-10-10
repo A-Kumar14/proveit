@@ -3,7 +3,6 @@
 import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { experimental_useObject as useObject } from "@ai-sdk/react";
-import { RefreshCw } from "lucide-react";
 import { ReviewText } from "@proveit/lib/schemas";
 import { TONE } from "@proveit/lib/mastery";
 import type { ReviewBase } from "@proveit/server/store";
@@ -11,6 +10,7 @@ import { buttonStyles } from "../Button";
 import { AssistantCard, CalloutRow, Callout, CardFooter, CardTable, Cell, Row, Section } from "../chat/AssistantCard";
 import { Skeleton } from "../chat/Skeleton";
 import { MasteryBar } from "./MasteryBar";
+import { REGENERATE_EVENT } from "./RegenerateButton";
 import { cn } from "@proveit/lib/cn";
 
 const STATUS = {
@@ -20,9 +20,16 @@ const STATUS = {
 } as const;
 
 /** Computed fields render at once. Model text shows a skeleton until it streams in. */
-export function MasteryReviewCard({ courseId, base, aiWritten }: { courseId: string; base: ReviewBase; aiWritten: boolean }) {
+export function MasteryReviewCard({ courseId, courseName, base, aiWritten }: { courseId: string; courseName: string; base: ReviewBase; aiWritten: boolean }) {
   const { object, submit, isLoading, error } = useObject({ api: "/api/mastery-review", schema: ReviewText });
   const run = () => submit({ courseId });
+  const runRef = useRef(run);
+  useEffect(() => { runRef.current = run; });
+  useEffect(() => {
+    const go = () => runRef.current();
+    window.addEventListener(REGENERATE_EVENT, go);
+    return () => window.removeEventListener(REGENERATE_EVENT, go);
+  }, []);
   // useObject returns a new submit each render, so depending on it would re-fire forever. Start once per mount.
   const started = useRef(false);
   useEffect(() => {
@@ -37,12 +44,8 @@ export function MasteryReviewCard({ courseId, base, aiWritten }: { courseId: str
 
   return (
     <AssistantCard
-      ariaLabel="Mastery review" label="Mastery review · Intro Statistics" headline={base.headline}
-      meta={
-        <button type="button" onClick={run} disabled={isLoading} className={cn(buttonStyles({ variant: "secondary", size: "sm" }))}>
-          <RefreshCw size={12} strokeWidth={2} aria-hidden />{isLoading ? "Writing..." : "Regenerate review"}
-        </button>
-      }
+      ariaLabel="Mastery review" label={`Mastery review · ${courseName}`} headline={base.headline}
+      meta={`From ${base.attemptCount} attempts`}
     >
       <CardTable head={["CONCEPT", "MASTERY", "STATUS", "MISCONCEPTION"]}>
         {base.concepts.map((c) => {
@@ -71,7 +74,7 @@ export function MasteryReviewCard({ courseId, base, aiWritten }: { courseId: str
         </div>
       ) : (
         <CalloutRow>
-          <Callout kind="risk" title="Biggest risk">{text(object?.biggestRisk?.reason)}</Callout>
+          <Callout kind="risk" title={`Biggest risk${base.riskName ? ` · ${base.riskName}` : ""}`}>{text(object?.biggestRisk?.reason)}</Callout>
           <Callout kind="advice" title="Recommendation">{text(object?.recommendation)}</Callout>
         </CalloutRow>
       )}
@@ -83,7 +86,7 @@ export function MasteryReviewCard({ courseId, base, aiWritten }: { courseId: str
         </ul>
         {base.nextHref && <Link href={base.nextHref} className={cn(buttonStyles(), "mt-1 self-start")}>Start now</Link>}
       </Section>
-      <CardFooter left="Numbers are computed from your attempts." right={aiWritten ? "Risk and advice written by AI" : undefined} />
+      <CardFooter left="Scores and status are computed from your attempts. Same data, same numbers." right={aiWritten ? "Risk and advice written by AI" : undefined} />
     </AssistantCard>
   );
 }

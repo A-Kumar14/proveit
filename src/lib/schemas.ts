@@ -19,6 +19,7 @@ export const AssessInput = z.object({
   followUpTo: z.string().optional(),
   /** Transcription of an uploaded photo that passed the upload check. Judged together with the typed answer. */
   imageSummary: z.string().max(2000).optional(),
+  imageName: z.string().max(200).optional(),
 });
 export type AssessInput = z.infer<typeof AssessInput>;
 

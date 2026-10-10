@@ -2,6 +2,8 @@
 export type Authored = {
   /** Course-material truth the evaluator grades against. */
   correct: string;
+  /** Diagnostic probe asked when the student says "I don't know yet". Smaller than the main question. */
+  probe: string;
   question: string;
   misconception: { id: string; name: string; gap: string };
   /** Demo heuristic. The Gemini evaluator replaces this behind the same return shape. */
@@ -35,6 +37,7 @@ const ciWrong = [
 export const AUTHORED: Record<string, Authored> = {
   cii: {
     correct: "A 95% confidence level describes the method. Over many repeated samples about 95% of the intervals built this way contain the true mean. Once one interval is calculated, the mean is fixed, so that interval either contains it or does not.",
+    probe: "No problem. Start smaller. If you built one 95% interval from your sample, what does the 95% describe, the method or this one interval? Guess in one sentence.",
     question: "Explain what a 95% confidence interval means.",
     misconception: {
       id: "parameter_probability_trap",
@@ -69,6 +72,7 @@ export const AUTHORED: Record<string, Authored> = {
   },
   se: {
     correct: "Standard error equals the spread divided by the square root of n, so a larger sample gives a smaller standard error.",
+    probe: "No problem. Pick one. With more students in the sample, does the sample mean bounce around more or less from sample to sample?",
     question: "Researcher A samples 25 students and Researcher B samples 400 from the same school. Whose sample mean has the smaller standard error, and why?",
     misconception: {
       id: "more_data_more_error",

@@ -10,6 +10,7 @@ import type { QuestionView } from "@proveit/server/store";
 import { Button, buttonStyles } from "../Button";
 import { AddFileMenu } from "../upload/AddFileMenu";
 import { Orb, type OrbState } from "./Orb";
+import { useSettings } from "@proveit/lib/settings";
 import { createRecognition, speak, useVoiceSupport, type Recognition } from "./speech";
 
 type Phase = "tutor" | "listening" | "review";
@@ -20,6 +21,7 @@ const clock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2,
 export function VoiceSession({ courseId, question, typeHref, uploads }: { courseId: string; question: QuestionView; typeHref: string; uploads: { enabled: boolean; demo: boolean } }) {
   const router = useRouter();
   const supported = useVoiceSupport();
+  const [settings] = useSettings();
   const [phase, setPhase] = useState<Phase>("tutor");
   const [muted, setMuted] = useState(false);
   const [spoken, setSpoken] = useState("");
@@ -75,11 +77,15 @@ export function VoiceSession({ courseId, question, typeHref, uploads }: { course
   // The tutor reads the question first. If speech never starts (blocked or unsupported), go straight to listening.
   useEffect(() => {
     if (phase !== "tutor") return;
+    if (!settings.speakQuestions) {
+      const t = setTimeout(listen, 0);
+      return () => clearTimeout(t);
+    }
     let started = false;
     const guard = setTimeout(() => { if (!started) { speechSynthesis?.cancel(); listen(); } }, 1500);
     speak(prompt, () => { started = true; clearTimeout(guard); }, () => { clearTimeout(guard); listen(); });
     return () => { clearTimeout(guard); speechSynthesis?.cancel(); };
-  }, [phase, prompt, listen]);
+  }, [phase, prompt, listen, settings.speakQuestions]);
 
   useEffect(() => { const t = setInterval(() => setSeconds((s) => s + 1), 1000); return () => clearInterval(t); }, []);
   useEffect(() => () => { stopRec(); speechSynthesis?.cancel(); }, [stopRec]);

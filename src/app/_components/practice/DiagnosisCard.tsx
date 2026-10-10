@@ -56,7 +56,7 @@ export function DiagnosisCard({ a }: { a: AttemptView }) {
 
       <Section title="Next actions">
         {wrong
-          ? <DiagnosisActions attemptId={a.id} lessonHref={`/course/${a.courseId}/lesson/${a.id}`} />
+          ? <DiagnosisActions attemptId={a.id} lessonHref={`/course/${a.courseId}/lesson/${a.id}`} talkHref={`/course/${a.courseId}/practice/${a.conceptId}?mode=speak`} />
           : <div className="flex gap-2"><Link href={`/course/${a.courseId}`} className={buttonStyles()}>Back to course map</Link></div>}
       </Section>
       <CardFooter left="Levels come from your attempts." />

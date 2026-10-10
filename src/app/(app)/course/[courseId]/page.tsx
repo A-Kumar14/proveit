@@ -1,5 +1,6 @@
 import { AppShell } from "@proveit/app/_components/shell/AppShell";
 import { Log } from "@proveit/app/_components/shell/Log";
+import { ChipRow } from "@proveit/app/_components/chat/ChipRow";
 import { AssistantMessage } from "@proveit/app/_components/chat/AssistantMessage";
 import { UserBubble } from "@proveit/app/_components/chat/UserBubble";
 import { CourseMapCard } from "@proveit/app/_components/mastery/CourseMapCard";
@@ -28,6 +29,11 @@ export default async function CoursePage({ params }: PageProps<"/course/[courseI
           <CourseMapCard course={course} initialId={course.nextUp?.id ?? first.id} />
         </AssistantMessage>
       </Log>
+      <ChipRow chips={[
+        ...(course.nextUp ? [{ label: `Test ${course.nextUp.name}`, href: `/course/${courseId}/practice/${course.nextUp.id}` }] : []),
+        { label: "How am I doing?", href: `/course/${courseId}/tutor` },
+        { label: "Misconception log", href: `/course/${courseId}/misconceptions` },
+      ]} />
     </AppShell>
   );
 }

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { assess, getAttempt, getCourse, getDashboard, getQuestion, getRemediation, getResult, getReviewBase, NotFoundError, submitTransfer } from "./store";
+import { assess, getAttempt, getCourse, getDashboard, getQuestion, getRemediation, getFiles, getHistory, getMisconceptionLog, getResult, getReviewBase, getReviews, getSidebar, NotFoundError, submitTransfer } from "./store";
 
 const WRONG = "It means there's a 95% probability that the true population mean is inside our interval.";
 const RIGHT_TRANSFER = "About 95 of them. But for any one interval that's already calculated, there's no 95% chance. It either contains the mean or it doesn't.";
@@ -104,5 +104,37 @@ describe("mastery review base", () => {
 
   it("rejects an unknown course", () => {
     expect(() => getReviewBase("nope")).toThrow(NotFoundError);
+  });
+});
+
+describe("review queue, history and misconception log", () => {
+  it("starts with an open seeded misconception, no history and no reviews", async () => {
+    expect(getHistory()).toEqual([]);
+    expect(getReviews()).toEqual({ due: [], upcoming: [] });
+    expect(getSidebar().reviewsDue).toBe(0);
+    expect(getMisconceptionLog("intro-stats")).toMatchObject([{ name: "Parameter probability trap", open: true, note: "From your earlier attempts" }]);
+  });
+
+  it("logs the answer, then the pass, and flips the misconception to repaired", async () => {
+    const { attemptId } = await run(WRONG);
+    expect(getHistory()[0]).toMatchObject({ detail: "Caught: Parameter probability trap", tone: "bad" });
+    expect(getMisconceptionLog("intro-stats")[0]).toMatchObject({ open: true, href: `/course/intro-stats/lesson/${attemptId}` });
+    await submitTransfer(attemptId, RIGHT_TRANSFER);
+    expect(getHistory().map((h) => h.tone)).toEqual(["good", "bad"]);
+    expect(getMisconceptionLog("intro-stats")[0]).toMatchObject({ open: false, note: "Fixed with a lesson and a new question" });
+    expect(getReviews().upcoming).toMatchObject([{ id: "cii", due: false }]);
+  });
+
+  it("keeps the uploaded file name on the attempt only when an image was read", async () => {
+    const withImg = await assess({ courseId: "intro-stats", conceptId: "cii", answer: WRONG, imageSummary: "handwritten work", imageName: "work.jpg" });
+    expect(getAttempt(withImg.attemptId).attachment).toBe("work.jpg");
+    const plain = await assess({ courseId: "intro-stats", conceptId: "cii", answer: WRONG, imageName: "ignored.jpg" });
+    expect(getAttempt(plain.attemptId).attachment).toBeNull();
+  });
+
+  it("lists course files and rejects unknown courses", () => {
+    expect(getFiles("intro-stats").files).toHaveLength(1);
+    expect(() => getFiles("nope")).toThrow(NotFoundError);
+    expect(() => getMisconceptionLog("nope")).toThrow(NotFoundError);
   });
 });

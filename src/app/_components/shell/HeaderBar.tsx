@@ -16,7 +16,7 @@ export function HeaderBar({ crumbs, state, right }: { crumbs: Crumb[]; state?: M
         ))}
         {state && <StatusPill state={state} className="ml-1" />}
       </nav>
-      {right && <div className="truncate text-xs text-ink-faint">{right}</div>}
+      {right && <div className="shrink-0 text-xs text-ink-faint">{right}</div>}
     </header>
   );
 }

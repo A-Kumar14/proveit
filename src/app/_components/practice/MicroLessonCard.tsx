@@ -1,10 +1,11 @@
 import { AssistantCard } from "../chat/AssistantCard";
 import { CiIntervalsFigure } from "./CiIntervalsFigure";
-import { Button } from "../Button";
+import Link from "next/link";
+import { Button, buttonStyles } from "../Button";
 import type { RemediationView } from "@proveit/server/store";
 
-export function MicroLessonCard({ lesson, conceptName, open, toggleable, onToggle, onGotIt }: {
-  lesson: RemediationView["lesson"]; conceptName: string; open: boolean; toggleable: boolean; onToggle: () => void; onGotIt?: () => void;
+export function MicroLessonCard({ lesson, conceptName, open, toggleable, onToggle, onGotIt, talkHref }: {
+  lesson: RemediationView["lesson"]; conceptName: string; open: boolean; toggleable: boolean; onToggle: () => void; onGotIt?: () => void; talkHref?: string;
 }) {
   return (
     <AssistantCard
@@ -32,7 +33,12 @@ export function MicroLessonCard({ lesson, conceptName, open, toggleable, onToggl
               {lesson.rule && <span className="rounded-full bg-surface-active px-[9px] py-0.5 text-[11px] text-ink-3">{lesson.rule}</span>}
               {lesson.aiWording && <span className="rounded-full bg-developing-bg px-[9px] py-0.5 text-[11px] text-developing-text">Wording by AI</span>}
             </div>
-            {onGotIt && <Button onClick={onGotIt} size="sm" className="py-[7px] text-xs">Got it, give me a new question</Button>}
+            {onGotIt && (
+              <div className="flex gap-2">
+                {talkHref && <Link href={talkHref} className={buttonStyles({ variant: "secondary", size: "sm" })}>Still confused? Talk it through</Link>}
+                <Button onClick={onGotIt} size="sm" className="py-[7px] text-xs">Got it, give me a new question</Button>
+              </div>
+            )}
           </div>
         </>
       )}

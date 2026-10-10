@@ -1,3 +1,4 @@
+import { SwitchToVoice } from "@proveit/app/_components/voice/SwitchToVoice";
 import { VoiceSession } from "@proveit/app/_components/voice/VoiceSession";
 import { AppShell } from "@proveit/app/_components/shell/AppShell";
 import { PracticeFlow } from "@proveit/app/_components/practice/PracticeFlow";
@@ -21,7 +22,7 @@ export default async function PracticePage({ params, searchParams }: PageProps<"
   const uploads = { enabled: aiEnabled() || demo, demo };
   if (modeParam === "speak") return <VoiceSession courseId={courseId} question={q} typeHref={`/course/${courseId}/practice/${conceptId}?mode=type`} uploads={uploads} />;
   return (
-    <AppShell active="practice" courseId={courseId} state={q.state} crumbs={[{ label: q.courseName, href: `/course/${courseId}` }, { label: q.conceptName }]} right={q.prompt}>
+    <AppShell active="practice" courseId={courseId} state={q.state} crumbs={[{ label: q.courseName, href: `/course/${courseId}` }, { label: q.conceptName }]} right={<SwitchToVoice href={`/course/${courseId}/practice/${conceptId}?mode=speak`} />}>
       <PracticeFlow key={resume?.attemptId ?? "new"} courseId={courseId} question={q} resume={resume} uploads={uploads} modeParam={modeParam} />
     </AppShell>
   );

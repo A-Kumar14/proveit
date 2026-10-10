@@ -39,12 +39,19 @@ export function PracticeFlow({ courseId, question, resume, uploads, modeParam }:
     if (settings.answerMode === "talk" && canTalk && !modeParam && !resume) router.replace(`${pathname}?mode=speak`);
   }, [settings.answerMode, canTalk, modeParam, resume, router, pathname]);
 
+  /** "I don't know yet" is a signal, not a wrong answer. The tutor asks a smaller question instead of diagnosing. */
+  function dontKnow() {
+    setTurns((t) => [...t, { answer: "I don't know yet", followUp: question.probe }]);
+    setAnswer("");
+    setError(null);
+  }
+
   async function submit() {
     if (status === "evaluating" || !answer.trim()) return;
     setStatus("evaluating");
     setError(null);
     try {
-      const { attemptId, evaluation } = await api.assess({ courseId, conceptId: question.conceptId, answer, followUpTo, imageSummary: upload?.ok ? upload.summary : undefined });
+      const { attemptId, evaluation } = await api.assess({ courseId, conceptId: question.conceptId, answer, followUpTo, imageSummary: upload?.ok ? upload.summary : undefined, imageName: upload?.ok ? upload.name : undefined });
       if (evaluation.verdict === "uncertain") {
         setTurns((t) => [...t, { answer, followUp: evaluation.followUp ?? "Say a bit more." }]);
         setFollowUpTo(attemptId);
@@ -63,7 +70,7 @@ export function PracticeFlow({ courseId, question, resume, uploads, modeParam }:
   return (
     <>
       <Log>
-        <AssistantMessage><QuestionCard conceptName={question.conceptName} prompt={question.prompt} why={question.why} /></AssistantMessage>
+        <AssistantMessage><QuestionCard conceptName={question.conceptName} prompt={question.prompt} why={question.why} source={question.source} /></AssistantMessage>
         {turns.map((t, i) => (
           <div key={i} className="contents">
             <UserBubble>{t.answer}</UserBubble>
@@ -80,6 +87,7 @@ export function PracticeFlow({ courseId, question, resume, uploads, modeParam }:
             {canTalk && (
               <Link href={`${pathname}?mode=speak`} className={cn(buttonStyles({ variant: "secondary", size: "sm" }), "gap-1.5 py-[7px] font-semibold")}><Mic size={14} strokeWidth={2} aria-hidden />Talk it through</Link>
             )}
+            <button type="button" onClick={dontKnow} disabled={status === "evaluating"} className={cn(buttonStyles({ variant: "secondary", size: "sm" }), "py-[7px] font-semibold")}>I don&apos;t know yet</button>
             {uploads.enabled && <AddFileMenu
             conceptId={question.conceptId} demo={uploads.demo} disabled={status === "evaluating"}
             onError={(m) => { setError(m); }}

@@ -2,8 +2,8 @@
 
 import { useCallback, useSyncExternalStore } from "react";
 
-export type Settings = { answerMode: "type" | "talk"; showHints: boolean };
-const DEFAULTS: Settings = { answerMode: "type", showHints: true };
+export type Settings = { answerMode: "type" | "talk"; showHints: boolean; speakQuestions: boolean };
+const DEFAULTS: Settings = { answerMode: "type", showHints: true, speakQuestions: true };
 const KEY = "proveit.settings";
 const listeners = new Set<() => void>();
 let cached: { raw: string | null; value: Settings } | null = null;

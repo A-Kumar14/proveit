@@ -1,12 +1,14 @@
 import { Info } from "lucide-react";
 import { AssistantCard } from "../chat/AssistantCard";
 
-export function QuestionCard({ conceptName, prompt, why }: { conceptName: string; prompt: string; why: string }) {
+export function QuestionCard({ conceptName, prompt, why, source }: { conceptName: string; prompt: string; why: string; source: string }) {
   return (
     <AssistantCard ariaLabel="Question" label={`Question · ${conceptName}`} headline={<span className="text-base leading-normal">{prompt}</span>}>
-      <div className="flex items-start gap-2 px-[18px] py-3 text-xs text-ink-muted">
-        <Info size={14} strokeWidth={1.8} className="mt-px shrink-0" aria-hidden />
-        <span><span className="font-semibold text-ink-3">Why this question.</span> {why}</span>
+      <p className="m-0 border-b border-line px-[18px] py-3 text-[13px] text-ink-muted">In your own words. Type it, talk it through, or add a photo of your work.</p>
+      <div className="flex gap-4 px-[18px] py-3 text-xs">
+        <div className="flex-1"><div className="eyebrow mb-1 flex items-center gap-1.5"><Info size={12} aria-hidden />Why this question</div><div className="leading-normal text-ink-3">{why}</div></div>
+        <div className="w-px bg-line" aria-hidden />
+        <div className="flex-1"><div className="eyebrow mb-1">Graded against</div><div className="leading-normal text-ink-3">Your course material, {source}. Uploads only count if they show your own work.</div></div>
       </div>
     </AssistantCard>
   );

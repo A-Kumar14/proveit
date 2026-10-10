@@ -20,7 +20,7 @@ type Concept = {
 };
 type Attempt = {
   id: string; courseId: string; conceptId: string; kind: "initial" | "transfer";
-  answer: string; evaluation: Evaluation | null; passed: boolean;
+  answer: string; imageName?: string; evaluation: Evaluation | null; passed: boolean;
   previousState: MasteryState; failedTransfers: number; createdAt: number;
 };
 type Db = { course: { id: string; name: string; deadline: string; concepts: Concept[]; edges: [string, string][] }; attempts: Attempt[]; provenDays: Set<string>; seq: number };
@@ -96,6 +96,11 @@ const streak = () => {
   return n;
 };
 
+const dueConcepts = () => {
+  const today = isoDay(new Date());
+  return db().course.concepts.filter((c) => c.nextReview && c.nextReview <= today && (c.state === "provisional" || c.state === "mastered"));
+};
+
 const testable = (c: Concept) => c.id in AUTHORED;
 const upsertSkill = (c: Concept, s: Skill) => {
   const skills = c.skills ?? [];
@@ -160,11 +165,11 @@ export function getCourse(courseId: string): CourseView {
   };
 }
 
-export type SidebarView = { courses: { id: string; name: string; pct: number }[]; streak: number; practiceHref: string | null };
+export type SidebarView = { courses: { id: string; name: string; pct: number }[]; streak: number; practiceHref: string | null; reviewsDue: number };
 export function getSidebar(): SidebarView {
   const { course } = db();
   const next = nextConcept();
-  return { courses: [{ id: course.id, name: course.name, pct: coursePct(course.concepts) }], streak: streak(), practiceHref: next ? practiceHref(next) : null };
+  return { courses: [{ id: course.id, name: course.name, pct: coursePct(course.concepts) }], streak: streak(), practiceHref: next ? practiceHref(next) : null, reviewsDue: dueConcepts().length };
 }
 
 export type DashboardView = {
@@ -180,9 +185,8 @@ export type DashboardView = {
 export function getDashboard(): DashboardView {
   const { course, attempts } = db();
   const now = new Date();
-  const today = isoDay(now);
   const cs = course.concepts;
-  const due = cs.filter((c) => c.nextReview && c.nextReview <= today && (c.state === "provisional" || c.state === "mastered")).length;
+  const due = dueConcepts().length;
   const bad = cs.find((c) => c.state === "needs_work");
   // Seeded needs-work concepts have no attempt yet, so fall back to the authored misconception name.
   const lastBad = (id: string) =>
@@ -207,7 +211,7 @@ export function getDashboard(): DashboardView {
   };
 }
 
-export type QuestionView = { courseName: string; conceptId: string; conceptName: string; state: MasteryState; prompt: string; why: string };
+export type QuestionView = { courseName: string; conceptId: string; conceptName: string; state: MasteryState; prompt: string; why: string; probe: string; source: string };
 export function getQuestion(courseId: string, conceptId: string): QuestionView {
   assertCourse(courseId);
   const c = concept(conceptId);
@@ -220,7 +224,7 @@ export function getQuestion(courseId: string, conceptId: string): QuestionView {
     c.state === "not_started" ? "You haven't been tested on this yet, so this question sets your starting point."
     : weak && strong && weak !== strong && strong.pct - weak.pct >= 30 ? `${strong.label} is at ${strong.pct}% but ${weak.label} is at ${weak.pct}%, so this checks the meaning, not the mechanics.`
     : "Your answers so far are only partly right. This checks whether the idea holds up in your own words.";
-  return { courseName: db().course.name, conceptId, conceptName: c.name, state: c.state, prompt: a.question, why };
+  return { courseName: db().course.name, conceptId, conceptName: c.name, state: c.state, prompt: a.question, why, probe: a.probe, source: a.lesson.rule?.replace("Rule from course material, ", "") ?? "your course material" };
 }
 
 // ---- assess / diagnose ----
@@ -257,17 +261,17 @@ export async function assess(input: AssessInput): Promise<AssessResult> {
     c.evidence.sound++;
     evaluation = { ...base, skills: (c.skills ?? []).filter((s) => s.label !== "New-question test"), recommendation: "Nodes only turn green after a new-question test. Try a different setup to prove it." };
   }
-  const rec: Attempt = { id: newId(), courseId: input.courseId, conceptId: c.id, kind: "initial", answer: input.answer, evaluation, passed: false, previousState, failedTransfers: 0, createdAt: Date.now() };
+  const rec: Attempt = { id: newId(), courseId: input.courseId, conceptId: c.id, kind: "initial", answer: input.answer, imageName: input.imageSummary ? input.imageName : undefined, evaluation, passed: false, previousState, failedTransfers: 0, createdAt: Date.now() };
   db().attempts.push(rec);
   return { attemptId: rec.id, evaluation };
 }
 
-export type AttemptView = { id: string; courseId: string; conceptId: string; conceptName: string; state: MasteryState; answer: string; evaluation: Evaluation };
+export type AttemptView = { id: string; courseId: string; conceptId: string; conceptName: string; question: string; state: MasteryState; answer: string; attachment: string | null; evaluation: Evaluation };
 export function getAttempt(id: string): AttemptView {
   const a = attempt(id);
   if (!a.evaluation) throw new NotFoundError(`attempt ${id} has no evaluation`);
   const c = concept(a.conceptId);
-  return { id: a.id, courseId: a.courseId, conceptId: c.id, conceptName: c.name, state: c.state, answer: a.answer, evaluation: a.evaluation };
+  return { id: a.id, courseId: a.courseId, conceptId: c.id, conceptName: c.name, question: AUTHORED[c.id]?.question ?? "", state: c.state, answer: a.answer, attachment: a.imageName ?? null, evaluation: a.evaluation };
 }
 
 export function clarify(attemptId: string) {
@@ -278,7 +282,7 @@ export function clarify(attemptId: string) {
 // ---- remediate / transfer ----
 
 export type RemediationView = {
-  attemptId: string; courseId: string; conceptName: string; state: MasteryState;
+  attemptId: string; courseId: string; conceptId: string; conceptName: string; state: MasteryState;
   lesson: { title: string; said: string; actuallyTrue: string; explanation: string; rule: string | null; aiWording: boolean; figure: "ci-intervals" | null };
   transfer: { question: string; hint: string };
 };
@@ -288,7 +292,7 @@ export function getRemediation(attemptId: string): RemediationView {
   const au = AUTHORED[c.id];
   if (!au || a.evaluation?.verdict !== "incorrect") throw new NotFoundError(`nothing to remediate for ${attemptId}`);
   return {
-    attemptId, courseId: a.courseId, conceptName: c.name, state: c.state,
+    attemptId, courseId: a.courseId, conceptId: c.id, conceptName: c.name, state: c.state,
     lesson: { title: au.lesson.title, said: a.evaluation.evidenceQuote ?? a.answer, actuallyTrue: au.lesson.actuallyTrue, explanation: au.lesson.explanation, rule: au.lesson.rule, aiWording: false, figure: au.lesson.figure },
     transfer: { question: au.transfer.question, hint: au.transfer.hint },
   };
@@ -372,8 +376,10 @@ export function getResult(attemptId: string): ResultView {
 
 export type ReviewBase = {
   headline: string;
+  attemptCount: number;
   concepts: { name: string; mastery: number; status: "mastered" | "reteaching" | "transfer-pending" }[];
   riskConcept: string | null;
+  riskName: string | null;
   nextHref: string | null;
   /** What the model is asked to improve on, and what the UI shows when no model runs. */
   fallback: ReviewText;
@@ -398,9 +404,11 @@ export function getReviewBase(courseId: string): ReviewBase {
     return { concept: c.name, misconception: last?.evaluation?.misconceptionName ?? (c.state === "needs_work" ? AUTHORED[c.id]?.misconception.name ?? null : null), quote: last?.evaluation?.evidenceQuote ?? null };
   });
   return {
+    attemptCount: course.concepts.reduce((n, c) => n + c.evidence.answers, 0),
     headline: `${count("mastered")} mastered, ${count("transfer-pending")} awaiting a transfer test, ${count("reteaching")} to reteach`,
     concepts,
     riskConcept: d.risk?.concept ?? null,
+    riskName: course.concepts.find((c) => c.state === "needs_work")?.name ?? null,
     nextHref: next ? practiceHref(next) : null,
     facts,
     fallback: {
@@ -409,5 +417,60 @@ export function getReviewBase(courseId: string): ReviewBase {
       recommendation: d.recommendation,
       nextActions: d.nextActions.map((a) => a.label),
     },
+  };
+}
+
+// ---- review queue, history, misconception log, files ----
+
+export type ReviewItem = { id: string; name: string; courseName: string; when: string; due: boolean; href: string | null };
+export function getReviews(): { due: ReviewItem[]; upcoming: ReviewItem[] } {
+  const { course } = db();
+  const today = isoDay(new Date());
+  const items = course.concepts.filter((c) => c.nextReview && (c.state === "provisional" || c.state === "mastered")).map((c) => ({
+    id: c.id, name: c.name, courseName: course.name, due: c.nextReview! <= today, href: testable(c) ? practiceHref(c) : null,
+    when: c.nextReview! <= today ? "Due now" : shortDate(new Date(`${c.nextReview}T00:00:00`)),
+  }));
+  return { due: items.filter((i) => i.due), upcoming: items.filter((i) => !i.due) };
+}
+
+export type HistoryEvent = { id: string; at: number; title: string; detail: string; tone: "good" | "warn" | "bad"; href: string };
+export function getHistory(): HistoryEvent[] {
+  const { attempts } = db();
+  return [...attempts].reverse().map((a) => {
+    const c = concept(a.conceptId);
+    const base = `/course/${a.courseId}`;
+    if (a.kind === "transfer") return { id: a.id, at: a.createdAt, title: `Passed the new question on ${c.name}`, detail: "Now provisionally mastered", tone: "good" as const, href: `${base}/result/${a.id}` };
+    const v = a.evaluation?.verdict;
+    if (v === "incorrect") return { id: a.id, at: a.createdAt, title: `Answered ${c.name}`, detail: `Caught: ${a.evaluation?.misconceptionName}`, tone: "bad" as const, href: `${base}/diagnosis/${a.id}` };
+    if (v === "correct") return { id: a.id, at: a.createdAt, title: `Answered ${c.name}`, detail: "No misconception found", tone: "good" as const, href: `${base}/diagnosis/${a.id}` };
+    return { id: a.id, at: a.createdAt, title: `Answered ${c.name}`, detail: "Needed one more answer", tone: "warn" as const, href: `${base}/practice/${c.id}` };
+  });
+}
+
+export type MisconceptionEntry = { key: string; name: string; concept: string; quote: string | null; open: boolean; note: string; href: string };
+export function getMisconceptionLog(courseId: string): MisconceptionEntry[] {
+  assertCourse(courseId);
+  const { course, attempts } = db();
+  return course.concepts.flatMap((c) => {
+    const au = AUTHORED[c.id];
+    if (!au) return [];
+    const last = [...attempts].reverse().find((a) => a.conceptId === c.id && a.evaluation?.verdict === "incorrect");
+    const open = c.state === "needs_work";
+    if (!last && !open) return [];
+    const repaired = c.evidence.transferPassed && !open;
+    return [{
+      key: c.id, name: au.misconception.name, concept: c.name, quote: last?.evaluation?.evidenceQuote ?? null, open: !repaired,
+      note: repaired ? "Fixed with a lesson and a new question" : last ? "Open until you pass a new question" : "From your earlier attempts",
+      href: last && !repaired ? `/course/${courseId}/lesson/${last.id}` : practiceHref(c),
+    }];
+  });
+}
+
+export type CourseFile = { name: string; kind: string; detail: string };
+export function getFiles(courseId: string): { courseName: string; files: CourseFile[] } {
+  assertCourse(courseId);
+  return {
+    courseName: db().course.name,
+    files: [{ name: "OpenStax Introductory Statistics 2e", kind: "Textbook, CC BY 4.0", detail: `Source for all ${db().course.concepts.length} concepts and the misconceptions they carry.` }],
   };
 }

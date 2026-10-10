@@ -1,4 +1,5 @@
 import { notFound, redirect } from "next/navigation";
+import { Paperclip } from "lucide-react";
 import { AppShell } from "@proveit/app/_components/shell/AppShell";
 import { Log } from "@proveit/app/_components/shell/Log";
 import { AssistantMessage } from "@proveit/app/_components/chat/AssistantMessage";
@@ -15,9 +16,14 @@ export default async function DiagnosisPage({ params }: PageProps<"/course/[cour
   if (a.courseId !== courseId) notFound();
   if (a.evaluation.verdict === "uncertain") redirect(`/course/${courseId}/practice/${a.conceptId}`);
   return (
-    <AppShell active="practice" courseId={courseId} state={a.state} crumbs={[{ label: courseName, href: `/course/${courseId}` }, { label: a.conceptName }]}>
+    <AppShell active="practice" courseId={courseId} state={a.state} crumbs={[{ label: courseName, href: `/course/${courseId}` }, { label: a.conceptName }]} right={a.question}>
       <Log>
-        <UserBubble>{a.answer}</UserBubble>
+        <div className="flex max-w-[72%] flex-col items-end gap-1.5 self-end">
+          <UserBubble className="max-w-none">{a.answer}</UserBubble>
+          {a.attachment && (
+            <span className="flex items-center gap-1.5 rounded-full border border-mastered-line bg-mastered-bg px-2.5 py-0.5 text-[11px] text-mastered-text"><Paperclip size={11} strokeWidth={2.2} aria-hidden />{a.attachment} · read as your work</span>
+          )}
+        </div>
         <AssistantMessage><DiagnosisCard a={a} /></AssistantMessage>
       </Log>
     </AppShell>

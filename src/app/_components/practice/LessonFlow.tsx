@@ -11,11 +11,13 @@ import { MicroLessonCard } from "./MicroLessonCard";
 import { TransferQuestionCard } from "./TransferQuestionCard";
 import { api } from "@proveit/lib/api";
 import { useSettings } from "@proveit/lib/settings";
+import { useVoiceSupport } from "../voice/speech";
 import type { RemediationView } from "@proveit/server/store";
 
 export function LessonFlow({ r }: { r: RemediationView }) {
   const router = useRouter();
   const [settings] = useSettings();
+  const canTalk = useVoiceSupport();
   const [step, setStep] = useState<"learn" | "try">("learn");
   const [lessonOpen, setLessonOpen] = useState(false);
   const [hint, setHint] = useState(false);
@@ -48,7 +50,7 @@ export function LessonFlow({ r }: { r: RemediationView }) {
         <AssistantMessage>
           <MicroLessonCard
             lesson={r.lesson} conceptName={r.conceptName} open={learn || lessonOpen} toggleable={!learn}
-            onToggle={() => setLessonOpen((o) => !o)} onGotIt={learn ? () => setStep("try") : undefined}
+            onToggle={() => setLessonOpen((o) => !o)} onGotIt={learn ? () => setStep("try") : undefined} talkHref={canTalk ? `/course/${r.courseId}/practice/${r.conceptId}?mode=speak` : undefined}
           />
         </AssistantMessage>
         {!learn && (
