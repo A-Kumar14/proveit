@@ -70,6 +70,13 @@ describe("studyNotes", () => {
   });
 });
 
+describe("esc quotes", () => {
+  it("opens and closes straight quotes the way LaTeX expects", () => {
+    expect(esc('Say "ma" and \'hao\' now')).toBe("Say ``ma'' and `hao' now");
+    expect(esc('"Start" (the "end")')).toBe("``Start'' (the ``end'')");
+  });
+});
+
 describe("esc", () => {
   it("neutralises LaTeX control characters", () => {
     expect(esc("\\input{/etc/passwd} 50% & $x_1$ #a ~ ^")).toBe("\\textbackslash{}input\\{/etc/passwd\\} 50\\% \\& \\$x\\_1\\$ \\#a \\textasciitilde{} \\textasciicircum{}");

@@ -1,4 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+
+const { settings } = vi.hoisted(() => ({ settings: [] as Record<string, unknown>[] }));
+vi.mock("@openrouter/ai-sdk-provider", async (orig) => {
+  const m = await orig<typeof import("@openrouter/ai-sdk-provider")>();
+  return { ...m, createOpenRouter: (s: Record<string, unknown>) => { settings.push(s); return m.createOpenRouter(s); } };
+});
 import { aiEnabled, aiProvider, model } from "./ai";
 
 afterEach(() => vi.unstubAllEnvs());
@@ -28,5 +34,17 @@ describe("ai provider choice", () => {
     env("", "");
     expect(aiProvider()).toBeNull();
     expect(aiEnabled()).toBe(false);
+  });
+});
+
+describe("fast model", () => {
+  it("asks OpenRouter for low reasoning effort only when told to", () => {
+    vi.stubEnv("OPENROUTER_API_KEY", "sk-or-x");
+    vi.stubEnv("GOOGLE_GENERATIVE_AI_API_KEY", "");
+    settings.length = 0;
+    model();
+    model({ fast: true });
+    expect(settings[0]).not.toHaveProperty("extraBody");
+    expect(settings[1]).toMatchObject({ extraBody: { reasoning: { effort: "low" } } });
   });
 });

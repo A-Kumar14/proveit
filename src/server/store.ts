@@ -3,6 +3,7 @@ import { cardStatus, type AssessInput, type AssessResult, type AttemptKind, type
 import { toneForPct, type Tone } from "@proveit/lib/mastery";
 import { AUTHORED } from "./content";
 import { judgeAnswer, judgeReview, judgeTransfer, type AnswerContext } from "./evaluator";
+import { followUpFor } from "./followup";
 import { loadJson, saveJson } from "./persistence";
 import type { CourseSpec } from "@proveit/lib/courseSpec";
 import type { CalEvent } from "./calendar";
@@ -478,6 +479,9 @@ export async function assess(input: AssessInput): Promise<AssessResult> {
   const previousState = c.state;
   const judged = input.imageSummary ? `${input.answer}\n\n[Student's attached work, transcribed] ${input.imageSummary}` : input.answer;
   const j = await judgeAnswer(c.id, judged, parent ? answerContext(parent) : undefined);
+  // Written before the recheck below, so nothing awaits between the recheck and recording the attempt.
+  const diagnosedEarly = j.misconceptionId ? a.misconceptions.some((m) => m.id === j.misconceptionId) : false;
+  const nextQuestion = j.verdict === "uncertain" || (j.verdict === "incorrect" && !diagnosedEarly) ? await followUpFor(c.id, input.answer) : null;
   // Recheck after the async evaluator so two simultaneous follow-ups cannot both mutate the episode.
   if (parent && (!rootIsCurrentForConcept(parent.conceptId, parent.rootAttemptId) || latestEvaluatedInRoot(parent.rootAttemptId)?.id !== parent.id)) {
     throw new InvalidAttemptLinkError("follow-up parent became stale");
@@ -489,7 +493,7 @@ export async function assess(input: AssessInput): Promise<AssessResult> {
   const diagnosed = j.misconceptionId ? a.misconceptions.find((m) => m.id === j.misconceptionId) ?? null : null;
   let evaluation: Evaluation;
   if (j.verdict === "uncertain" || (j.verdict === "incorrect" && !diagnosed)) {
-    evaluation = { ...base, verdict: "uncertain", errorType: "uncertain", followUp: "Add one more sentence. Say what the idea applies to, and why.", recommendation: "One more answer would make the diagnosis reliable." };
+    evaluation = { ...base, verdict: "uncertain", errorType: "uncertain", followUp: nextQuestion, recommendation: "One more answer would make the diagnosis reliable." };
   } else if (j.verdict === "incorrect") {
     upsertSkill(c, a.skillOnWrong);
     c.state = "needs_work";

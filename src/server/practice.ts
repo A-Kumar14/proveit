@@ -70,13 +70,13 @@ async function buildPaper(courseId: string): Promise<Paper> {
   const w = getWeakness(courseId);
   if (!aiEnabled()) return offlinePaper(w);
   const { output } = await generateText({
-    model: model(),
+    model: model({ fast: true }),
     system: `You write a sample exam paper and its answer key for one course.
 - Exactly ${QUESTIONS} open-ended questions, ${MARKS} marks each, at least 6 of them on concepts marked weak. Cover each weak concept before repeating one.
 - For a weak concept with listed mistakes, write at least one question that a student with that mistake would get wrong.
 - "key" has one entry per question in the same order. "answer" is the correct answer. "marking" says what earns the marks.
 - Use only the course material given, including courseNotes. No outside facts. Plain text, no LaTeX, no markdown.
-- Write any non-Latin script in Latin letters, such as pinyin for Chinese, because the PDF font can't show other scripts.`,
+- Never write Chinese characters, because the PDF font can't show them. Write Mandarin in pinyin with tone marks, such as nǐ hǎo.`,
     output: Output.object({ schema: PaperOut }),
     prompt: JSON.stringify({ course: w.courseName, courseNotes: courseMaterial(courseId, 20_000), concepts: w.concepts.map((c) => ({ name: c.name, about: c.desc, weak: c.weak, courseMaterial: c.material, mistakes: c.mistakes.map((m) => ({ name: m.name, whatIsWrong: m.gap })) })) }),
   });
@@ -97,11 +97,11 @@ async function buildNotes(courseId: string): Promise<Notes> {
   let sections = offline();
   if (aiEnabled()) {
     const { output } = await generateText({
-      model: model(),
+      model: model({ fast: true }),
       system: `You write study notes for one course, one section per concept, in the order given.
 - "summary" is two or three plain sentences. "points" has up to 5 short facts or steps.
 - Use only the course material given, including courseNotes. Where none is given, stay within the description. No outside facts, no LaTeX, no markdown.
-- Write any non-Latin script in Latin letters, such as pinyin for Chinese, because the PDF font can't show other scripts.`,
+- Never write Chinese characters, because the PDF font can't show them. Write Mandarin in pinyin with tone marks, such as nǐ hǎo.`,
       output: Output.object({ schema: SectionsOut }),
       prompt: JSON.stringify({ course: w.courseName, courseNotes: courseMaterial(courseId, 20_000), concepts: ordered.map((c) => ({ name: c.name, about: c.desc, courseMaterial: c.material })) }),
     });
