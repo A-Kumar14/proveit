@@ -110,6 +110,11 @@ describe("evidence lineage", () => {
 });
 
 describe("correct-answer transfer path", () => {
+  it("does not mistake an explicit rejection of the CI misconception for the misconception itself", async () => {
+    const r = await run("It does not mean there is a 95% probability that the true mean is inside this interval; 95% describes the long-run method.");
+    expect(r.evaluation).toMatchObject({ verdict: "correct", misconceptionId: null });
+  });
+
   it("requires a different question before a correct first answer becomes provisional", async () => {
     const first = await run("Over repeated samples, about 95% of intervals made by the method contain the true mean.");
     expect(first.evaluation.verdict).toBe("correct");
@@ -159,6 +164,14 @@ describe("correct-answer transfer path", () => {
 });
 
 describe("repair and transfer", () => {
+  it("fails a transfer answer that mixes correct long-run language with the original CI misconception", async () => {
+    const first = await run("Over repeated samples, about 95% of intervals made by the method contain the true mean.");
+    const fail = await submitTransfer(first.attemptId, "About 95 of 100 intervals contain it because of the long-run method, and each finished interval still has a 95% probability of containing the mean.");
+    expect(fail.result).toBe("fail");
+    if (fail.result !== "fail") throw new Error("expected fail");
+    expect(fail.nextAttemptId).not.toBeNull();
+  });
+
   it("runs the full loop: wrong, lesson, transfer pass, provisional", async () => {
     const { attemptId } = await run(WRONG);
     expect(getRemediation(attemptId).lesson.said).toContain("95% probability");
@@ -225,6 +238,14 @@ describe("standard-error transfer semantics", () => {
     courseId: "intro-stats", conceptId: "se",
     answer: "Researcher B with 400 students has the smaller standard error because standard error decreases as sample size gets larger.",
   });
+  it("does not mistake a rejected bigger-sample/bigger-error claim for the misconception", async () => {
+    const r = await assess({
+      courseId: "intro-stats", conceptId: "se",
+      answer: "A bigger sample does not mean a bigger standard error; Researcher B has the smaller standard error because it decreases as n grows.",
+    });
+    expect(r.evaluation).toMatchObject({ verdict: "correct", misconceptionId: null });
+  });
+
 
   it("passes only when the factor and square-root reasoning are both present", async () => {
     const first = await start();
