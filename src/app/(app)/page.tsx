@@ -31,6 +31,8 @@ export default async function Dashboard({ searchParams }: PageProps<"/">) {
     >
       <div className="min-h-0 flex-1 overflow-y-auto px-7 py-6">
         <div className="flex flex-col gap-8">
+          <RankCard r={rewards} previewable={process.env.NEXT_PUBLIC_DEMO_MODE === "1"} />
+
           <section aria-labelledby="courses-heading" className="flex flex-col gap-3">
             <div className="flex items-baseline justify-between">
               <h1 id="courses-heading" className="m-0 text-[22px] font-semibold">Courses</h1>
@@ -45,7 +47,6 @@ export default async function Dashboard({ searchParams }: PageProps<"/">) {
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <RankCard r={rewards} previewable={process.env.NEXT_PUBLIC_DEMO_MODE === "1"} />
             <MasteryOverview d={widgets} />
             <StudyWeek d={widgets} />
             <RecentActivity d={widgets} />

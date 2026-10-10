@@ -10,7 +10,7 @@ import { Widget } from "./Widget";
 export function RankCard({ r, previewable }: { r: Rewards; previewable: boolean }) {
   const fmt = (n: number) => n.toLocaleString("en-US");
   return (
-    <div id="rank" className="col-span-2 scroll-mt-4">
+    <div id="rank" className="scroll-mt-4">
       <Widget title="Rank" action={{ label: "All courses", href: "/courses" }}>
         <div className="flex flex-col gap-5">
           <div className="flex items-center gap-4">
