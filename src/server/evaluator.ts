@@ -35,13 +35,13 @@ const Check = z.object({
 });
 type Check = z.infer<typeof Check>;
 
-const TransferCheck = z.object({
+const ChallengeCheck = z.object({
   verdict: z.enum(["pass", "fail", "uncertain"]),
   misconceptionId: z.string().nullable(),
   evidenceQuote: z.string().nullable(),
   feedback: z.string().max(240).nullable(),
 });
-type TransferCheck = z.infer<typeof TransferCheck>;
+type ChallengeCheck = z.infer<typeof ChallengeCheck>;
 
 const SYSTEM = `You grade a student's explanation against course material.
 Rules:
@@ -52,7 +52,7 @@ Rules:
 - Earlier responses are context, not permanent truth. If the current clarification explicitly corrects an earlier statement, the later clarification supersedes it.
 - Calculation slips, wording quibbles and missing detail are not misconceptions.`;
 
-const TRANSFER_SYSTEM = `You grade a transfer question against its rubric.
+const CHALLENGE_SYSTEM = `You grade a retrieval or transfer challenge against its rubric.
 Rules:
 - "pass" only when every required part of the rubric is demonstrated.
 - "fail" only when the current answer clearly contradicts the rubric or clearly states a listed misconception.
@@ -125,11 +125,13 @@ export async function judgeAnswer(conceptId: string, answer: string, context?: A
   return { verdict: j.verdict, quote: j.quote, misconceptionId: j.misconceptionId, votes: null };
 }
 
-async function voteTransfer(conceptId: string, answer: string): Promise<TransferJudgement> {
+async function voteChallenge(conceptId: string, answer: string, kind: "transfer" | "review"): Promise<TransferJudgement> {
   const a = AUTHORED[conceptId];
   if (!a) throw new Error(`no authored content for ${conceptId}`);
-  const prompt = `Transfer question: ${a.transfer.question}
-Rubric: ${a.transfer.rubric}
+  const challenge = a[kind];
+  const label = kind === "review" ? "Delayed review" : "Transfer";
+  const prompt = `${label} question: ${challenge.question}
+Rubric: ${challenge.rubric}
 Known misconceptions: ${JSON.stringify(a.misconceptions.map((m) => ({ id: m.id, name: m.name, description: m.gap })))}
 
 CURRENT student answer:
@@ -137,7 +139,7 @@ CURRENT student answer:
 ${answer}
 """`;
   const checks = await Promise.all(
-    Array.from({ length: CHECKS }, () => generateText({ model: model(), system: TRANSFER_SYSTEM, prompt, output: Output.object({ schema: TransferCheck }), temperature: TEMPERATURE }).then((r) => r.output)),
+    Array.from({ length: CHECKS }, () => generateText({ model: model(), system: CHALLENGE_SYSTEM, prompt, output: Output.object({ schema: ChallengeCheck }), temperature: TEMPERATURE }).then((r) => r.output)),
   );
   const winner = majority(checks, ["fail", "pass", "uncertain"] as const);
   const maxVotes = Math.max(...(["fail", "pass", "uncertain"] as const).map((v) => count(checks, v)));
@@ -156,6 +158,13 @@ ${answer}
 export async function judgeTransfer(conceptId: string, answer: string): Promise<TransferJudgement> {
   const a = AUTHORED[conceptId];
   if (!a) throw new Error(`no authored content for ${conceptId}`);
-  if (aiEnabled()) return voteTransfer(conceptId, answer);
+  if (aiEnabled()) return voteChallenge(conceptId, answer, "transfer");
   return { ...a.transfer.judge(answer), votes: null };
+}
+
+export async function judgeReview(conceptId: string, answer: string): Promise<TransferJudgement> {
+  const a = AUTHORED[conceptId];
+  if (!a) throw new Error(`no authored content for ${conceptId}`);
+  if (aiEnabled()) return voteChallenge(conceptId, answer, "review");
+  return { ...a.review.judge(answer), votes: null };
 }

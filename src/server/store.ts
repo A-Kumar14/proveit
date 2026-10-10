@@ -1,9 +1,9 @@
 import "server-only";
-import { cardStatus, type AssessInput, type AssessResult, type AttemptKind, type AttemptOutcome, type Evaluation, type MasteryState, type ReviewText, type TransferResult } from "@proveit/lib/schemas";
+import { cardStatus, type AssessInput, type AssessResult, type AttemptKind, type AttemptOutcome, type Evaluation, type MasteryState, type ReviewSubmitResult, type ReviewText, type TransferResult } from "@proveit/lib/schemas";
 import { toneForPct, type Tone } from "@proveit/lib/mastery";
 import { AUTHORED } from "./content";
 import { demoData } from "./mode";
-import { judgeAnswer, judgeTransfer, type AnswerContext } from "./evaluator";
+import { judgeAnswer, judgeReview, judgeTransfer, type AnswerContext } from "./evaluator";
 import type { CalEvent } from "./calendar";
 import { POINTS, STREAK_CAP, standing, TIERS, type Standing } from "@proveit/lib/rewards";
 
@@ -121,6 +121,7 @@ const db = (): Db => (g.__proveit ??= seed());
 
 export class NotFoundError extends Error {}
 export class InvalidAttemptLinkError extends Error {}
+export class ReviewNotDueError extends Error {}
 
 const isoDay = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 const addDays = (d: Date, n: number) => new Date(d.getFullYear(), d.getMonth(), d.getDate() + n);
@@ -160,7 +161,7 @@ function clarificationPromptFor(a: Attempt): string {
 
 function answerContext(parent: Attempt): AnswerContext {
   const previous = db().attempts
-    .filter((a) => a.rootAttemptId === parent.rootAttemptId && a.createdAt <= parent.createdAt && a.evaluation && a.kind !== "review")
+    .filter((a) => a.rootAttemptId === parent.rootAttemptId && a.createdAt <= parent.createdAt && a.evaluation)
     .sort((a, b) => a.createdAt - b.createdAt)
     .map((a) => ({ answer: a.answer, verdict: a.evaluation!.verdict, misconceptionId: a.evaluation!.misconceptionId }));
   return { previous, followUpPrompt: clarificationPromptFor(parent) };
@@ -185,6 +186,25 @@ const transferMissesFor = (rootAttemptId: string, beforeOrAt = Number.POSITIVE_I
 
 const rootHasPassedTransfer = (rootAttemptId: string) =>
   db().attempts.some((a) => a.rootAttemptId === rootAttemptId && a.kind === "transfer" && a.outcome === "pass");
+
+/** Successful-review streak after the latest transfer proof. A new transfer after relearning resets spacing. */
+const reviewPassesSinceLatestTransfer = (conceptId: string) => {
+  const attempts = db().attempts;
+  let latestTransfer = -1;
+  for (let i = attempts.length - 1; i >= 0; i--) {
+    const a = attempts[i]!;
+    if (a.conceptId === conceptId && a.kind === "transfer" && a.outcome === "pass") {
+      latestTransfer = i;
+      break;
+    }
+  }
+  return attempts.slice(latestTransfer + 1).filter((a) => a.conceptId === conceptId && a.kind === "review" && a.outcome === "pass").length;
+};
+
+const reviewGapDays = (conceptId: string) => {
+  const passed = reviewPassesSinceLatestTransfer(conceptId);
+  return passed === 0 ? 7 : passed === 1 ? 14 : 30;
+};
 
 function descendsFrom(candidate: Attempt, ancestorId: string): boolean {
   let current: Attempt | null = candidate;
@@ -684,14 +704,121 @@ export function getReviewBase(courseId: string): ReviewBase {
 // ---- review queue, history, misconception log, files ----
 
 export type ReviewItem = { id: string; name: string; courseName: string; when: string; /** ISO day the review lands. */ day: string; due: boolean; href: string | null };
-export function getReviews(): { due: ReviewItem[]; upcoming: ReviewItem[] } {
+export function getReviews(now = new Date()): { due: ReviewItem[]; upcoming: ReviewItem[] } {
   const { course } = db();
-  const today = isoDay(new Date());
-  const items = course.concepts.filter((c) => c.nextReview && (c.state === "provisional" || c.state === "mastered")).map((c) => ({
-    id: c.id, name: c.name, courseName: course.name, day: c.nextReview!, due: c.nextReview! <= today, href: testable(c) ? practiceHref(c) : null,
-    when: c.nextReview! <= today ? "Due now" : shortDate(new Date(`${c.nextReview}T00:00:00`)),
-  }));
+  const today = isoDay(now);
+  const items = course.concepts.filter((c) => c.nextReview && (c.state === "provisional" || c.state === "mastered")).map((c) => {
+    const due = c.nextReview! <= today;
+    return {
+      id: c.id, name: c.name, courseName: course.name, day: c.nextReview!, due,
+      href: due && testable(c) ? `/course/${course.id}/review/${c.id}` : null,
+      when: due ? "Due now" : shortDate(new Date(`${c.nextReview}T00:00:00`)),
+    };
+  });
   return { due: items.filter((i) => i.due), upcoming: items.filter((i) => !i.due) };
+}
+
+export type ReviewChallengeView = {
+  courseId: string; conceptId: string; conceptName: string; state: MasteryState; dueDay: string;
+  review: { question: string; hint: string };
+};
+
+const reviewIsDue = (c: Concept, now: Date) =>
+  !!c.nextReview && (c.state === "provisional" || c.state === "mastered") && c.nextReview <= isoDay(now);
+
+export function getReviewChallenge(courseId: string, conceptId: string, now = new Date()): ReviewChallengeView {
+  assertCourse(courseId);
+  const c = concept(conceptId);
+  const au = AUTHORED[c.id];
+  if (!au || !reviewIsDue(c, now)) throw new NotFoundError(`no due review for ${conceptId}`);
+  return {
+    courseId, conceptId: c.id, conceptName: c.name, state: c.state, dueDay: c.nextReview!,
+    review: { question: au.review.question, hint: au.review.hint },
+  };
+}
+
+export async function submitReview(courseId: string, conceptId: string, answer: string, now = new Date()): Promise<ReviewSubmitResult> {
+  assertCourse(courseId);
+  const c = concept(conceptId);
+  const au = AUTHORED[c.id];
+  if (!au) throw new NotFoundError(`no review content for ${conceptId}`);
+  if (!reviewIsDue(c, now)) throw new ReviewNotDueError("That review isn't due yet.");
+  const previousState = c.state;
+  const expectedDay = c.nextReview;
+  const expectedLatestAttempt = latestAttemptForConcept(c.id)?.id ?? null;
+  const judged = await judgeReview(c.id, answer);
+  if (c.state !== previousState || c.nextReview !== expectedDay || (latestAttemptForConcept(c.id)?.id ?? null) !== expectedLatestAttempt) {
+    throw new InvalidAttemptLinkError("review state changed while evaluating");
+  }
+
+  c.evidence.answers++;
+  if (judged.verdict === "pass") {
+    c.evidence.sound++;
+    c.evidence.transferPassed = true;
+    upsertSkill(c, au.skillOnRight);
+    upsertSkill(c, { label: "Retention", pct: 90 });
+    c.state = "mastered";
+    c.nextReview = isoDay(addDays(now, reviewGapDays(c.id)));
+    db().provenDays.add(isoDay(now));
+    const rec = recordAttempt({
+      courseId, conceptId: c.id, kind: "review", outcome: "pass", answer, evaluation: null,
+      previousState, createdAt: now.getTime(),
+    });
+    return { result: "pass", resultAttemptId: rec.id };
+  }
+
+  const diagnosed = misconceptionFor(c.id, judged.misconceptionId);
+  if (judged.verdict === "fail" && diagnosed) {
+    upsertSkill(c, au.skillOnWrong);
+    upsertSkill(c, { label: "Retention", pct: 25 });
+    c.state = "needs_work";
+    c.evidence.transferPassed = false;
+    c.nextReview = null;
+    const evaluation: Evaluation = {
+      verdict: "incorrect", errorType: "conceptual", misconceptionId: diagnosed.id, misconceptionName: diagnosed.name,
+      evidenceQuote: judged.quote && answer.includes(judged.quote) ? judged.quote : null, gapSentence: diagnosed.gap,
+      skills: c.skills ?? [], votes: judged.votes, followUp: null,
+      recommendation: "The delayed check exposed the gap again. Repair it, then prove it on a fresh transfer question.",
+    };
+    const rec = recordAttempt({
+      courseId, conceptId: c.id, kind: "review", outcome: "fail", answer, evaluation,
+      previousState, createdAt: now.getTime(),
+    });
+    return { result: "fail", failedAttemptId: rec.id, nextAttemptId: rec.id };
+  }
+
+  const followUp = judged.feedback ?? "Give one more precise answer that addresses every part of the review.";
+  const evaluation: Evaluation = {
+    verdict: "uncertain", errorType: "uncertain", misconceptionId: null, misconceptionName: null,
+    evidenceQuote: null, gapSentence: null, skills: c.skills ?? [], votes: judged.votes, followUp,
+    recommendation: "There is not enough evidence to change mastery yet.",
+  };
+  const rec = recordAttempt({
+    courseId, conceptId: c.id, kind: "review", outcome: "uncertain", answer, evaluation,
+    previousState, createdAt: now.getTime(),
+  });
+  return { result: "uncertain", attemptId: rec.id, followUp };
+}
+
+export type ReviewResultView = {
+  courseId: string; courseName: string; conceptName: string; previous: MasteryState; next: "mastered";
+  nextReview: string; pointsEarned: number; coursePct: number; provenLabel: string;
+};
+
+export function getReviewResult(attemptId: string): ReviewResultView {
+  const a = attempt(attemptId);
+  if (a.kind !== "review" || a.outcome !== "pass") throw new NotFoundError(`no review result for ${attemptId}`);
+  const c = concept(a.conceptId);
+  const { course } = db();
+  const proven = course.concepts.filter((x) => x.state === "mastered").length;
+  const provisional = course.concepts.filter((x) => x.state === "provisional").length;
+  return {
+    courseId: a.courseId, courseName: course.name, conceptName: c.name, previous: a.previousState, next: "mastered",
+    nextReview: c.nextReview ? shortDate(new Date(`${c.nextReview}T00:00:00`)) : "Not scheduled",
+    pointsEarned: a.previousState === "provisional" ? POINTS.mastered - POINTS.proved : 0,
+    coursePct: coursePct(course.concepts),
+    provenLabel: `${proven} mastered${provisional ? ` + ${provisional} provisional` : ""}`,
+  };
 }
 
 export type HistoryEvent = { id: string; at: number; title: string; detail: string; tone: "good" | "warn" | "bad"; href: string };
@@ -700,6 +827,9 @@ export function getHistory(): HistoryEvent[] {
   return [...attempts].reverse().map((a) => {
     const c = concept(a.conceptId);
     const base = `/course/${a.courseId}`;
+    if (a.kind === "review" && a.outcome === "pass") return { id: a.id, at: a.createdAt, title: `Passed delayed review on ${c.name}`, detail: "Mastered with delayed retrieval", tone: "good" as const, href: `${base}/review-result/${a.id}` };
+    if (a.kind === "review" && a.outcome === "fail" && a.evaluation?.verdict === "incorrect") return { id: a.id, at: a.createdAt, title: `Review exposed a gap in ${c.name}`, detail: `Caught: ${a.evaluation.misconceptionName}`, tone: "bad" as const, href: `${base}/diagnosis/${a.id}` };
+    if (a.kind === "review" && a.outcome === "uncertain") return { id: a.id, at: a.createdAt, title: `Reviewed ${c.name}`, detail: "Needs more evidence", tone: "warn" as const, href: "/review" };
     if (a.kind === "transfer" && a.outcome === "pass") return { id: a.id, at: a.createdAt, title: `Passed the new question on ${c.name}`, detail: "Now provisionally mastered", tone: "good" as const, href: `${base}/result/${a.id}` };
     if (a.kind === "transfer" && a.outcome === "fail" && a.evaluation?.verdict === "incorrect") return { id: a.id, at: a.createdAt, title: `Missed the new question on ${c.name}`, detail: `Caught: ${a.evaluation.misconceptionName}`, tone: "bad" as const, href: `${base}/diagnosis/${a.id}` };
     if (a.kind === "transfer" && a.outcome === "fail") {

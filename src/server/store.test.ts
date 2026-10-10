@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { getRewards, listCourses, setCoursesCompleted, setTaskDone } from "./store";
-import { assess, clarify, getAttempt, getEvidenceAttempt, getCourse, getDashboard, getQuestion, getRemediation, getFiles, getHistory, getMisconceptionLog, getResult, getReviewBase, getReviews, getSidebar, getTransferChallenge, InvalidAttemptLinkError, NotFoundError, submitTransfer } from "./store";
+import { assess, clarify, getAttempt, getEvidenceAttempt, getCourse, getDashboard, getQuestion, getRemediation, getFiles, getHistory, getMisconceptionLog, getResult, getReviewBase, getReviewChallenge, getReviewResult, getReviews, getSidebar, getTransferChallenge, InvalidAttemptLinkError, NotFoundError, ReviewNotDueError, submitReview, submitTransfer } from "./store";
 
 const WRONG = "It means there's a 95% probability that the true population mean is inside our interval.";
 const RIGHT_TRANSFER = "About 95 of them. But for any one interval that's already calculated, there's no 95% chance. It either contains the mean or it doesn't.";
@@ -331,6 +331,200 @@ describe("dashboard", () => {
     expect(d.courses[0]?.openMisconception).toBe("Parameter probability trap");
     expect(d.counts.due).toBe(0);
   });
+});
+
+
+describe("delayed review and retained mastery", () => {
+  const reviewNow = new Date(2026, 9, 10, 12, 0);
+  const reviewPass = "The report is invalid. A finished interval does not have a 95% probability; 95% describes the long-run repeated-sampling method.";
+
+  async function provisionalDue() {
+    const first = await run("Over repeated samples, about 95% of intervals made by the method contain the true mean.");
+    const transfer = await submitTransfer(first.attemptId, RIGHT_TRANSFER);
+    if (transfer.result !== "pass") throw new Error("expected transfer pass");
+    const db = (globalThis as unknown as { __proveit: { course: { concepts: { id: string; nextReview: string | null }[] } } }).__proveit;
+    db.course.concepts.find((c) => c.id === "cii")!.nextReview = "2026-10-10";
+    return transfer.resultAttemptId;
+  }
+
+  it("does not allow the delayed check before its scheduled day", async () => {
+    const first = await run("Over repeated samples, about 95% of intervals made by the method contain the true mean.");
+    const transfer = await submitTransfer(first.attemptId, RIGHT_TRANSFER);
+    if (transfer.result !== "pass") throw new Error("expected transfer pass");
+    const beforeDue = new Date(2026, 9, 10, 12, 0);
+    const concept = (globalThis as unknown as { __proveit: { course: { concepts: { id: string; nextReview: string | null }[] } } }).__proveit.course.concepts.find((c) => c.id === "cii");
+    concept!.nextReview = "2026-10-11";
+    expect(() => getReviewChallenge("intro-stats", "cii", beforeDue)).toThrow(NotFoundError);
+    await expect(submitReview("intro-stats", "cii", reviewPass, beforeDue)).rejects.toThrow(ReviewNotDueError);
+    expect(state("cii")).toBe("provisional");
+  });
+
+  it("promotes provisional to mastered only after a due delayed-retrieval pass", async () => {
+    await provisionalDue();
+    const beforePoints = getRewards().points;
+    const challenge = getReviewChallenge("intro-stats", "cii", reviewNow);
+    expect(challenge.review.question).toContain("A report says");
+    expect(challenge.state).toBe("provisional");
+
+    const result = await submitReview("intro-stats", "cii", reviewPass, reviewNow);
+    expect(result.result).toBe("pass");
+    if (result.result !== "pass") throw new Error("expected review pass");
+    expect(state("cii")).toBe("mastered");
+    expect(getEvidenceAttempt(result.resultAttemptId)).toMatchObject({
+      kind: "review", outcome: "pass", parentAttemptId: null, rootAttemptId: result.resultAttemptId, previousState: "provisional", evaluation: null,
+    });
+    expect(getReviewResult(result.resultAttemptId)).toMatchObject({
+      previous: "provisional", next: "mastered", nextReview: "Oct 17", pointsEarned: 100,
+    });
+    expect(getRewards().points).toBe(beforePoints + 100);
+    expect(getHistory()[0]).toMatchObject({ title: "Passed delayed review on CI interpretation", detail: "Mastered with delayed retrieval", tone: "good" });
+  });
+
+  it("expands the spacing interval after subsequent successful reviews", async () => {
+    await provisionalDue();
+    const first = await submitReview("intro-stats", "cii", reviewPass, reviewNow);
+    if (first.result !== "pass") throw new Error("expected first review pass");
+    const secondDay = new Date(2026, 9, 17, 12, 0);
+    expect(getReviewChallenge("intro-stats", "cii", secondDay).state).toBe("mastered");
+    const second = await submitReview("intro-stats", "cii", reviewPass, secondDay);
+    if (second.result !== "pass") throw new Error("expected second review pass");
+    expect(getReviewResult(second.resultAttemptId)).toMatchObject({ previous: "mastered", next: "mastered", nextReview: "Oct 31", pointsEarned: 0 });
+    expect(state("cii")).toBe("mastered");
+  });
+
+  it("keeps an incomplete review uncertain without demoting mastery or moving the due date", async () => {
+    await provisionalDue();
+    const result = await submitReview("intro-stats", "cii", "I think the report is probably wrong.", reviewNow);
+    expect(result).toMatchObject({ result: "uncertain", followUp: expect.any(String) });
+    if (result.result !== "uncertain") throw new Error("expected uncertain review");
+    expect(state("cii")).toBe("provisional");
+    expect(getEvidenceAttempt(result.attemptId)).toMatchObject({ kind: "review", outcome: "uncertain", evaluation: { verdict: "uncertain" } });
+    expect(getReviews(reviewNow).due).toMatchObject([{ id: "cii", href: "/course/intro-stats/review/cii" }]);
+    expect(getHistory()[0]).toMatchObject({ title: "Reviewed CI interpretation", detail: "Needs more evidence", tone: "warn", href: "/review" });
+  });
+
+  it("demotes a confirmed review misconception, clears the review date, and re-enters remediation", async () => {
+    await provisionalDue();
+    const fail = await submitReview("intro-stats", "cii", "The report is valid because there is a 95% probability the true mean is inside the finished interval.", reviewNow);
+    expect(fail.result).toBe("fail");
+    if (fail.result !== "fail") throw new Error("expected review fail");
+    expect(fail.nextAttemptId).toBe(fail.failedAttemptId);
+    expect(state("cii")).toBe("needs_work");
+    expect(getAttempt(fail.failedAttemptId)).toMatchObject({
+      kind: "review", outcome: "fail",
+      evaluation: { verdict: "incorrect", misconceptionId: "parameter_probability_trap" },
+    });
+    expect(getReviews(reviewNow)).toEqual({ due: [], upcoming: [] });
+    expect(getRemediation(fail.failedAttemptId).lesson.title).toContain("95%");
+
+    const repaired = await submitTransfer(fail.failedAttemptId, RIGHT_TRANSFER);
+    expect(repaired.result).toBe("pass");
+    expect(state("cii")).toBe("provisional");
+  });
+  it("carries a failed review answer into a diagnosis dispute before requiring fresh proof", async () => {
+    await provisionalDue();
+    const fail = await submitReview("intro-stats", "cii", "The report is valid because there is a 95% probability the true mean is inside the finished interval.", reviewNow);
+    if (fail.result !== "fail") throw new Error("expected review fail");
+    expect(clarify(fail.failedAttemptId).followUp).toContain("long-run method");
+
+    const corrected = await assess({
+      courseId: "intro-stats", conceptId: "cii",
+      answer: "I meant the long-run method, not this one finished interval.",
+      followUpTo: fail.failedAttemptId,
+    });
+    expect(corrected.evaluation.verdict).toBe("correct");
+    expect(getAttempt(corrected.attemptId)).toMatchObject({ parentAttemptId: fail.failedAttemptId, rootAttemptId: fail.failedAttemptId });
+    expect(state("cii")).toBe("developing");
+    expect(getMisconceptionLog("intro-stats")).toEqual([]);
+
+    const reproved = await submitTransfer(corrected.attemptId, RIGHT_TRANSFER);
+    expect(reproved.result).toBe("pass");
+    expect(state("cii")).toBe("provisional");
+  });
+
+
+  it("rejects duplicate review submissions after the first one changes the schedule", async () => {
+    await provisionalDue();
+    const first = await submitReview("intro-stats", "cii", reviewPass, reviewNow);
+    expect(first.result).toBe("pass");
+    await expect(submitReview("intro-stats", "cii", reviewPass, reviewNow)).rejects.toThrow(ReviewNotDueError);
+    expect(getHistory().filter((h) => h.title === "Passed delayed review on CI interpretation")).toHaveLength(1);
+  });
+  it("resets spacing after a retention failure is repaired and reproved", async () => {
+    await provisionalDue();
+    const first = await submitReview("intro-stats", "cii", reviewPass, reviewNow);
+    if (first.result !== "pass") throw new Error("expected first review pass");
+
+    const secondDay = new Date(2026, 9, 17, 12, 0);
+    const failed = await submitReview("intro-stats", "cii", "A finished interval has a 95% probability of containing the mean.", secondDay);
+    if (failed.result !== "fail") throw new Error("expected review failure");
+    const reproved = await submitTransfer(failed.failedAttemptId, RIGHT_TRANSFER);
+    if (reproved.result !== "pass") throw new Error("expected reproof");
+    expect(state("cii")).toBe("provisional");
+
+    const nextDay = new Date(2026, 9, 18, 12, 0);
+    const retained = await submitReview("intro-stats", "cii", reviewPass, nextDay);
+    if (retained.result !== "pass") throw new Error("expected retained pass");
+    expect(getReviewResult(retained.resultAttemptId)).toMatchObject({ nextReview: "Oct 25" });
+  });
+
+  it("grades the Standard Error review independently, including the named misconception", async () => {
+    const first = await assess({
+      courseId: "intro-stats", conceptId: "se",
+      answer: "Researcher B with 400 students has the smaller standard error because a larger sample makes standard error decrease.",
+    });
+    const transfer = await submitTransfer(first.attemptId, "The standard error is cut in half because n is four times larger and sqrt(4) = 2.");
+    if (transfer.result !== "pass") throw new Error("expected SE transfer pass");
+    const db = (globalThis as unknown as { __proveit: { course: { concepts: { id: string; nextReview: string | null }[] } } }).__proveit;
+    db.course.concepts.find((c) => c.id === "se")!.nextReview = "2026-10-10";
+
+    const pass = await submitReview("intro-stats", "se", "Study B has the smaller standard error. It is half of A because 256 is four times 64 and sqrt(4) is 2.", reviewNow);
+    expect(pass.result).toBe("pass");
+    expect(state("se")).toBe("mastered");
+
+    // Recreate the due provisional state and check a clearly wrong direction claim.
+    (globalThis as { __proveit?: unknown }).__proveit = undefined;
+    const again = await assess({
+      courseId: "intro-stats", conceptId: "se",
+      answer: "Researcher B with 400 students has the smaller standard error because a larger sample makes standard error decrease.",
+    });
+    const againTransfer = await submitTransfer(again.attemptId, "The standard error is cut in half because n is four times larger and sqrt(4) = 2.");
+    if (againTransfer.result !== "pass") throw new Error("expected SE transfer pass");
+    const db2 = (globalThis as unknown as { __proveit: { course: { concepts: { id: string; nextReview: string | null }[] } } }).__proveit;
+    db2.course.concepts.find((c) => c.id === "se")!.nextReview = "2026-10-10";
+    const fail = await submitReview("intro-stats", "se", "Study A has the smaller standard error because the bigger sample in B creates more standard error.", reviewNow);
+    expect(fail.result).toBe("fail");
+    if (fail.result !== "fail") throw new Error("expected SE review fail");
+    expect(getAttempt(fail.failedAttemptId).evaluation).toMatchObject({ misconceptionId: "more_data_more_error" });
+    expect(state("se")).toBe("needs_work");
+  });
+
+  it("does not falsely accept Study A merely because the explanation contains the letter b in another word", async () => {
+    const first = await assess({
+      courseId: "intro-stats", conceptId: "se",
+      answer: "Researcher B with 400 students has the smaller standard error because a larger sample makes standard error decrease.",
+    });
+    const transfer = await submitTransfer(first.attemptId, "The standard error is cut in half because n is four times larger and sqrt(4) = 2.");
+    if (transfer.result !== "pass") throw new Error("expected SE transfer pass");
+    const db = (globalThis as unknown as { __proveit: { course: { concepts: { id: string; nextReview: string | null }[] } } }).__proveit;
+    db.course.concepts.find((c) => c.id === "se")!.nextReview = "2026-10-10";
+    const result = await submitReview("intro-stats", "se", "Study A is half because of the square root.", reviewNow);
+    expect(result.result).not.toBe("pass");
+    expect(state("se")).toBe("provisional");
+  });
+
+  it("does not pass a contradictory CI review that calls the report invalid but repeats the probability misconception", async () => {
+    await provisionalDue();
+    const result = await submitReview(
+      "intro-stats", "cii",
+      "The report is invalid because of its wording, but this finished interval still has a 95% probability of containing the mean; the method is repeated over samples.",
+      reviewNow,
+    );
+    expect(result.result).toBe("fail");
+    if (result.result !== "fail") throw new Error("expected contradictory review to fail");
+    expect(getAttempt(result.failedAttemptId).evaluation).toMatchObject({ misconceptionId: "parameter_probability_trap" });
+  });
+
 });
 
 describe("mastery review base", () => {

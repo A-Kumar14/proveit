@@ -24,13 +24,23 @@ describe("review queue", () => {
     expect(rows.slice(3).every((r) => r.slot === null)).toBe(true);
   });
 
+  it("uses the supplied clock when deciding whether a review is due", async () => {
+    const { attemptId } = await assess({ courseId: "intro-stats", conceptId: "cii", answer: WRONG });
+    await submitTransfer(attemptId, RIGHT);
+    const concept = (globalThis as unknown as { __proveit: { course: { concepts: { id: string; nextReview: string | null }[] } } }).__proveit.course.concepts.find((c) => c.id === "cii");
+    concept!.nextReview = "2026-10-11";
+    expect(getReviewQueue(now).find((r) => r.id === "review:cii")?.href).toBeNull();
+    const tomorrow = new Date(2026, 9, 11, 8, 0);
+    expect(getReviewQueue(tomorrow).find((r) => r.id === "review:cii")?.href).toBe("/course/intro-stats/review/cii");
+  });
+
   it("puts a due review ahead of quiz prep, and drops a course once it is completed", async () => {
     const { attemptId } = await assess({ courseId: "intro-stats", conceptId: "cii", answer: WRONG });
     await submitTransfer(attemptId, RIGHT);
     const concept = (globalThis as unknown as { __proveit: { course: { concepts: { id: string; nextReview: string | null }[] } } }).__proveit.course.concepts.find((c) => c.id === "cii");
     concept!.nextReview = "2026-10-10";
     const rows = getReviewQueue(now);
-    expect(rows[0]).toMatchObject({ id: "review:cii", pressure: "review", because: "Due now" });
+    expect(rows[0]).toMatchObject({ id: "review:cii", pressure: "review", because: "Due now", href: "/course/intro-stats/review/cii" });
     expect(rows.map((r) => r.id)).not.toContain("cii");
     setCoursesCompleted(["intro-stats"], true);
     expect(getReviewQueue(now).every((r) => r.courseName !== "Intro Statistics")).toBe(true);
