@@ -1,13 +1,13 @@
 import "server-only";
-import { demoData } from "./mode";
 import { lookup } from "node:dns/promises";
+import { loadJson, saveJson } from "./persistence";
 import { isIP } from "node:net";
 import ical, { type VEvent } from "node-ical";
 
 /**
  * Calendar engine. Pulls events from any iCal (.ics) feed, which covers Google ("secret address in iCal format"),
  * Apple (public calendar link) and Outlook, and finds free time between them.
- * Until a calendar is connected it serves clearly labelled sample events.
+ * Calendar connection state is persisted locally through the same database seam as learner state.
  */
 
 export type CalKind = "class" | "quiz" | "review" | "other";
@@ -15,7 +15,7 @@ export type CalEvent = { id: string; title: string; start: string; end: string; 
 export type Slot = { start: string; end: string };
 
 export type CalendarState = {
-  mode: "sample" | "ics";
+  mode: "none" | "ics";
   /** Display name for the connected provider, never the secret URL itself. */
   provider: string | null;
   syncedAt: number | null;
@@ -24,7 +24,17 @@ export type CalendarState = {
 
 type Held = CalendarState & { url: string | null };
 const g = globalThis as unknown as { __proveitCal?: Held };
-const held = (): Held => (g.__proveitCal ??= { mode: "sample", provider: null, syncedAt: null, events: [], url: null });
+
+function restoreCalendar(): Held {
+  const saved = loadJson<Held>("calendar");
+  if (!saved || (saved.mode !== "ics" && saved.mode !== "none")) return { mode: "none", provider: null, syncedAt: null, events: [], url: null };
+  return { mode: saved.mode, provider: saved.provider ?? null, syncedAt: saved.syncedAt ?? null, events: Array.isArray(saved.events) ? saved.events : [], url: saved.url ?? null };
+}
+const held = (): Held => (g.__proveitCal ??= restoreCalendar());
+const persistCalendar = () => {
+  const h = held();
+  saveJson("calendar", { mode: h.mode, provider: h.provider, syncedAt: h.syncedAt, events: h.events, url: h.url });
+};
 
 export class CalendarError extends Error {}
 
@@ -115,45 +125,31 @@ export async function connectCalendar(raw: string): Promise<CalendarState> {
   const url = await assertSafeUrl(raw);
   const events = await pull(url.toString());
   Object.assign(held(), { mode: "ics", url: url.toString(), provider: providerName(url.hostname), syncedAt: Date.now(), events });
+  persistCalendar();
   return getCalendarState();
 }
 
-/** Re-reads the connected feed. With only the sample calendar there is nothing to sync, so it says so. */
+/** Re-reads the connected feed. An empty calendar has nothing to sync. */
 export async function refreshCalendar(): Promise<CalendarState> {
   const h = held();
-  if (h.mode !== "ics" || !h.url) throw new CalendarError("You're using the sample calendar. Connect yours to sync it.");
+  if (h.mode !== "ics" || !h.url) throw new CalendarError("No calendar is connected yet.");
   h.events = await pull(h.url);
   h.syncedAt = Date.now();
+  persistCalendar();
   return getCalendarState();
 }
 
 export function disconnectCalendar(): CalendarState {
-  Object.assign(held(), { mode: "sample", url: null, provider: null, syncedAt: null, events: [] });
+  Object.assign(held(), { mode: "none", url: null, provider: null, syncedAt: null, events: [] });
+  persistCalendar();
   return getCalendarState();
 }
 
 // ---- reading ----
 
-/** Sample week for the next four weeks: lectures, a seminar, office hours and a part-time shift. */
-export function sampleEvents(now = new Date()): CalEvent[] {
-  const out: CalEvent[] = [];
-  const at = (d: Date, h: number, m = 0) => new Date(d.getFullYear(), d.getMonth(), d.getDate(), h, m);
-  for (let i = 0; i < 28; i++) {
-    const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i);
-    const add = (title: string, kind: CalKind, h1: number, m1: number, h2: number, m2: number) =>
-      out.push({ id: `sample-${title}-${d.toISOString().slice(0, 10)}`, title, start: at(d, h1, m1).toISOString(), end: at(d, h2, m2).toISOString(), allDay: false, kind });
-    const dow = d.getDay();
-    if (dow === 2 || dow === 4) add("Intro Statistics lecture", "class", 10, 0, 10, 50);
-    if (dow === 3) add("Personal Finance seminar", "class", 14, 0, 15, 15);
-    if (dow === 5) add("Office hours", "other", 13, 0, 14, 0);
-    if (dow === 1 || dow === 3) add("Shift at the campus cafe", "other", 17, 0, 21, 0);
-  }
-  return out.filter((e) => new Date(e.end) > now);
-}
-
 export function getCalendarState(): CalendarState {
   const h = held();
-  return { mode: h.mode, provider: h.provider, syncedAt: h.syncedAt, events: h.mode === "ics" ? h.events : demoData() ? sampleEvents() : [] };
+  return { mode: h.mode, provider: h.provider, syncedAt: h.syncedAt, events: h.events };
 }
 
 // ---- free time ----
