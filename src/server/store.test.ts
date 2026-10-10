@@ -286,6 +286,17 @@ describe("review queue, history and misconception log", () => {
     expect(getMisconceptionLog("intro-stats")[0]).toMatchObject({ open: false, note: "Fixed with a lesson and a new question" });
     expect(getReviews().upcoming).toMatchObject([{ id: "cii", due: false }]);
   });
+  it("surfaces a misconception discovered on transfer in recently caught", async () => {
+    const first = await run("Over repeated samples, about 95% of intervals made by the method contain the true mean.");
+    const fail = await submitTransfer(first.attemptId, "Each finished interval still has a 95% chance of containing the mean.");
+    expect(fail.result).toBe("fail");
+    expect(getDashboard().recentlyCaught[0]).toMatchObject({
+      misconception: "Parameter probability trap",
+      concept: "CI interpretation",
+      repaired: false,
+    });
+  });
+
 
   it("keeps the uploaded file name on the attempt only when an image was read", async () => {
     const withImg = await assess({ courseId: "intro-stats", conceptId: "cii", answer: WRONG, imageSummary: "handwritten work", imageName: "work.jpg" });
