@@ -25,7 +25,7 @@ export function MasteryChangeCard({ r }: { r: ResultView }) {
       }
     >
       <CardTable head={["STEP", "RESULT"]}>
-        <Row><Cell className="text-ink-3">Misconception found</Cell><Cell className="font-semibold">{r.misconception}</Cell></Row>
+        <Row><Cell className="text-ink-3">{r.diagnosisLabel}</Cell><Cell className="font-semibold">{r.misconception}</Cell></Row>
         <Row><Cell className="text-ink-3">Fixed with</Cell><Cell className="font-semibold">{r.intervention}</Cell></Row>
         <Row><Cell className="text-ink-3">New question, different setup</Cell><Cell className="font-semibold text-mastered-text">{r.transferText}</Cell></Row>
         <Row>

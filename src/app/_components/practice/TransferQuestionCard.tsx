@@ -1,10 +1,15 @@
 import { AssistantCard } from "../chat/AssistantCard";
 
-export function TransferQuestionCard({ question, hint, showHint, hintsEnabled, onToggleHint }: { question: string; hint: string; showHint: boolean; hintsEnabled: boolean; onToggleHint: () => void }) {
+export function TransferQuestionCard({
+  question, hint, showHint, hintsEnabled, onToggleHint,
+  description = "The setup is different. The idea underneath is the one you just fixed. Repeating the first question would only check memory.",
+}: {
+  question: string; hint: string; showHint: boolean; hintsEnabled: boolean; onToggleHint: () => void; description?: string;
+}) {
   return (
-    <AssistantCard ariaLabel="Transfer question" label="Step 2 · New question, same idea" headline="Now prove it transfers.">
+    <AssistantCard ariaLabel="Transfer question" label="New question · same idea" headline="Now prove it transfers.">
       <div className="flex flex-col gap-2 px-[18px] py-3">
-        <p className="m-0 text-xs text-ink-muted">The setup is different. The idea underneath is the one you just fixed. Repeating the first question would only check memory.</p>
+        <p className="m-0 text-xs text-ink-muted">{description}</p>
         <p className="m-0 text-base font-semibold leading-normal">{question}</p>
       </div>
       {hintsEnabled && (
