@@ -198,3 +198,20 @@ export const FileUploadResult = z.object({
   failed: z.array(z.object({ name: z.string(), reason: z.string() })),
 });
 export type FileUploadResult = z.infer<typeof FileUploadResult>;
+
+// ---- quiz ----
+
+export const QuizStartInput = z.object({ courseId: z.string(), count: z.number().int().min(3).max(15).optional() });
+/** A question as the student sees it. The answer stays on the server until the quiz is submitted. */
+export const QuizQuestion = z.object({ id: z.string(), concept: z.string(), prompt: z.string(), options: z.array(z.string()).length(4) });
+export const QuizStartResult = z.object({ quizId: z.string(), courseName: z.string(), questions: z.array(QuizQuestion), aiWritten: z.boolean() });
+export type QuizQuestion = z.infer<typeof QuizQuestion>;
+export type QuizStartResult = z.infer<typeof QuizStartResult>;
+
+export const QuizSubmitInput = z.object({ quizId: z.string(), answers: z.array(z.number().int().min(0).max(3).nullable()).max(30) });
+export const QuizResult = z.object({
+  score: z.number(), total: z.number(), pct: z.number(),
+  items: z.array(QuizQuestion.extend({ picked: z.number().nullable(), correct: z.number(), explanation: z.string() })),
+  byConcept: z.array(z.object({ concept: z.string(), right: z.number(), total: z.number() })),
+});
+export type QuizResult = z.infer<typeof QuizResult>;

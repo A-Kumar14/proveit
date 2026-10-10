@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { Download, FileQuestion, FileText, ListChecks, LoaderCircle } from "lucide-react";
 import { api } from "@proveit/lib/api";
 import { cn } from "@proveit/lib/cn";
@@ -11,8 +12,8 @@ type Run = { status: "idle" | "busy" | "done" | "error"; result?: PracticeResult
 
 const link = "inline-flex items-center gap-1.5 rounded-sm border border-line px-2.5 py-1.5 text-xs font-medium text-ink-2 no-underline hover:bg-surface-hover";
 
-function Tool({ icon: Icon, title, text, button, run, onRun, disabled }: {
-  icon: typeof FileText; title: string; text: string; button: string; run: Run; onRun?: () => void; disabled?: string;
+function Tool({ icon: Icon, title, text, button, run, onRun, disabled, href }: {
+  icon: typeof FileText; title: string; text: string; button: string; run: Run; onRun?: () => void; disabled?: string; href?: string;
 }) {
   const busy = run.status === "busy";
   return (
@@ -35,7 +36,9 @@ function Tool({ icon: Icon, title, text, button, run, onRun, disabled }: {
           ))}
         </div>
       )}
-      {disabled ? <span className="text-[11px] text-ink-faint">{disabled}</span> : (
+      {disabled ? <span className="text-[11px] text-ink-faint">{disabled}</span> : href ? (
+        <Link href={href} className={cn(buttonStyles({ size: "sm" }), "w-fit")}>{button}</Link>
+      ) : (
         <button type="button" onClick={onRun} disabled={busy} className={cn(buttonStyles({ size: "sm" }), "w-fit cursor-pointer")}>
           {busy && <LoaderCircle size={13} className="animate-spin" aria-hidden />}
           {busy ? "Generating..." : run.status === "done" ? "Generate again" : button}
@@ -59,8 +62,8 @@ export function PracticeHub({ courseId }: { courseId: string }) {
         text="A 10-question paper that leans on what you keep getting wrong. The answer key comes as a separate file." />
       <Tool icon={FileText} title="Notes" button="Generate notes" run={notes} onRun={go(setNotes, api.studyNotes)}
         text="Notes on the course, plus the mistakes you keep making and how to fix each one." />
-      <Tool icon={ListChecks} title="Quiz" button="" run={{ status: "idle" }} disabled="Coming soon"
-        text="A quick quiz you take in the app. Not built yet." />
+      <Tool icon={ListChecks} title="Quiz" button="Start quiz" run={{ status: "idle" }} href={`/course/${courseId}/practice/quiz`}
+        text="An 8-question multiple-choice quiz you take here, with a score and a review. It leans on your weak spots." />
     </div>
   );
 }

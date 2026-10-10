@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { ApiError, AssessResult, AuditResult, CatalogAddResult, FileUploadResult, CatalogRemoveResult, ConverseResult, PracticeResult, ClarifyResult, CourseCompleteResult, Ok, ReviewSubmitResult, TransferResult, UploadCheck, type AssessInput, type ConverseInput } from "./schemas";
+import { ApiError, AssessResult, AuditResult, CatalogAddResult, FileUploadResult, CatalogRemoveResult, ConverseResult, PracticeResult, QuizResult, QuizStartResult, ClarifyResult, CourseCompleteResult, Ok, ReviewSubmitResult, TransferResult, UploadCheck, type AssessInput, type ConverseInput } from "./schemas";
 
 /** Client side of the API. Components call these; the route handlers behind them are the backend seam. */
 async function post<T>(url: string, body: unknown, schema: z.ZodType<T>): Promise<T> {
@@ -52,6 +52,8 @@ export const api = {
   studyNotes: (courseId: string) => post("/api/practice/notes", { courseId }, PracticeResult),
   addCatalogCourse: (id: string) => post("/api/catalog/add", { id }, CatalogAddResult),
   removeCatalogCourse: (id: string) => post("/api/catalog/remove", { id }, CatalogRemoveResult),
+  startQuiz: (courseId: string, count?: number) => post("/api/quiz/start", { courseId, count }, QuizStartResult),
+  submitQuiz: (quizId: string, answers: (number | null)[]) => post("/api/quiz/submit", { quizId, answers }, QuizResult),
   clarify: (attemptId: string) => post("/api/clarify", { attemptId }, ClarifyResult),
   transfer: (attemptId: string, answer: string) => post("/api/transfer", { attemptId, answer }, TransferResult),
   review: (courseId: string, conceptId: string, answer: string) => post("/api/review/submit", { courseId, conceptId, answer }, ReviewSubmitResult),
