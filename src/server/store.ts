@@ -855,7 +855,7 @@ export function getHistory(): HistoryEvent[] {
   });
 }
 
-export type MisconceptionEntry = { key: string; name: string; concept: string; quote: string | null; open: boolean; note: string; href: string };
+export type MisconceptionEntry = { key: string; name: string; concept: string; quote: string | null; /** What the misconception gets wrong, in one sentence. */ gap: string; open: boolean; note: string; href: string };
 export function getMisconceptionLog(courseId: string): MisconceptionEntry[] {
   const course = courseFor(courseId);
   const { attempts } = db();
@@ -873,7 +873,7 @@ export function getMisconceptionLog(courseId: string): MisconceptionEntry[] {
       if (!last && !seededOpen) return [];
       const repaired = c.evidence.transferPassed && c.state !== "needs_work";
       return [{
-        key: `${c.id}:${m.id}`, name: m.name, concept: c.name, quote: last?.evaluation?.evidenceQuote ?? null, open: !repaired,
+        key: `${c.id}:${m.id}`, name: m.name, concept: c.name, gap: m.gap, quote: last?.evaluation?.evidenceQuote ?? null, open: !repaired,
         note: repaired ? "Fixed with a lesson and a new question" : last ? "Open until you pass a new question" : "From your earlier attempts",
         href: last && !repaired ? `/course/${courseId}/lesson/${last.id}` : practiceHref(c),
       }];
