@@ -29,6 +29,13 @@ type Saved = { items: Item[]; mode: "chat" | "check"; followUpTo?: string };
 const DONT_KNOW = "I don't know yet";
 const KEEP_TALKING = /^keep talking/i;
 const CHECK_NOW = /^check what i['’]?ve got/i;
+const STUCK = /^(i don['’]?t know|i['’]?m (still )?(stuck|not sure|lost))/i;
+
+/** Quick replies may offer the check or a menu after the student said they're stuck. Anything else could be a possible answer, so it never shows. */
+export function allowedOptions(options: string[], prevUser: string | undefined): string[] {
+  if (options.some((o) => CHECK_NOW.test(o) || KEEP_TALKING.test(o))) return options.filter((o) => CHECK_NOW.test(o) || KEEP_TALKING.test(o));
+  return prevUser && STUCK.test(prevUser) ? options : [];
+}
 const chip = "h-9 cursor-pointer rounded-full border px-3.5 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50";
 
 /** Test this concept, as a conversation first. The student says what they think, the tutor agrees or corrects, and a graded check comes only when they ask for it. */
@@ -174,7 +181,10 @@ export function SessionChat({ courseId, question, opening, resume }: {
             );
           }
           if (it.role === "user") return <UserBubble key={it.id}>{it.text}</UserBubble>;
-          const { text, options } = splitOptions(it.text);
+          const split = splitOptions(it.text);
+          const { text } = split;
+          const prev = items[items.indexOf(it) - 1];
+          const options = allowedOptions(split.options, prev && prev.kind === "chat" && prev.role === "user" ? prev.text : undefined);
           const showChips = it === lastChat && options.length > 0 && !busy && mode === "chat" && hideChips !== it.id;
           return (
             <AssistantMessage key={it.id}>

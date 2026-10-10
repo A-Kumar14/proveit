@@ -60,6 +60,15 @@ describe("Test this concept, as a conversation", () => {
     expect(chips.getAllByRole("button").map((b) => b.textContent)).toEqual(["The 95% part", "What an interval is", "Teach me from scratch"]);
   });
 
+  it("never shows quick replies that could be answers to the tutor's question", async () => {
+    tutor("What does 95% refer to?\nOPTIONS: The method's long-run hit rate | The chance this interval is right");
+    mount();
+    await type("Tell me what you think", "an interval");
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+    expect(await screen.findByText("What does 95% refer to?")).toBeTruthy();
+    expect(screen.queryByRole("group", { name: "Quick replies" })).toBeNull();
+  });
+
   it("sends a quick reply as the student's message, and it carries on from there", async () => {
     tutor("Which part confuses you most?\nOPTIONS: The 95% part | Teach me from scratch", "Okay, from the start. Imagine tossing rings at a peg. Is the peg moving?");
     mount();
