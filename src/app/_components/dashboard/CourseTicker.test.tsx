@@ -7,7 +7,7 @@ import { CourseTicker } from "./CourseTicker";
 import { TickerCard } from "./TickerCard";
 
 afterEach(cleanup);
-const course = (over: Partial<CourseRow> = {}): CourseRow => ({ id: "stats", name: "Intro Statistics", pct: 42, proven: 5, total: 12, needsWork: 1, inProgress: 3, notStarted: 3, next: "CI interpretation", completed: false, manual: false, openMisconception: null, ...over });
+const course = (over: Partial<CourseRow> = {}): CourseRow => ({ id: "stats", name: "Intro Statistics", pct: 42, proven: 5, total: 12, needsWork: 1, inProgress: 3, notStarted: 3, next: "CI interpretation", completed: false, manual: false, openMisconception: null, removable: true, ...over });
 
 describe("CourseTicker", () => {
   it("renders one live copy and two hidden copies of every card", () => {

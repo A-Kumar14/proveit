@@ -3,13 +3,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CircleCheck, MoreHorizontal } from "lucide-react";
+import { CircleCheck, MoreHorizontal, Trash2 } from "lucide-react";
 import { api } from "@proveit/lib/api";
 import { cn } from "@proveit/lib/cn";
 import type { CourseRow } from "@proveit/server/store";
 import { Button } from "../Button";
 import { MasteryBar } from "../mastery/MasteryBar";
 import { EmptyState } from "../shell/EmptyState";
+import { DeleteCourseDialog } from "./DeleteCourseDialog";
 
 type Filter = "all" | "progress" | "completed";
 type Menu = { x: number; y: number; ids: string[] };
@@ -25,6 +26,7 @@ export function CoursesTable({ rows }: { rows: CourseRow[] }) {
   const [menu, setMenu] = useState<Menu | null>(null);
   const [notice, setNotice] = useState<Notice | null>(null);
   const [busy, setBusy] = useState(false);
+  const [deleting, setDeleting] = useState<{ id: string; name: string } | null>(null);
   const closeMenu = useCallback(() => setMenu(null), []);
 
   const counts = { all: rows.length, progress: rows.filter((r) => !r.completed).length, completed: rows.filter((r) => r.completed).length };
@@ -133,16 +135,18 @@ export function CoursesTable({ rows }: { rows: CourseRow[] }) {
         </>
       )}
 
-      {menu && <RowMenu menu={menu} rows={menu.ids.map((id) => byId.get(id)).filter((r): r is CourseRow => !!r)} onClose={closeMenu} onApply={apply} />}
+      {menu && <RowMenu menu={menu} rows={menu.ids.map((id) => byId.get(id)).filter((r): r is CourseRow => !!r)} onClose={closeMenu} onApply={apply} onDelete={(r) => { setMenu(null); setDeleting({ id: r.id, name: r.name }); }} />}
+      {deleting && <DeleteCourseDialog course={deleting} onClose={() => setDeleting(null)} onDeleted={() => { setNotice({ text: `Deleted ${deleting.name}.`, undo: null }); setDeleting(null); setSelected(new Set()); router.refresh(); }} />}
     </div>
   );
 }
 
-function RowMenu({ menu, rows, onClose, onApply }: { menu: Menu; rows: CourseRow[]; onClose: () => void; onApply: (ids: string[], completed: boolean) => void }) {
+function RowMenu({ menu, rows, onClose, onApply, onDelete }: { menu: Menu; rows: CourseRow[]; onClose: () => void; onApply: (ids: string[], completed: boolean) => void; onDelete: (row: CourseRow) => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const openable = rows.length === 1 ? rows[0] : null;
   const toComplete = rows.filter((r) => !r.completed);
   const toReopen = rows.filter((r) => r.completed);
+  const deletable = rows.length === 1 && openable?.removable ? openable : null;
 
   useEffect(() => {
     ref.current?.querySelector<HTMLElement>('[role="menuitem"]')?.focus();
@@ -155,11 +159,13 @@ function RowMenu({ menu, rows, onClose, onApply }: { menu: Menu; rows: CourseRow
       items[(i + (e.key === "ArrowDown" ? 1 : -1) + items.length) % items.length]?.focus();
       e.preventDefault();
     };
-    window.addEventListener("click", close);
+    // React can run this effect while the click that opened the menu is still travelling up to the window.
+    // Listening a moment later keeps that same click from closing the menu again.
+    const arm = setTimeout(() => window.addEventListener("click", close), 0);
     window.addEventListener("scroll", close, true);
     window.addEventListener("resize", close);
     window.addEventListener("keydown", key);
-    return () => { window.removeEventListener("click", close); window.removeEventListener("scroll", close, true); window.removeEventListener("resize", close); window.removeEventListener("keydown", key); };
+    return () => { clearTimeout(arm); window.removeEventListener("click", close); window.removeEventListener("scroll", close, true); window.removeEventListener("resize", close); window.removeEventListener("keydown", key); };
   }, [onClose]);
 
   const item = "flex w-full cursor-pointer items-center gap-2 rounded-sm border-0 bg-transparent px-2.5 py-2 text-left text-[0.8125rem] text-ink no-underline hover:bg-surface-hover";
@@ -170,6 +176,7 @@ function RowMenu({ menu, rows, onClose, onApply }: { menu: Menu; rows: CourseRow
       {openable && <Link role="menuitem" href={`/course/${openable.id}`} className={item}>Open course</Link>}
       {toComplete.length > 0 && <button role="menuitem" type="button" className={item} onClick={() => onApply(toComplete.map((r) => r.id), true)}><CircleCheck size={14} strokeWidth={2} className="text-mastered" aria-hidden />Mark as completed{rows.length > 1 ? ` (${toComplete.length})` : ""}</button>}
       {toReopen.length > 0 && <button role="menuitem" type="button" className={item} onClick={() => onApply(toReopen.map((r) => r.id), false)}>Mark as in progress{rows.length > 1 ? ` (${toReopen.length})` : ""}</button>}
+      {deletable && <button role="menuitem" type="button" className={cn(item, "text-needswork-text")} onClick={() => onDelete(deletable)}><Trash2 size={14} strokeWidth={2} aria-hidden />Delete course</button>}
     </div>
   );
 }

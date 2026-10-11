@@ -7,19 +7,21 @@ import { FilesPanel, MisconceptionPanel, PracticePanel, TutorPanel } from "@prov
 import { AppShell } from "@proveit/app/_components/shell/AppShell";
 import { orNotFound } from "@proveit/server/page";
 import { CourseRankBar } from "@proveit/app/_components/dashboard/CourseRankBar";
-import { getCourse, getCourseRanks, getFiles, getMisconceptionLog, getReviewBase } from "@proveit/server/store";
+import { DeleteCourseButton } from "@proveit/app/_components/courses/DeleteCourseButton";
+import { getCourse, getCourseRanks, listCourses, getFiles, getMisconceptionLog, getReviewBase } from "@proveit/server/store";
 
 export const dynamic = "force-dynamic";
 
 async function CoursePage({ params, searchParams }: PageProps<"/course/[courseId]">) {
   const { courseId } = await params;
   const { built } = await searchParams;
-  const { course, review, log, files, rank } = orNotFound(() => ({
+  const { course, review, log, files, rank, removable } = orNotFound(() => ({
     course: getCourse(courseId),
     review: getReviewBase(courseId),
     log: getMisconceptionLog(courseId),
     files: getFiles(courseId).files,
     rank: getCourseRanks().find((r) => r.courseId === courseId),
+    removable: listCourses().find((r) => r.id === courseId)?.removable ?? false,
   }));
   // Courses you added get their learning content written in the background, so the first click on a concept isn't a wait.
   const owner = scopedUserId();
@@ -40,6 +42,7 @@ async function CoursePage({ params, searchParams }: PageProps<"/course/[courseId
               <MisconceptionPanel courseId={courseId} log={log} />
               <FilesPanel courseId={courseId} files={files} />
             </div>
+            {removable && <DeleteCourseButton course={{ id: courseId, name: course.name }} />}
           </div>
         ) : (
           <div className="rounded-md border border-line p-6 text-sm text-ink-muted">No concepts yet for this course.</div>

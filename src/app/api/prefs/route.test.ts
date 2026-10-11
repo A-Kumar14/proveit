@@ -52,3 +52,13 @@ describe("/api/account/export", () => {
     expect(json.preferences).toHaveProperty("tutorVoice");
   });
 });
+
+import { POST as removeRoute } from "../courses/remove/route";
+
+describe("/api/courses/remove", () => {
+  it("deletes a course the student can remove, and refuses the main one or an unknown one", async () => {
+    expect((await removeRoute(post({ courseId: "intro-stats" }))).status).toBe(404);
+    expect((await removeRoute(post({ courseId: "nope" }))).status).toBe(404);
+    expect((await removeRoute(post({}))).status).toBe(400);
+  });
+});

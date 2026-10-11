@@ -40,6 +40,12 @@ describe("curated courses", () => {
     expect(getTodos().map((g) => g.courseId)).not.toContain("network-management");
   });
 
+  it("removes any course except the main one, and flags which rows can be removed", () => {
+    const rows = listCourses();
+    expect(rows.find((r) => r.id === "intro-stats")!.removable).toBe(false);
+    expect(rows.filter((r) => r.id !== "intro-stats").every((r) => r.removable)).toBe(true);
+  });
+
   it("removes only courses the student added", () => {
     addCatalogCourse("accounting-101");
     expect(removeCatalogCourse("accounting-101")).toEqual({ removed: true });

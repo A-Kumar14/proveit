@@ -78,6 +78,7 @@ export const api = {
   samplePaper: (courseId: string) => post("/api/practice/paper", { courseId }, PracticeResult),
   studyNotes: (courseId: string) => post("/api/practice/notes", { courseId }, PracticeResult),
   addCatalogCourse: (id: string) => post("/api/catalog/add", { id }, CatalogAddResult),
+  removeCourse: (courseId: string) => post("/api/courses/remove", { courseId }, CatalogRemoveResult),
   removeCatalogCourse: (id: string) => post("/api/catalog/remove", { id }, CatalogRemoveResult),
   startQuiz: (courseId: string, count?: number, conceptId?: string, format?: "quiz" | "explanation" | "mixed") => post("/api/quiz/start", { courseId, count, conceptId, format }, QuizStartResult),
   submitQuiz: (quizId: string, answers: (number | string | null)[]) => post("/api/quiz/submit", { quizId, answers }, QuizResult),
