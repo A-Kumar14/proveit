@@ -5,7 +5,7 @@ Branch `demo/stage`. Seeded sample data only, never merged into `main`.
 Run it on its own database, so your real data stays untouched:
 
 ```bash
-pnpm stage            # builds, then runs on .data/stage.sqlite (fast, use this on stage)
+pnpm present          # builds, then runs on .data/stage.sqlite (fast, use this on stage)
 pnpm dev:stage        # same data, dev mode (slow first visits)
 ```
 

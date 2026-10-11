@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "dev:stage": "PROVEIT_DB_PATH=.data/stage.sqlite next dev",
-    "stage": "next build && PROVEIT_DB_PATH=.data/stage.sqlite next start",
+    "present": "next build && PROVEIT_DB_PATH=.data/stage.sqlite next start",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
