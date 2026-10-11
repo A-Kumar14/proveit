@@ -299,9 +299,10 @@ export type QuizEvidenceObservation = {
 };
 
 /**
- * Multiple-choice quiz answers are supporting evidence only.
+ * Multiple-choice quiz answers are supporting mastery evidence only.
  * They can establish that a concept has been seen, but never diagnose a misconception,
- * prove transfer, schedule review, directly award rank points, or demote stronger mastery states.
+ * prove transfer, schedule review, or demote stronger mastery states. Assessment-point
+ * awards are handled separately by the reward ledger after server-side quiz grading.
  */
 export function recordQuizEvidence(courseId: string, observations: QuizEvidenceObservation[], at = Date.now()): string[] {
   const course = courseFor(courseId);
@@ -1511,13 +1512,11 @@ export type Rewards = Standing & {
 };
 
 /**
- * Points derived from current evidence, so the same data always gives the same number. Repaired and first-try
- * bonuses count once per concept so a deliberate wrong answer can't be cycled for points. Rank keeps the
- * highest total ever shown: a concept slipping back doesn't take a tier away.
- */
-/**
- * Points for one course, or for every course when `courseId` is left out. The overall rank is not the sum of
- * the course ranks, because the streak counts once, for the student, and not per course.
+ * Points come only from immutable reward-ledger awards: mastered quiz coverage, mastered explanations,
+ * and the one-time fully-mastered-course bonus. Mastery state, streaks, task clicks and manual completion
+ * do not create points. Awards are one-time, so retakes cannot farm the same allocation.
+ *
+ * Pass a courseId for that course's scaled ladder; omit it for the overall fixed ladder.
  */
 /** Plans and awards survive course deletion and are shared by duplicate imports of the same source. */
 function rewardsForCourse(course: Course) {
