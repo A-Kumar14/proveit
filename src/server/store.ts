@@ -112,6 +112,7 @@ function demoRuntimeState(): Db {
   se.skills = [{ label: "Application", pct: 85 }, { label: "New-question test", pct: 90 }, { label: "Retention", pct: 55 }];
   se.evidence = app(3, 2, true);
   se.nextReview = day(0);
+  // Stage story: Intro Statistics sits 220 points under Platinum. Proving CI interpretation on stage tips it over.
   pop.skills = [...(pop.skills ?? []), { label: "Retention", pct: 90 }];
   pop.evidence = app(4, 4, true);
   pop.nextReview = day(7);
@@ -174,6 +175,19 @@ function demoRuntimeState(): Db {
       },
     },
   ];
+  const q = (conceptId: string, concept: string, prompt: string, options: string[], correct: number, picked: number | null, explanation: string) => ({ conceptId, concept, prompt, options, correct, picked, explanation });
+  const quizItems = [
+    q("pop", "Population vs. sample", "A school surveys 200 of its 2,000 students. What is the population?", ["The 200 surveyed students", "All 2,000 students", "The survey form", "The school's teachers"], 1, 1, "The population is the whole group you want to learn about."),
+    q("par", "Parameter vs. statistic", "The average height of the 200 surveyed students is a...", ["Parameter", "Statistic", "Population", "Bias"], 1, 1, "A number computed from a sample is a statistic."),
+    q("se", "Standard error", "What happens to the standard error when the sample size quadruples?", ["It doubles", "It halves", "It stays the same", "It quadruples"], 1, 1, "Standard error shrinks with the square root of n, so four times the data halves it."),
+    q("clt", "Central Limit Theorem", "Sample means from a skewed population look roughly normal when...", ["The sample is small", "The sample is large enough", "The population is normal", "The mean is zero"], 1, 1, "The CLT needs samples large enough, whatever the population's shape."),
+    q("cii", "CI interpretation", "A 95% confidence interval for a mean is (4.1, 5.3). Which statement is right?", ["There is a 95% chance the true mean is in (4.1, 5.3)", "95% of intervals built this way capture the true mean", "95% of the data lies in (4.1, 5.3)", "The sample mean is 95% accurate"], 1, 0, "The 95% describes the method over repeated samples, not this one interval."),
+    q("moe", "Margin of error", "Which change makes the margin of error larger?", ["A larger sample", "A higher confidence level", "A smaller standard deviation", "None of these"], 1, null, "A higher confidence level needs a wider interval."),
+  ];
+  data.quizzes = [{
+    id: "demo-quiz-1", courseId: "intro-stats", courseName: "Intro Statistics", at: Date.now() - 26 * 60 * 60_000,
+    score: 4, total: 6, pct: 67, items: quizItems, changes: [], pointsGained: 0,
+  }];
   data.provenDays = new Set([day(-2), day(-1), day(0)]);
   data.taskDone = new Set(["pv"]);
   data.peakPoints = 6000;

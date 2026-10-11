@@ -4,6 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "dev:stage": "PROVEIT_DB_PATH=.data/stage.sqlite next dev",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
