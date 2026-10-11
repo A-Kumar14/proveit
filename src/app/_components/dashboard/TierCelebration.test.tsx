@@ -90,8 +90,26 @@ const rank = (courseId: string, name: string, points: number, tierIndex: number)
 const COURSES = [rank("intro-stats", "Intro Statistics", 2600, 2), rank("pf", "Personal Finance", 0, 0)];
 
 describe("RankCard", () => {
-  it("shows the tier, points, distance to the next tier and the whole ladder", () => {
+  it("starts collapsed: tier, points, distance and a checkpoint for every tier", () => {
     render(<RankCard r={rewards(6000)} courses={COURSES} previewable={false} />);
+    expect(screen.getByText("4,000 to Platinum")).toBeTruthy();
+    expect(within(screen.getByRole("list", { name: "Tiers" })).getAllByRole("listitem")).toHaveLength(7);
+    expect(screen.queryByRole("region", { name: "Rank by course" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Show full rank details" }).getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("expands to the full card from the arrow, remembers it, and collapses again", async () => {
+    render(<RankCard r={rewards(6000)} courses={COURSES} previewable={false} />);
+    await userEvent.click(screen.getByRole("button", { name: "Show full rank details" }));
+    expect(screen.getByRole("region", { name: "Rank by course" })).toBeTruthy();
+    expect(localStorage.getItem("proveit.rank.expanded")).toBe("1");
+    await userEvent.click(screen.getByRole("button", { name: "Show less rank detail" }));
+    expect(screen.queryByRole("region", { name: "Rank by course" })).toBeNull();
+  });
+
+  it("shows the tier, points, distance to the next tier and the whole ladder", async () => {
+    render(<RankCard r={rewards(6000)} courses={COURSES} previewable={false} />);
+    await userEvent.click(screen.getByRole("button", { name: "Show full rank details" }));
     expect(screen.getByText("Gold", { selector: "span.text-\\[1\\.375rem\\]" })).toBeTruthy();
     expect(screen.getByText("4,000 to Platinum")).toBeTruthy();
     expect(screen.getByRole("progressbar", { name: "Progress to Platinum" }).getAttribute("aria-valuenow")).toBe("20");
@@ -100,8 +118,9 @@ describe("RankCard", () => {
     expect(steps.filter((s) => s.getAttribute("aria-current") === "step")).toHaveLength(1);
   });
 
-  it("labels the rank as overall and lists each course's own rank", () => {
+  it("labels the rank as overall and lists each course's own rank", async () => {
     render(<RankCard r={rewards(6000)} courses={COURSES} previewable={false} />);
+    await userEvent.click(screen.getByRole("button", { name: "Show full rank details" }));
     expect(screen.getByRole("region", { name: "Overall rank" })).toBeTruthy();
     const list = within(screen.getByRole("region", { name: "Rank by course" }));
     expect(list.getByText("Intro Statistics").closest("li")!.textContent).toContain("Gold");
