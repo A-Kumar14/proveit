@@ -8,6 +8,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@proveit/lib/api";
 import { splitOptions } from "@proveit/lib/sessionText";
+import { appendRecognizedSignText } from "@proveit/lib/signbridgeText";
 import { streamTutor } from "@proveit/lib/tutorStream";
 import { useSettings } from "@proveit/lib/settings";
 import { useVoiceSupport } from "../voice/speech";
@@ -224,7 +225,11 @@ export function SessionChat({ userId, courseId, question, opening, resume, autoT
         <div ref={end} />
         </div>
       </Log>
-      {signing && <SignInput onUse={(t) => setDraft((d) => (d.trim() ? `${d.trimEnd()} ${t}` : t))} onClose={() => setSigning(false)} />}
+      {signing && <SignInput
+        onRecognizedText={(text, kind, startsTranscript) => setDraft((current) =>
+          appendRecognizedSignText(current, text, kind, startsTranscript))}
+        onClose={() => setSigning(false)}
+      />}
       <div className="mx-auto w-full max-w-[822px]">
       <Composer
         value={draft} onChange={setDraft} onSubmit={submit} status={status} error={error}

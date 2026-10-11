@@ -25,8 +25,13 @@ function modelDisplayName(model: string) {
   return model;
 }
 
-export function SignBridgeDemo() {
+export function SignBridgeDemo({ compact = false, autoStart = false, onRecognizedText }: {
+  compact?: boolean;
+  autoStart?: boolean;
+  onRecognizedText?: (text: string, kind: "letter" | "sign", startsTranscript: boolean) => void;
+}) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const startButtonRef = useRef<HTMLButtonElement | null>(null);
   const captureCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const landmarkCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -35,6 +40,7 @@ export function SignBridgeDemo() {
   const predictionAbortRef = useRef<AbortController | null>(null);
   const motionAbortRef = useRef<AbortController | null>(null);
   const startingRef = useRef(false);
+  const autoStartAttemptedRef = useRef(false);
   const activeRef = useRef(false);
   const mountedRef = useRef(true);
   const candidateRef = useRef<{ label: string; frames: number } | null>(null);
@@ -44,6 +50,8 @@ export function SignBridgeDemo() {
   const consecutiveFailuresRef = useRef(0);
   const motionCaptureRef = useRef(false);
   const speakOnCaptureRef = useRef(false);
+  const messageRef = useRef("");
+  const onRecognizedTextRef = useRef(onRecognizedText);
   const [status, setStatus] = useState("Start the camera to begin live sign recognition.");
   const [error, setError] = useState<string | null>(null);
   const [health, setHealth] = useState<ReturnType<typeof SignBridgeHealth.parse> | null>(null);
@@ -54,6 +62,10 @@ export function SignBridgeDemo() {
   const [starting, setStarting] = useState(false);
   const [recognizingMotion, setRecognizingMotion] = useState(false);
   const [speakOnCapture, setSpeakOnCapture] = useState(false);
+
+  useEffect(() => {
+    onRecognizedTextRef.current = onRecognizedText;
+  }, [onRecognizedText]);
 
   const clearRecognitionSession = (sessionId: string) => {
     void fetch("/api/signbridge/reset", {
@@ -208,8 +220,11 @@ export function SignBridgeDemo() {
     }
   };
 
-  const appendRecognizedSign = (label: string) => {
-    setMessage((current) => `${current}${label}`);
+  const appendRecognizedSign = (label: string, kind: "letter" | "sign" = "letter") => {
+    const startsTranscript = messageRef.current.length === 0;
+    messageRef.current += label;
+    onRecognizedTextRef.current?.(label, kind, startsTranscript);
+    setMessage(messageRef.current);
     if (speakOnCaptureRef.current && "speechSynthesis" in window) {
       window.speechSynthesis.cancel();
       window.speechSynthesis.speak(new SpeechSynthesisUtterance(label));
@@ -367,6 +382,13 @@ export function SignBridgeDemo() {
     }
   };
 
+  useEffect(() => {
+    if (autoStart && !autoStartAttemptedRef.current) {
+      autoStartAttemptedRef.current = true;
+      void startCamera();
+    }
+  }, [autoStart]);
+
   const captureMovement = async () => {
     const sessionId = sessionRef.current;
     if (!running || !sessionId || recognizingMotion || !health?.motionReady) return;
@@ -426,16 +448,18 @@ export function SignBridgeDemo() {
 
   const addSuggestion = () => {
     if (!suggestion) return;
-    appendRecognizedSign(suggestion.label);
+    appendRecognizedSign(suggestion.label, suggestion.source === "motion" ? "sign" : "letter");
     setStatus(`Added ${suggestion.label.replaceAll("_", " ")} to the live transcript.`);
     setSuggestion(null);
   };
 
   const deleteLast = () => {
-    setMessage((current) => current.slice(0, -1));
+    messageRef.current = messageRef.current.slice(0, -1);
+    setMessage(messageRef.current);
   };
 
   const clearMessage = () => {
+    messageRef.current = "";
     setMessage("");
     setSuggestion(null);
     setPrediction(null);
@@ -456,7 +480,7 @@ export function SignBridgeDemo() {
   };
 
   return (
-    <div className="grid gap-5 xl:grid-cols-[minmax(0,1.4fr)_minmax(330px,0.85fr)]">
+    <div className={compact ? "flex min-w-0 flex-col gap-3" : "grid gap-5 xl:grid-cols-[minmax(0,1.4fr)_minmax(330px,0.85fr)]"}>
       <section className="flex min-w-0 flex-col gap-4" aria-label="Live ASL camera recognition">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 items-center gap-2 text-sm">
@@ -465,7 +489,7 @@ export function SignBridgeDemo() {
             <span className="truncate text-ink-muted">{status}</span>
           </div>
           {!running ? (
-            <Button onClick={() => void startCamera()} disabled={starting}>{starting ? "Starting…" : "Start live camera"}</Button>
+            <Button ref={startButtonRef} onClick={() => void startCamera()} disabled={starting}>{starting ? "Starting…" : "Start live camera"}</Button>
           ) : (
             <button type="button" onClick={stopCamera} className={buttonStyles({ variant: "secondary", size: "md" })}>Stop camera</button>
           )}
@@ -478,7 +502,7 @@ export function SignBridgeDemo() {
           </div>
         )}
 
-        <div className="relative aspect-[4/3] overflow-hidden rounded-2xl border border-line bg-[#17191d]">
+        <div className={cn("relative overflow-hidden rounded-2xl border border-line bg-[#17191d]", compact ? "aspect-video max-h-64" : "aspect-[4/3]")}>
           <video ref={videoRef} autoPlay playsInline muted className="absolute inset-0 block h-full w-full -scale-x-100 object-cover" aria-label="Mirrored live camera preview" />
           <canvas ref={landmarkCanvasRef} className="pointer-events-none absolute inset-0 h-full w-full -scale-x-100" aria-label="Detected hand landmark overlay" />
           {!running && (
@@ -517,26 +541,30 @@ export function SignBridgeDemo() {
             <span>These are landmarks, not interpreted ASL grammar.</span>
           </div>
         )}
-        <div className="flex flex-wrap gap-1.5" aria-label="Supported ASL fingerspelling letters">
-          {"ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map((letter) => (
-            <span key={letter} className="rounded-md border border-line bg-surface-subtle px-2 py-1 text-xs font-medium text-ink-muted">{letter}</span>
-          ))}
-        </div>
+        {!compact && (
+          <div className="flex flex-wrap gap-1.5" aria-label="Supported ASL fingerspelling letters">
+            {"ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map((letter) => (
+              <span key={letter} className="rounded-md border border-line bg-surface-subtle px-2 py-1 text-xs font-medium text-ink-muted">{letter}</span>
+            ))}
+          </div>
+        )}
         <div className="flex flex-wrap gap-2">
           <Button onClick={() => void captureMovement()} disabled={!running || recognizingMotion || !health?.motionReady}>
             {recognizingMotion ? "Analyzing movement…" : "Recognize movement"}
           </Button>
           {!health?.motionReady && (
-            <span className="self-center text-xs text-ink-muted">Word-level movement translation needs a configured vision model.</span>
+            <span className="self-center text-xs text-ink-muted">
+              {compact ? "Movement recognition needs a configured model." : "Word-level movement translation needs a configured vision model."}
+            </span>
           )}
         </div>
       </section>
 
-      <section className="flex min-w-0 flex-col gap-4 rounded-2xl border border-line bg-surface-subtle p-4 sm:p-5" aria-label="Live sign transcript">
+      <section className={cn("flex min-w-0 flex-col gap-4 rounded-2xl border border-line bg-surface-subtle", compact ? "p-3" : "p-4 sm:p-5")} aria-label="Live sign transcript">
         <div className="flex items-center justify-between gap-2">
           <div>
             <div className="eyebrow">Live transcript</div>
-            <h2 className="mb-0 mt-1 text-xl font-semibold text-ink">Recognized characters</h2>
+            <h2 className="mb-0 mt-1 text-xl font-semibold text-ink">{compact ? "Recognized text" : "Recognized characters"}</h2>
           </div>
           <button
             type="button"
@@ -548,7 +576,7 @@ export function SignBridgeDemo() {
           </button>
         </div>
 
-        <div aria-live="polite" aria-atomic="true" className="min-h-40 flex-1 rounded-xl border border-line bg-surface p-4 text-2xl leading-relaxed tracking-wide text-ink">
+        <div aria-live="polite" aria-atomic="true" className={cn("flex-1 rounded-xl border border-line bg-surface p-4 text-2xl leading-relaxed tracking-wide text-ink", compact ? "min-h-16 text-xl" : "min-h-40")}>
           {message || <span className="text-base tracking-normal text-ink-faint">Start signing. Confident, steady letters will appear here automatically.</span>}
         </div>
 
@@ -563,15 +591,17 @@ export function SignBridgeDemo() {
           </div>
         )}
 
-        <div className="flex flex-wrap items-center gap-2">
-          <label className="flex items-center gap-2 text-xs text-ink-muted">
-            <input type="checkbox" checked={speakOnCapture} onChange={(event) => {
-              speakOnCaptureRef.current = event.target.checked;
-              setSpeakOnCapture(event.target.checked);
-            }} />
-            Speak recognized letters
-          </label>
-        </div>
+        {!compact && (
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="flex items-center gap-2 text-xs text-ink-muted">
+              <input type="checkbox" checked={speakOnCapture} onChange={(event) => {
+                speakOnCaptureRef.current = event.target.checked;
+                setSpeakOnCapture(event.target.checked);
+              }} />
+              Speak recognized letters
+            </label>
+          </div>
+        )}
 
         {suggestion?.source === "motion" && (
           <div className="flex items-center justify-between gap-3 rounded-xl border border-mastered-line bg-mastered-bg p-3">
@@ -585,14 +615,16 @@ export function SignBridgeDemo() {
 
         <div className="mt-auto flex flex-wrap gap-2 border-t border-line pt-3">
           <Button onClick={speakMessage} disabled={!message.trim()}>Speak now</Button>
-          <button type="button" onClick={() => setMessage((current) => `${current} `)} disabled={!message} className={buttonStyles({ variant: "secondary", size: "md" })}>Space</button>
+          <button type="button" onClick={() => { messageRef.current = `${messageRef.current} `; setMessage(messageRef.current); }} disabled={!message} className={buttonStyles({ variant: "secondary", size: "md" })}>Space</button>
           <button type="button" onClick={deleteLast} disabled={!message} className={buttonStyles({ variant: "secondary", size: "md" })}>Backspace</button>
           <button type="button" onClick={clearMessage} disabled={!message} className={buttonStyles({ variant: "secondary", size: "md" })}>Clear</button>
         </div>
 
-        <p className="m-0 border-t border-line pt-3 text-xs leading-5 text-ink-muted">
-          Live model: hand-tracked ASL alphabet fingerspelling (A–Z). Face landmarks and basic mouth/brow measurements run locally; they do not identify people or interpret facial grammar. Full ASL sentence translation needs a trained continuous-sign model.
-        </p>
+        {!compact && (
+          <p className="m-0 border-t border-line pt-3 text-xs leading-5 text-ink-muted">
+            Live model: hand-tracked ASL alphabet fingerspelling (A–Z). Face landmarks and basic mouth/brow measurements run locally; they do not identify people or interpret facial grammar. Full ASL sentence translation needs a trained continuous-sign model.
+          </p>
+        )}
       </section>
     </div>
   );

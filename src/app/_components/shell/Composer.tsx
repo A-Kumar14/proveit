@@ -69,8 +69,8 @@ export function Composer({ value, onChange, onSubmit, status, error, placeholder
                 : <span className="text-ink-faint">{hint ?? "Cmd + Enter to send"}</span>}
             </div>
             {onSign && !busy && (
-              <button type="button" onClick={onSign} aria-pressed={!!signing} aria-label="Sign your message" title="Spell with your hands (ASL letters)" className={cn("flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border px-3 text-xs font-semibold transition-colors", signing ? "border-ink bg-ink text-white" : "border-line-button bg-surface text-ink hover:bg-surface-hover")}>
-                <Hand size={14} strokeWidth={2} aria-hidden />Sign
+              <button type="button" onClick={onSign} aria-pressed={!!signing} aria-label={signing ? "Close ASL Assistant" : "Open ASL Assistant"} title="Spell with your hands (ASL letters)" className={cn("flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border px-3 text-xs font-semibold transition-colors", signing ? "border-ink bg-ink text-white" : "border-line-button bg-surface text-ink hover:bg-surface-hover")}>
+                <Hand size={14} strokeWidth={2} aria-hidden />ASL
               </button>
             )}
             {onTalk && !busy && <TalkPill onClick={onTalk} unavailable={!!talkUnavailable} />}

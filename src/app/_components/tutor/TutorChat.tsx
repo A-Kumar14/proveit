@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Mic, Paperclip, X } from "lucide-react";
 import { streamTutor } from "@proveit/lib/tutorStream";
+import { appendRecognizedSignText } from "@proveit/lib/signbridgeText";
 import { cn } from "@proveit/lib/cn";
 import { useSettings } from "@proveit/lib/settings";
 import type { ReviewBase } from "@proveit/server/store";
@@ -214,7 +215,11 @@ export function TutorChat({ courseId, courseName, base, aiWritten, enabled }: { 
         />
       ) : (
         <>
-        {signing && <SignInput onUse={(t) => setDraft((d) => (d.trim() ? `${d.trimEnd()} ${t}` : t))} onClose={() => setSigning(false)} />}
+        {signing && <SignInput
+          onRecognizedText={(text, kind, startsTranscript) => setDraft((current) =>
+            appendRecognizedSignText(current, text, kind, startsTranscript))}
+          onClose={() => setSigning(false)}
+        />}
         <Composer
           value={draft} onChange={setDraft} onSubmit={submit} status={enabled ? status : "idle"} error={enabled ? error : null}
           placeholder={enabled ? "Ask the tutor anything" : "The tutor is temporarily unavailable"} submitLabel="Send" loadingText="Tutor is replying..."
