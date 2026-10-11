@@ -6,7 +6,7 @@ import { AUTHORED } from "./content";
 import { documentKind, documentText, isLegacyOffice, UnreadableDocumentError } from "./documentText";
 import { loadUserJson, saveUserJson } from "./persistence";
 import { pdfText } from "./pdfText";
-import { courseInstance, courseSpec, getCourse, NotFoundError } from "./store";
+import { courseInstance, courseSpec, getCourse, NotFoundError, builtinNotes } from "./store";
 
 export type Material = { id: string; courseId: string; name: string; mime: string; size: number; addedAt: number; text: string; words: number; readBy: "text" | "ai" };
 
@@ -161,6 +161,8 @@ export function courseMaterial(courseId: string, budget = 24_000): string {
   if (spec?.source === "catalog") parts.push(`# Course notes\n${spec.material}`);
   const authored = authoredNotes(courseId);
   if (authored) parts.push(`# Course notes\n${authored}`);
+  const shipped = builtinNotes(courseId);
+  if (shipped && !authored) parts.push(`# Course notes\n${shipped}`);
   for (const m of listMaterials(courseId)) parts.push(`# Uploaded file: ${m.name}\n${m.text}`);
   const all = parts.join("\n\n");
   if (all.length <= budget) return all;

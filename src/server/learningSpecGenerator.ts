@@ -14,7 +14,7 @@ import {
   saveGeneratedLearningSpec,
 } from "./learningSpecStore";
 import { listMaterials } from "./materials";
-import { courseSpec, getCourse, NotFoundError } from "./store";
+import { courseSpec, getCourse, NotFoundError, builtinNotes } from "./store";
 import { scopedUserId } from "./userScope";
 
 export class LearningSpecGenerationError extends Error {}
@@ -100,6 +100,8 @@ function termsFor(name: string, desc: string): string[] {
 function sourceDocuments(courseId: string): SourceDocument[] {
   getCourse(courseId);
   const out: SourceDocument[] = [];
+  const notes = builtinNotes(courseId);
+  if (notes) out.push({ materialId: `notes:${courseId}`, title: "Course notes", text: cleanText(notes) });
   const spec = courseSpec(courseId);
   if (spec?.material.trim()) {
     out.push({
