@@ -32,6 +32,7 @@ export function SignBridgeDemo({ compact = false, autoStart = false, onRecognize
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const startButtonRef = useRef<HTMLButtonElement | null>(null);
+  const startCameraRef = useRef<(() => Promise<void>) | null>(null);
   const captureCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const landmarkCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -382,12 +383,14 @@ export function SignBridgeDemo({ compact = false, autoStart = false, onRecognize
     }
   };
 
+  startCameraRef.current = startCamera;
+
   useEffect(() => {
     if (autoStart && !autoStartAttemptedRef.current) {
       autoStartAttemptedRef.current = true;
-      void startCamera();
+      void startCameraRef.current?.();
     }
-  }, [autoStart, startCamera]);
+  }, [autoStart]);
 
   const captureMovement = async () => {
     const sessionId = sessionRef.current;
