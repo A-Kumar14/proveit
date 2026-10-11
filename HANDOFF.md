@@ -252,7 +252,7 @@ This is a local hackathon adapter, not a production hosted DB. There is no multi
 - Browse courses (`/courses/browse`): five curated courses written as markdown in `content/courses/`. Adding one creates a runtime course (`CourseSpec`, persisted under `added_courses`). Runtime courses have a map, tutor, notes, paper and quiz. Source-grounded learning specs are generated on demand and drive diagnosis, targeted remediation, transfer and delayed review.
 - Course files upload (`/course/[id]/files`): md, txt, PDF and images become extra context (`server/materials.ts`). PDFs and images are read by the model.
 - Course build pipeline (`server/courseJobs.ts`): uploading returns a job id at once and the build runs after the response, in four stages the modal shows (reading, topics, map, notes) with per-file status, a timer and Cancel. Typeset PDFs and text are read locally (`unpdf`, about 50 ms each). Only scans and images go to the model, in parallel, at low reasoning effort, with timeouts. Job state lives in SQLite so any server process can answer the poll. It replaced a pipeline that transcribed every PDF with the model, one at a time, which took minutes per file.
-- Test this concept is a conversation first (`SessionChat`, `server/session.ts`, `/api/session`). The tutor opens by asking what the student thinks, with no question on screen. It then agrees or corrects, teaches when asked, and asks the next question, and none of that is graded or changes mastery. "I don't know yet" makes it ask which part is confusing, with quick replies (an `OPTIONS:` line the screen parses), and "Teach me from scratch" makes it teach in small steps before asking questions. The graded question appears only when the student taps "Check what I've got" or accepts the tutor's offer, and from there the old evidence flow runs unchanged (assess, follow-up, diagnosis, lesson, transfer). Without a model the screen falls back to the fixed question and offline judges. Voice (ElevenLabs) is not built, and the older voice routes are hidden while the model is on.
+- Test this concept is a conversation first (`SessionChat`, `server/session.ts`, `/api/session`). The tutor opens by asking what the student thinks, with no question on screen. It then agrees or corrects, teaches when asked, and asks the next question, and none of that is graded or changes mastery. "I don't know yet" makes it ask which part is confusing, with quick replies (an `OPTIONS:` line the screen parses), and "Teach me from scratch" makes it teach in small steps before asking questions. The graded question appears only when the student taps "Check what I've got" or accepts the tutor's offer, and from there the evidence flow runs unchanged (assess, follow-up, diagnosis, lesson, transfer). With ElevenLabs agent credentials, Speech mode runs the same tutor brief as a live WebRTC call and shares the transcript with chat; without them it falls back to the browser-recognition speech page. Voice conversation itself never changes mastery.
 - Quiz evidence (`recordQuiz` in `store.ts`): finished quizzes are saved per user and reopen from History. Answered questions feed `recordQuizEvidence`; blanks supply no evidence. An unseen concept may become Developing, but quiz performance never diagnoses, demotes, proves mastery, schedules review or awards rank. Runtime course concept checks generate canonical content on demand.
 - Paper, notes and quiz are written as 2 to 4 parallel model calls over disjoint concepts (`server/parallel.ts`), which is what brought a paper from 21 s to 7 s. Compile is 0.3 s.
 - Add a course: upload notes (markdown headings keep their structure, other notes go to the model for an outline), browse curated, or import from Granola or Wispr Flow.
@@ -306,7 +306,7 @@ Do not merge PR #5 demo data into `main`.
 
 Backend semantics are now substantially complete for the hackathon scope. Remaining work is mostly integration/deployment hardening:
 
-- broad end-to-end UI smoke/integration against the latest frontend;
+- live end-to-end browser/device smoke against the latest frontend (the repo-wide integration hardening pass is merged);
 - hosted durable database/storage adapter;
 - real Clerk account-switch browser smoke;
 - live Gemini/OpenRouter presentation-device smoke;
@@ -361,7 +361,7 @@ The no-auth `local` namespace keeps original keys and test reset hooks. Pre-auth
 ## Speech mode
 
 `/course/[courseId]/practice/[conceptId]/talk` is a spoken two-way conversation with the same tutor as the chat. It shares the transcript with `SessionChat` through sessionStorage, so the student can switch both ways. Speech in uses the browser's recognition (silence for 1.6s ends a turn). Speech out goes through `/api/voice/speak`, which proxies ElevenLabs (`ELEVENLABS_API_KEY`, optional `ELEVENLABS_VOICE_ID`, `ELEVENLABS_MODEL`) and falls back to browser speech on a 501. Nothing is graded in speech mode; the check happens in the chat.
-After this backend hardening milestone, do one deliberate frontend/backend integration pass rather than chasing frontend commits piecemeal.
+The deliberate frontend/backend integration pass landed in PR #14. Re-run focused hardening when teammate changes land on top of it rather than re-auditing stable subsystems from scratch.
 
 
 ## Rank ladder
