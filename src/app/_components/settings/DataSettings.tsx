@@ -6,6 +6,7 @@ import { Download } from "lucide-react";
 import { cn } from "@proveit/lib/cn";
 import { buttonStyles } from "../Button";
 import { SettingRow } from "./SettingRow";
+import { DemoResetButton } from "../dashboard/DemoResetButton";
 
 const CHAT_KEY = /^proveit\.session\./;
 
@@ -47,6 +48,9 @@ export function DataSettings({ courses }: { courses: { id: string; name: string 
   return (
     <>
       <h2 className="m-0 mb-1 text-lg font-semibold">Data and privacy</h2>
+      <SettingRow title="Reset the demo" description="Puts every course, answer, quiz, rank and the calendar back to the starting sample state. Use it before presenting.">
+        <DemoResetButton />
+      </SettingRow>
       <SettingRow title="Download your data" description="Your courses, concept states, answers, quiz scores, and these settings, as one JSON file.">
         <a href="/api/account/export" download className={cn(buttonStyles({ variant: "secondary" }), "no-underline")}><Download size={14} aria-hidden />Download</a>
       </SettingRow>

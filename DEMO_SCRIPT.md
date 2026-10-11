@@ -2,7 +2,7 @@
 
 One student, one concept (**CI interpretation**, Intro Statistics), eight different answers. Each beat shows a different reaction from the same tutor. The lines in quotes are what you say or type. Every one was run against the live model while writing this, so the reactions below are what to expect. The exact wording changes from run to run. The behaviour does not.
 
-Before you start: tap **Reset demo** on the dashboard, check the microphone is allowed, and have `service.py` running if SignBridge is on the agenda.
+Before you start: tap **Reset demo** in Settings, Data and privacy, check the microphone is allowed, and have `service.py` running if SignBridge is on the agenda.
 
 ## The whole thing on one card
 
@@ -125,7 +125,7 @@ Needs `service.py` running (see the setup note at the top). If the service is of
 - **Model slow or down.** The tutor needs a key and takes 1 to 3 seconds a reply. Keep talking over the wait. If it errors, retry once. The screen puts your message back in the box.
 - **Voice won't connect.** The red message on the page says why. Say you'll show it by text, go **Back to chat**, and keep going. Nothing else depends on it.
 - **A different reaction than this script.** Say what it did. The behaviour matters: correct kindly, credit the right half, never invent a mistake, grade only on request.
-- **Need to redo it.** Tap **Reset demo**. It reloads the starting state in a second.
+- **Need to redo it.** Open Settings, Data and privacy, and tap **Reset demo**. It reloads the starting state in a second.
 
 ## What this proves to the judges, in one sentence each
 

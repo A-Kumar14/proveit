@@ -9,7 +9,7 @@ pnpm present          # builds, then runs on .data/stage.sqlite (fast, use this 
 pnpm dev:stage        # same data, dev mode (slow first visits)
 ```
 
-Top right, **Reset demo** puts everything back to the starting state below. Use it before going on stage.
+In **Settings, Data and privacy**, **Reset demo** puts everything back to the starting state below. Use it before going on stage.
 
 ## Starting state
 
