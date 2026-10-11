@@ -292,10 +292,10 @@ export function addCourseSpec(spec: CourseSpec): { id: string; added: boolean } 
   return { id: spec.id, added: true };
 }
 
-/** Removes a course added at runtime. The demo course and test placeholders can't be removed. */
+/** Removes any course except the main one. Rank points already earned stay, so a course can't be deleted and re-added for more. */
 export function removeAddedCourse(id: string): boolean {
   const data = db();
-  const i = data.samples.findIndex((c) => c.id === id && c.runtime);
+  const i = data.samples.findIndex((c) => c.id === id);
   if (i < 0) return false;
   const removed = data.samples[i]!;
   data.samples.splice(i, 1);
@@ -1534,6 +1534,8 @@ export type CourseRow = {
   /** Developing or provisional: started, not yet mastered. */ inProgress: number; notStarted: number; next: string | null;
   completed: boolean; /** true when the student set it, false when every concept got Mastered on its own */ manual: boolean;
   openMisconception: string | null;
+  /** False for the main built-in course, which everything else hangs off. */
+  removable: boolean;
 };
 
 export function listCourses(): CourseRow[] {
@@ -1550,6 +1552,7 @@ export function listCourses(): CourseRow[] {
       next: nextConceptFor(c)?.name ?? c.concepts.find((x) => x.state !== "mastered")?.name ?? null,
       completed: isCompleted(c), manual: c.completedOverride !== null,
       openMisconception: last || null,
+      removable: c !== course,
     };
   });
 }

@@ -7,15 +7,16 @@ import type { CourseRow } from "@proveit/server/store";
 const refresh = vi.fn();
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh, push: vi.fn() }) }));
 const setCoursesCompleted = vi.fn();
-vi.mock("@proveit/lib/api", () => ({ api: { setCoursesCompleted: (...a: unknown[]) => setCoursesCompleted(...a) } }));
+const removeCourse = vi.fn();
+vi.mock("@proveit/lib/api", () => ({ api: { setCoursesCompleted: (...a: unknown[]) => setCoursesCompleted(...a), removeCourse: (...a: unknown[]) => removeCourse(...a) } }));
 
 import { CoursesTable } from "./CoursesTable";
 
-const row = (over: Partial<CourseRow>): CourseRow => ({ id: "x", name: "X", pct: 10, proven: 1, total: 10, needsWork: 0, inProgress: 0, notStarted: 0, next: null, completed: false, manual: false, openMisconception: null, ...over });
+const row = (over: Partial<CourseRow>): CourseRow => ({ id: "x", name: "X", pct: 10, proven: 1, total: 10, needsWork: 0, inProgress: 0, notStarted: 0, next: null, completed: false, manual: false, openMisconception: null, removable: true, ...over });
 const stats = row({ id: "stats", name: "Intro Statistics", pct: 42 });
 const algebra = row({ id: "algebra", name: "Linear Algebra", pct: 100, proven: 8, total: 8, completed: true });
 
-beforeEach(() => { refresh.mockReset(); setCoursesCompleted.mockReset().mockResolvedValue({ updated: [] }); });
+beforeEach(() => { removeCourse.mockReset().mockResolvedValue({ removed: true }); refresh.mockReset(); setCoursesCompleted.mockReset().mockResolvedValue({ updated: [] }); });
 afterEach(cleanup);
 
 describe("CoursesTable", () => {
@@ -82,5 +83,57 @@ describe("CoursesTable", () => {
     render(<CoursesTable rows={[stats]} />);
     await userEvent.click(screen.getByRole("button", { name: /^Completed/ }));
     expect(screen.getByText("No completed courses yet")).toBeTruthy();
+  });
+});
+
+describe("deleting a course", () => {
+  const open = async (name: string) => {
+    await userEvent.click(screen.getByRole("button", { name: `Actions for ${name}` }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Delete course" }));
+  };
+
+  it("asks first, then deletes and refreshes the list", async () => {
+    render(<CoursesTable rows={[stats, algebra]} />);
+    await open("Intro Statistics");
+    expect(screen.getByRole("alertdialog").textContent).toContain("Delete Intro Statistics?");
+    expect(removeCourse).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: "Delete course" }));
+    expect(removeCourse).toHaveBeenCalledWith("stats");
+    expect(await screen.findByText("Deleted Intro Statistics.")).toBeTruthy();
+    expect(refresh).toHaveBeenCalled();
+  });
+
+  it("does nothing when cancelled", async () => {
+    render(<CoursesTable rows={[stats]} />);
+    await open("Intro Statistics");
+    await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+    expect(removeCourse).not.toHaveBeenCalled();
+  });
+
+  it("shows why it failed and keeps the dialog open", async () => {
+    removeCourse.mockRejectedValueOnce(new Error("That course can't be deleted."));
+    render(<CoursesTable rows={[stats]} />);
+    await open("Intro Statistics");
+    await userEvent.click(screen.getByRole("button", { name: "Delete course" }));
+    expect((await screen.findByRole("alert")).textContent).toBe("That course can't be deleted.");
+    expect(screen.getByRole("alertdialog")).toBeTruthy();
+  });
+
+  it("offers no delete for the main built-in course", async () => {
+    render(<CoursesTable rows={[row({ id: "main", name: "Main Course", removable: false })]} />);
+    await userEvent.click(screen.getByRole("button", { name: "Actions for Main Course" }));
+    expect(screen.queryByRole("menuitem", { name: "Delete course" })).toBeNull();
+  });
+});
+
+describe("the row actions menu", () => {
+  it("stays open after the click that opened it", async () => {
+    render(<CoursesTable rows={[stats]} />);
+    await userEvent.click(screen.getByRole("button", { name: "Actions for Intro Statistics" }));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.getByRole("menu")).toBeTruthy();
+    await userEvent.click(document.body);
+    expect(screen.queryByRole("menu")).toBeNull();
   });
 });
