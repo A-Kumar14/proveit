@@ -378,3 +378,12 @@ Overall tiers start at 0 / 1,000 / 5,000 / 10,000 / 50,000 / 100,000 / 500,000 p
 ## Settings and account
 
 Settings has five tabs: Learning, Tutor, Voice, Data and privacy, Accessibility. Tutor, voice and quiz choices are stored per account (`server/prefs.ts`, key `prefs`, schema in `lib/prefs.ts`) and saved through `/api/prefs`. A patch never overwrites fields it doesn't name, and unknown keys are refused. The tutor reads the choices on the server (`sessionSystem`), so they can't be changed from a chat message. The voice list is fixed in `TUTOR_VOICES`, and only those ids reach ElevenLabs (the call override and `/api/voice/speak` previews). Calls report their length to `/api/voice/usage`, counted at most 30 minutes each. `VOICE_MINUTES_CAP` sets a per-account limit, enforced when a call starts. Data and privacy has a JSON export (`/api/account/export`), clear tutor chats on this device, and start a course over (`/api/courses/reset`, typed confirmation, rank points stay). The account page now shows streak, best streak, concepts by state, quizzes taken, voice minutes and the calendar connection. The decorative "Free plan" badge is gone. Not built: delete account (Clerk's Manage account has it), per-account reminders.
+
+## Speed and polish pass
+
+- **Run the demo built, not in dev.** `pnpm dev` compiles each page on first visit, which is most of the "slow" feeling. Built pages answer in about 5 ms. Use `pnpm build && pnpm start`.
+- **First click on a concept used to wait about 8 seconds** while the model wrote its learning content. `warmCourseSpecs` (`server/specWarmup.ts`) now writes it in the background, four at a time, when a course you added is opened. Measured after: 5 to 30 ms. A loading screen covers the rest.
+- A course quiz of 8 or more questions is written in four parallel parts, about 6 s to 3.7 s. Paper and notes did not get faster this way, because compiling the PDF dominates.
+- Pages have their own browser tab titles, there is a styled 404, and screen-reader headings exist on settings, the course map and the tutor.
+- Text sizes use rem everywhere, so the Text size setting scales them. The sidebar is a drawer under 1024 px and page padding tightens. No page overflows sideways from 768 px up.
+- Every "talk it through" link (diagnosis, lesson, `?mode=speak`) opens the live call when a model is on, and Settings, Learning, Answer by Talk now opens it when you start a concept. A bad follow-up link opens the concept fresh instead of a 404.
