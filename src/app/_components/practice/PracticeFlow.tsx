@@ -51,7 +51,7 @@ export function PracticeFlow({ courseId, question, resume, uploads, modeParam }:
     setStatus("evaluating");
     setError(null);
     try {
-      const { attemptId, evaluation } = await api.assess({ courseId, conceptId: question.conceptId, answer, followUpTo, imageSummary: upload?.ok ? upload.summary : undefined, imageName: upload?.ok ? upload.name : undefined });
+      const { attemptId, evaluation } = await api.assess({ courseId, conceptId: question.conceptId, learningSpecRevision: question.learningSpecRevision, answer, followUpTo, imageSummary: upload?.ok ? upload.summary : undefined, imageName: upload?.ok ? upload.name : undefined });
       if (evaluation.verdict === "uncertain") {
         setTurns((t) => [...t, { answer, followUp: evaluation.followUp ?? "Say a bit more." }]);
         setFollowUpTo(attemptId);

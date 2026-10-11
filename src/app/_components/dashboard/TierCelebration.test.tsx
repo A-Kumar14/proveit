@@ -85,16 +85,16 @@ describe("TierCelebration", () => {
 
 const rank = (courseId: string, name: string, points: number, tierIndex: number): CourseRank => {
   const s = standing(points);
-  return { courseId, name, ...s, tierIndex };
+  return { courseId, name, ...s, tierIndex, tier: TIERS[tierIndex]! };
 };
 const COURSES = [rank("intro-stats", "Intro Statistics", 2600, 2), rank("pf", "Personal Finance", 0, 0)];
 
 describe("RankCard", () => {
   it("shows the tier, points, distance to the next tier and the whole ladder", () => {
     render(<RankCard r={rewards(6000)} courses={COURSES} previewable={false} />);
-    expect(screen.getByText("Platinum", { selector: "span.text-\\[1\\.375rem\\]" })).toBeTruthy();
-    expect(screen.getByText("1,000 to Diamond")).toBeTruthy();
-    expect(screen.getByRole("progressbar", { name: "Progress to Diamond" }).getAttribute("aria-valuenow")).toBe("60");
+    expect(screen.getByText("Gold", { selector: "span.text-\\[1\\.375rem\\]" })).toBeTruthy();
+    expect(screen.getByText("4,000 to Platinum")).toBeTruthy();
+    expect(screen.getByRole("progressbar", { name: "Progress to Platinum" }).getAttribute("aria-valuenow")).toBe("20");
     const steps = within(screen.getByRole("list", { name: "Tiers" })).getAllByRole("listitem");
     expect(steps).toHaveLength(7);
     expect(steps.filter((s) => s.getAttribute("aria-current") === "step")).toHaveLength(1);
@@ -110,7 +110,8 @@ describe("RankCard", () => {
   });
 
   it("says when the top tier is reached", () => {
-    render(<RankCard r={rewards(20000)} courses={COURSES} previewable={false} />);
+    render(<RankCard r={rewards(600000)} courses={COURSES} previewable={false} />);
     expect(screen.getByText("Top tier reached")).toBeTruthy();
   });
 });
+

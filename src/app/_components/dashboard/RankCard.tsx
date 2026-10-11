@@ -39,7 +39,7 @@ export function RankCard({ r, courses, previewable, userId = "local" }: { r: Rew
 
           <section aria-label="Rank by course" className="flex flex-col gap-1.5">
             <h3 className="m-0 text-[0.6875rem] font-medium tracking-[0.06em] text-ink-faint uppercase">By course</h3>
-            <p className="m-0 text-xs text-ink-muted">Your overall rank adds up everything across every course, plus your streak. Each course also has its own rank on the same ladder.</p>
+            <p className="m-0 text-xs text-ink-muted">Your overall rank adds up everything across every course, plus your streak. Each course also has its own rank, with a ladder scaled to that course so one topic can reach the top.</p>
             <ul className="m-0 grid list-none grid-cols-1 gap-x-6 gap-y-1 p-0 sm:grid-cols-2">
               {courses.map((c) => (
                 <li key={c.courseId} className="flex items-center gap-2 border-t border-line py-1.5 text-xs">
@@ -75,3 +75,4 @@ export function RankCard({ r, courses, previewable, userId = "local" }: { r: Rew
     </div>
   );
 }
+

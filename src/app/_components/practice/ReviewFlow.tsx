@@ -45,7 +45,7 @@ export function ReviewFlow({ r }: { r: ReviewChallengeView }) {
       <Log>
         <AssistantMessage>
           <TransferQuestionCard
-            question={r.review.question}
+            sources={r.review.sources} question={r.review.question}
             hint={r.review.hint}
             showHint={hint}
             hintsEnabled={settings.showHints}
@@ -70,3 +70,4 @@ export function ReviewFlow({ r }: { r: ReviewChallengeView }) {
     </>
   );
 }
+

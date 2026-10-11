@@ -1,12 +1,13 @@
+import { SourceLineage } from "./SourceLineage";
 import { AssistantCard } from "../chat/AssistantCard";
 
 export function TransferQuestionCard({
-  question, hint, showHint, hintsEnabled, onToggleHint,
+  question, hint, sources = [], showHint, hintsEnabled, onToggleHint,
   description = "The setup is different. The idea underneath is the one you just fixed. Repeating the first question would only check memory.",
   label = "New question · same idea",
   headline = "Now prove it transfers.",
 }: {
-  question: string; hint: string; showHint: boolean; hintsEnabled: boolean; onToggleHint: () => void; description?: string; label?: string; headline?: string;
+  sources?: import("@proveit/server/sourceLineage").LearningSourceView[]; question: string; hint: string; showHint: boolean; hintsEnabled: boolean; onToggleHint: () => void; description?: string; label?: string; headline?: string;
 }) {
   return (
     <AssistantCard ariaLabel={label} label={label} headline={headline}>
@@ -20,6 +21,8 @@ export function TransferQuestionCard({
         </div>
       )}
       {hintsEnabled && showHint && <div className="mx-[18px] mb-3 rounded-sm border border-developing-line bg-developing-bg px-3 py-2 text-xs text-developing-text">{hint}</div>}
+      <SourceLineage sources={sources} />
     </AssistantCard>
   );
 }
+

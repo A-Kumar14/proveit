@@ -7,13 +7,13 @@ import { aiEnabled, model } from "./ai";
 import { courseMaterial } from "./materials";
 import { splitByConcept } from "./parallel";
 import { getWeakness, type Weak } from "./practice";
-import { getQuizRecord, NotFoundError, recordQuiz, type QuizRecord } from "./store";
+import { courseInstance, getQuizRecord, NotFoundError, recordQuiz, type QuizRecord } from "./store";
 import type { QuizQuestion, QuizResult, QuizStartResult } from "@proveit/lib/schemas";
 
 export const DEFAULT_QUESTIONS = 8;
 
 type Keyed = QuizQuestion & { conceptId: string; correct: number; explanation: string };
-type Held = { id: string; courseId: string; courseName: string; questions: Keyed[]; at: number; result: QuizResult | null };
+type Held = { course: object; id: string; courseId: string; courseName: string; questions: Keyed[]; at: number; result: QuizResult | null };
 
 const g = globalThis as unknown as { __proveitQuizzes?: Map<string, Held> };
 const quizzes = (): Map<string, Held> => userCache("quizzes", () => (g.__proveitQuizzes ??= new Map<string, Held>()), () => new Map<string, Held>());
@@ -120,6 +120,7 @@ const strip = ({ id, concept, prompt, options }: Keyed): QuizQuestion => ({ id, 
 const FOCUSED_QUESTIONS = 4;
 
 export async function startQuiz(courseId: string, count?: number, conceptId?: string): Promise<QuizStartResult> {
+  const course = courseInstance(courseId);
   const w = getWeakness(courseId);
   if (w.concepts.length === 0) throw new NotFoundError(`course ${courseId} has no concepts`);
   const focus = conceptId ? w.concepts.find((c) => c.id === conceptId) : undefined;
@@ -130,8 +131,9 @@ export async function startQuiz(courseId: string, count?: number, conceptId?: st
   // Without a model, a one-concept quiz can only ask about the concept once, since the questions come from the other concepts' descriptions.
   const questions = useAi ? await written(courseId, w.courseName, concepts, n) : offline(concepts, n, w.concepts);
   if (questions.length === 0) throw new NotFoundError(`course ${courseId} is too small for a quiz`);
+  if (courseInstance(courseId) !== course) throw new NotFoundError("course replaced while generating quiz");
   const id = randomUUID();
-  remember({ id, courseId, courseName: w.courseName, questions, at: Date.now(), result: null });
+  remember({ course, id, courseId, courseName: w.courseName, questions, at: Date.now(), result: null });
   return { quizId: id, courseName: w.courseName, questions: questions.map(strip), aiWritten: useAi };
 }
 
@@ -153,10 +155,10 @@ export function auditOf(r: QuizRecord): QuizResult {
 
 export const getQuizAudit = (quizId: string): QuizResult => auditOf(getQuizRecord(quizId));
 
-/** Grades a quiz and saves it. Submitting twice returns the first result. The quiz moves the course map and earns a few rank points. */
+/** Grades a quiz and saves it. Submitting twice returns the first result. Answered questions are weak evidence; they never demote mastery or award rank. */
 export function submitQuiz(quizId: string, answers: (number | null)[]): QuizResult {
   const quiz = quizzes().get(quizId);
-  if (!quiz) throw new NotFoundError(`quiz ${quizId}`);
+  if (!quiz || courseInstance(quiz.courseId) !== quiz.course) throw new NotFoundError(`quiz ${quizId}`);
   if (quiz.result) return quiz.result;
   const record = recordQuiz({
     courseId: quiz.courseId,
@@ -165,3 +167,4 @@ export function submitQuiz(quizId: string, answers: (number | null)[]): QuizResu
   quiz.result = auditOf(record);
   return quiz.result;
 }
+

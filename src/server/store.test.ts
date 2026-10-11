@@ -684,7 +684,7 @@ describe("rank points", () => {
   it("starts from the seeded evidence and explains every point", () => {
     const r = getRewards();
     expect(r.points).toBe(6000);
-    expect(r.tier.name).toBe("Platinum");
+    expect(r.tier.name).toBe("Gold");
     expect(r.breakdown.reduce((n, b) => n + b.points, 0)).toBe(6000);
     expect(r.breakdown.find((b) => b.label === "Concepts mastered")).toMatchObject({ count: 16, points: 4800 });
     expect(r.breakdown.find((b) => b.label === "Courses mastered end to end")).toMatchObject({ count: 1, points: 1000 });
@@ -740,3 +740,4 @@ describe("rank points", () => {
     expect(getRewards().breakdown.find((b) => b.label === "Courses mastered end to end")?.count).toBe(0);
   });
 });
+

@@ -172,7 +172,7 @@ export function TutorChat({ courseId, courseName, base, aiWritten, enabled }: { 
       <Log>
         <AssistantMessage>
           <div className="w-fit max-w-[640px] rounded-[14px_14px_14px_4px] border border-line bg-surface px-3.5 py-3">
-            <Prose text={enabled ? `I'm your tutor for ${courseName}. Ask me anything, attach a file, or talk it through. I know where you're strong and where you're stuck.` : `I'm your tutor for ${courseName}, but I need a Gemini key on the server before I can answer. Add GOOGLE_GENERATIVE_AI_API_KEY and restart.`} />
+            <Prose text={enabled ? `I'm your tutor for ${courseName}. Ask me anything, attach a file, or talk it through. I know where you're strong and where you're stuck.` : `I'm your tutor for ${courseName}, but I am temporarily unavailable. Please try again after the AI connection is configured.`} />
           </div>
           {empty && enabled && (
             <div className="mt-2.5 flex flex-wrap gap-2">
@@ -211,7 +211,7 @@ export function TutorChat({ courseId, courseName, base, aiWritten, enabled }: { 
       ) : (
         <Composer
           value={draft} onChange={setDraft} onSubmit={submit} status={enabled ? status : "idle"} error={enabled ? error : null}
-          placeholder={enabled ? "Ask the tutor anything" : "The tutor needs a Gemini key"} submitLabel="Send" loadingText="Tutor is replying..."
+          placeholder={enabled ? "Ask the tutor anything" : "The tutor is temporarily unavailable"} submitLabel="Send" loadingText="Tutor is replying..."
           hint={dictating ? (heard || "Listening. Tap the mic to stop.") : "Proof of understanding comes from Test this concept."}
           onStop={() => abort.current?.abort()}
           onTalk={enabled ? startVoice : undefined} talkUnavailable={!canTalk}
@@ -237,3 +237,4 @@ export function TutorChat({ courseId, courseName, base, aiWritten, enabled }: { 
     </>
   );
 }
+

@@ -127,7 +127,7 @@ export function VoiceSession({ courseId, question, typeHref, uploads }: { course
     setBusy(true);
     setError(null);
     try {
-      const { attemptId, evaluation } = await api.assess({ courseId, conceptId: question.conceptId, answer: draft, followUpTo, imageSummary: shown?.ok ? shown.summary : undefined });
+      const { attemptId, evaluation } = await api.assess({ courseId, conceptId: question.conceptId, learningSpecRevision: question.learningSpecRevision, answer: draft, followUpTo, imageSummary: shown?.ok ? shown.summary : undefined });
       if (evaluation.verdict !== "uncertain") return router.push(`/course/${courseId}/diagnosis/${attemptId}`);
       finals.current = "";
       setSpoken(""); setInterim(""); setFollowUpTo(attemptId);

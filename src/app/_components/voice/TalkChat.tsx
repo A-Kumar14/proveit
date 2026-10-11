@@ -5,6 +5,7 @@ import Link from "next/link";
 import { MessageSquare } from "lucide-react";
 import { streamTutor } from "@proveit/lib/tutorStream";
 import { forSpeech } from "@proveit/lib/speechText";
+import { sessionStorageKey } from "@proveit/lib/sessionStorageKey";
 import { cn } from "@proveit/lib/cn";
 import { Orb, type OrbState } from "./Orb";
 import { playSpeech } from "./playSpeech";
@@ -22,8 +23,8 @@ const SILENCE_MS = 1600;
  * through sessionStorage, so the student can switch between talking and typing without losing the thread.
  * Nothing here is graded. The check happens back in the chat.
  */
-export function TalkChat({ courseId, conceptId, opening, chatHref }: { courseId: string; conceptId: string; opening: string; chatHref: string }) {
-  const storeKey = `proveit.session.${courseId}.${conceptId}`;
+export function TalkChat({ userId, courseId, conceptId, opening, chatHref }: { userId: string; courseId: string; conceptId: string; opening: string; chatHref: string }) {
+  const storeKey = sessionStorageKey(userId, courseId, conceptId);
   const supported = useVoiceSupport();
   const [phase, setPhase] = useState<"idle" | "listening" | "thinking" | "speaking">("idle");
   const [muted, setMuted] = useState(false);
@@ -141,3 +142,4 @@ export function TalkChat({ courseId, conceptId, opening, chatHref }: { courseId:
     </div>
   );
 }
+

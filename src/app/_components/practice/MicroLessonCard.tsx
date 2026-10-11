@@ -1,3 +1,4 @@
+import { SourceLineage } from "./SourceLineage";
 import { AssistantCard } from "../chat/AssistantCard";
 import { CiIntervalsFigure } from "./CiIntervalsFigure";
 import Link from "next/link";
@@ -28,6 +29,7 @@ export function MicroLessonCard({ lesson, conceptName, open, toggleable, onToggl
             </div>
             {lesson.figure === "ci-intervals" && <CiIntervalsFigure />}
           </div>
+          <SourceLineage sources={lesson.sources} showExcerpt />
           <div className="flex items-center justify-between gap-2.5 px-[18px] pb-3">
             <div className="flex gap-1.5">
               {lesson.rule && <span className="rounded-full bg-surface-active px-[9px] py-0.5 text-[0.6875rem] text-ink-3">{lesson.rule}</span>}
@@ -45,3 +47,4 @@ export function MicroLessonCard({ lesson, conceptName, open, toggleable, onToggl
     </AssistantCard>
   );
 }
+

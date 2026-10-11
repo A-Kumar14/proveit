@@ -8,6 +8,7 @@ vi.mock("./ai", () => ({ aiEnabled: () => ai, model: () => "mock-model" }));
 import { startQuiz, submitQuiz } from "./quiz";
 import { addCatalogCourse } from "./courses";
 import { getCourse, getCourseRanks, getEvidenceAttempt, getHistory, getRewards, NotFoundError, stateAfterQuiz } from "./store";
+import { removeCatalogCourse } from "./courses";
 import { getQuizAudit } from "./quiz";
 
 beforeEach(() => {
@@ -143,9 +144,9 @@ describe("what a quiz does to the map, the history and the rank", () => {
 
   it("follows one rule for what a quiz may do to a concept", () => {
     expect(stateAfterQuiz("not_started", 1, 2)).toBe("developing");
-    expect(stateAfterQuiz("not_started", 0, 1)).toBe("needs_work");
+    expect(stateAfterQuiz("not_started", 0, 1)).toBe("developing");
     expect(stateAfterQuiz("developing", 0, 1)).toBe("developing");
-    expect(stateAfterQuiz("developing", 0, 2)).toBe("needs_work");
+    expect(stateAfterQuiz("developing", 0, 2)).toBe("developing");
     expect(stateAfterQuiz("developing", 2, 2)).toBe("developing");
     for (const s of ["needs_work", "provisional", "mastered"] as const) {
       expect(stateAfterQuiz(s, 2, 2)).toBe(s);
@@ -159,10 +160,10 @@ describe("what a quiz does to the map, the history and the rank", () => {
     const c = getCourse(NM).concepts;
     const r = await take([c[0]!.name, c[2]!.name]);
     expect(stateOf(c[0]!.id)).toBe("developing");
-    expect(stateOf(c[1]!.id)).toBe("needs_work");
+    expect(stateOf(c[1]!.id)).toBe("developing");
     expect(stateOf(c[2]!.id)).toBe("developing");
-    expect(c.slice(3).every((x) => stateOf(x.id) === "needs_work")).toBe(true);
-    expect(r.changes.filter((x) => x.to === "developing").map((x) => [x.concept, x.from]).sort()).toEqual([[c[0]!.name, "not_started"], [c[2]!.name, "not_started"]].sort());
+    expect(c.slice(3).every((x) => stateOf(x.id) === "developing")).toBe(true);
+    expect(r.changes.filter((x) => x.to === "developing").map((x) => [x.concept, x.from]).sort()).toEqual(c.map((x) => [x.name, "not_started"]).sort());
     expect(r.changes).toHaveLength(c.length);
     expect(r.byConcept.find((x) => x.conceptId === c[2]!.id)).toMatchObject({ right: 1, total: 1 });
   });
@@ -188,18 +189,15 @@ describe("what a quiz does to the map, the history and the rank", () => {
     for (const c of getCourse("intro-stats").concepts) if (["mastered", "provisional", "needs_work"].includes(before[c.id]!)) expect(c.state).toBe(before[c.id]);
   });
 
-  it("gives rank points once per concept answered right, and none for retaking the same ones", async () => {
+  it("records weak evidence and never awards rank, including on retakes", async () => {
     addCatalogCourse(NM);
     const n = names();
     const start = getRewards().points;
-    const first = await take([n[0]!, n[1]!]);
-    expect(first.pointsGained).toBe(50);
-    expect(getRewards().points).toBe(start + 50);
-    expect(getRewards(NM).breakdown).toContainEqual({ label: "Concepts answered right in a quiz", count: 2, each: 25, points: 50 });
-    expect((await take([n[0]!, n[2]!])).pointsGained).toBe(25);
     expect((await take([n[0]!, n[1]!])).pointsGained).toBe(0);
-    expect(getCourseRanks().find((r) => r.courseId === NM)!.points).toBe(75);
-    expect(getRewards().points).toBe(start + 75);
+    expect((await take([n[0]!, n[2]!])).pointsGained).toBe(0);
+    expect(getCourseRanks().find((r) => r.courseId === NM)!.points).toBe(0);
+    expect(getRewards().points).toBe(start);
+    expect(getHistory().filter((e) => e.quizPct === undefined).length).toBeGreaterThan(0);
   });
 
   it("saves the quiz to History and reopens it as an audit", async () => {
@@ -214,10 +212,26 @@ describe("what a quiz does to the map, the history and the rank", () => {
     expect(() => getEvidenceAttempt(r.quizId)).toThrow();
     expect(ev.detail).toContain(n[0]!);
     const audit = getQuizAudit(r.quizId);
-    expect(audit).toMatchObject({ score: 1, total: n.length, courseId: NM, pointsGained: 25 });
+    expect(audit).toMatchObject({ score: 1, total: n.length, courseId: NM, pointsGained: 0 });
     expect(audit.items[1]).toMatchObject({ picked: expect.any(Number), correct: expect.any(Number), explanation: expect.stringMatching(/^Because /) });
     expect(audit.changes).toHaveLength(n.length);
     expect(() => getQuizAudit("q999")).toThrow(NotFoundError);
+  });
+
+  it("rejects old quizzes and removes their history when a course is removed and re-added", async () => {
+    addCatalogCourse(NM);
+    ai = true;
+    quizModel();
+    const open = await startQuiz(NM, 4);
+    const completed = submitQuiz(open.quizId, [0, 0, 0, 0]);
+    const pending = await startQuiz(NM, 4);
+    removeCatalogCourse(NM);
+    addCatalogCourse(NM);
+    expect(() => submitQuiz(pending.quizId, [0, 0, 0, 0])).toThrow(NotFoundError);
+    expect(() => submitQuiz(open.quizId, [0, 0, 0, 0])).toThrow(NotFoundError);
+    expect(() => getQuizAudit(completed.quizId)).toThrow(NotFoundError);
+    expect(getHistory().some((e) => e.id === completed.quizId)).toBe(false);
+    expect(getCourse(NM).concepts.every((c) => c.state === "not_started")).toBe(true);
   });
 
   it("quizzes one concept when asked, and in a full quiz drops questions about concepts that don't exist", async () => {
@@ -232,3 +246,4 @@ describe("what a quiz does to the map, the history and the rank", () => {
     expect((await startQuiz(NM, c.length)).questions).toHaveLength(c.length - 1);
   });
 });
+

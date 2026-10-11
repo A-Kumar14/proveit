@@ -32,6 +32,8 @@ import {
   getReviewChallenge,
   submitReview,
   submitTransfer,
+  recordQuiz,
+  InvalidAttemptLinkError,
 } from "./store";
 
 type GenerationPrompt = { sources: { id: string; excerpt: string }[] };
@@ -148,6 +150,7 @@ describe("generated-course backend regression", () => {
         retrieved: true,
       })]);
 
+      await expect(assess({ courseId, conceptId, answer: "The membrane controls transport.", learningSpecRevision: 99 })).rejects.toBeInstanceOf(InvalidAttemptLinkError);
       const first = await assess({
         courseId,
         conceptId,
@@ -163,6 +166,9 @@ describe("generated-course backend regression", () => {
       const lesson = getRemediation(first.attemptId);
       expect(lesson.lesson.title).toBe("The membrane controls exchange.");
       expect(lesson.lesson.sources[0]).toMatchObject({ retrieved: true, materialId: expect.any(String) });
+
+      recordQuiz({ courseId, items: [{ conceptId, concept: "Cell membrane", prompt: "Transport role?", options: ["Controls movement", "Stores DNA", "Makes ATP", "No role"], picked: 1, correct: 0, explanation: "It controls movement." }] });
+      expect(getCourse(courseId).concepts[0]!.state).toBe("needs_work");
 
       const transfer = await submitTransfer(
         first.attemptId,
@@ -189,7 +195,7 @@ describe("generated-course backend regression", () => {
       if (review.result !== "pass") throw new Error("expected review pass");
       expect(getCourse(courseId).concepts[0]!.state).toBe("mastered");
       expect(getEvidenceAttempt(review.resultAttemptId).sources[0]).toMatchObject({ retrieved: true });
-      expect(getHistory().map((event) => event.title)).toEqual([
+      expect(getHistory().filter((event) => !event.title.startsWith("Quiz")).map((event) => event.title)).toEqual([
         "Passed delayed review on Cell membrane",
         "Passed the new question on Cell membrane",
         "Answered Cell membrane",
@@ -220,3 +226,4 @@ describe("generated-course backend regression", () => {
     });
   });
 });
+

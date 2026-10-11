@@ -16,7 +16,7 @@ import type { QuestionView } from "@proveit/server/store";
 
 const question: QuestionView = { courseName: "Intro Statistics", conceptId: "cii", conceptName: "CI interpretation", state: "needs_work", prompt: "Explain what a 95% confidence interval means.", why: "Why", probe: "Probe?", source: "Unit 03", sources: [] };
 const OPENING = "Let's talk about CI interpretation. What do you think it means?";
-const mount = (resume?: { attemptId: string; answer: string; followUp: string }) => render(<SessionChat courseId="intro-stats" question={question} opening={OPENING} resume={resume} />);
+const mount = (resume?: { attemptId: string; answer: string; followUp: string }) => render(<SessionChat userId="user_a" courseId="intro-stats" question={question} opening={OPENING} resume={resume} />);
 /** A tutor that replies with the given texts, one per call, streaming each in two pieces. */
 const tutor = (...replies: string[]) => replies.forEach((r) => streamTutor.mockImplementationOnce(async (_i: unknown, onText: (t: string) => void) => { onText(r.slice(0, 6)); onText(r); return r; }));
 const type = (placeholder: RegExp | string, text: string) => userEvent.type(screen.getByPlaceholderText(placeholder), text);
@@ -171,9 +171,20 @@ describe("Test this concept, as a conversation", () => {
     expect(screen.getByText("A range")).toBeTruthy();
   });
 
+  it("does not restore another account or a legacy unscoped transcript", async () => {
+    const privateThread = JSON.stringify({ items: [{ id: 1, kind: "chat", role: "assistant", text: "Private learner answer" }], mode: "chat" });
+    sessionStorage.setItem('proveit.session.v2:["user_b","intro-stats","cii"]', privateThread);
+    sessionStorage.setItem("proveit.session.intro-stats.cii", privateThread);
+    mount();
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    expect(screen.queryByText("Private learner answer")).toBeNull();
+    expect(screen.getByText(OPENING)).toBeTruthy();
+  });
+
   it("resumes at the check when it was opened from a follow-up link", () => {
     mount({ attemptId: "a9", answer: "It is a range.", followUp: "Say what the 95 attaches to." });
     expect(screen.getByText("Say what the 95 attaches to.")).toBeTruthy();
     expect(screen.getByPlaceholderText("Explain it in your own words")).toBeTruthy();
   });
 });
+
