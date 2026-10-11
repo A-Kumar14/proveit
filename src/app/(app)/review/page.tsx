@@ -99,3 +99,5 @@ function ReviewPage() {
 }
 
 export default withUserPage(ReviewPage);
+
+export const metadata = { title: "Review" };

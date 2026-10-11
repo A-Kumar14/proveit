@@ -75,3 +75,5 @@ async function CalendarPage({ searchParams }: PageProps<"/calendar">) {
 }
 
 export default withUserPage(CalendarPage);
+
+export const metadata = { title: "Calendar" };

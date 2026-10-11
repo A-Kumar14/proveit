@@ -39,3 +39,5 @@ async function PracticePage({ params, searchParams }: PageProps<"/course/[course
 
 export default withUserPage(PracticePage);
 
+
+export const metadata = { title: "Test this concept" };

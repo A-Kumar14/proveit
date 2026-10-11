@@ -21,3 +21,5 @@ async function PracticeHubPage({ params }: PageProps<"/course/[courseId]/practic
 }
 
 export default withUserPage(PracticeHubPage);
+
+export const metadata = { title: "Practice" };

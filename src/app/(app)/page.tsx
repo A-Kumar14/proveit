@@ -57,3 +57,5 @@ async function Dashboard({ searchParams }: PageProps<"/">) {
 }
 
 export default withUserPage(Dashboard);
+
+export const metadata = { title: "Dashboard" };

@@ -21,3 +21,5 @@ async function ResultPage({ params }: PageProps<"/course/[courseId]/result/[atte
 }
 
 export default withUserPage(ResultPage);
+
+export const metadata = { title: "Result" };

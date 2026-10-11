@@ -193,6 +193,9 @@ export function removeAddedCourse(id: string): boolean {
 
 export const addedCourseIds = (): string[] => db().samples.flatMap((c) => (c.spec ? [c.id] : []));
 
+/** True for courses added at runtime (uploads, imports, the catalog), whose learning content is written on demand. */
+export const isRuntimeCourse = (courseId: string): boolean => Boolean(courseFor(courseId).runtime);
+
 /** The notes a course was built from, or null for a course with authored content only. */
 export function courseSpec(courseId: string): CourseSpec | null {
   return courseFor(courseId).spec ?? null;

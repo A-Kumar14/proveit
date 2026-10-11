@@ -15,3 +15,5 @@ function SettingsPage() {
 }
 
 export default withUserPage(SettingsPage);
+
+export const metadata = { title: "Settings" };

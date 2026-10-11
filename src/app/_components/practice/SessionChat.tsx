@@ -178,7 +178,7 @@ export function SessionChat({ userId, courseId, question, opening, resume }: {
             return (
               <AssistantMessage key={it.id}>
                 <AssistantCard ariaLabel="Check" label={`Check · ${question.conceptName}`} headline={<span className="text-base leading-normal">{it.text}</span>}>
-                  <p className="m-0 px-[18px] py-3 text-[13px] text-ink-muted">Answer in your own words. This one is graded, and it moves your course map. You can keep talking first if you want.</p>
+                  <p className="m-0 px-[18px] py-3 text-[0.8125rem] text-ink-muted">Answer in your own words. This one is graded, and it moves your course map. You can keep talking first if you want.</p>
                   <SourceLineage sources={question.sources} />
                 </AssistantCard>
               </AssistantMessage>

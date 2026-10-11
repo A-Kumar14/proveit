@@ -19,3 +19,5 @@ async function TransferPage({ params }: PageProps<"/course/[courseId]/transfer/[
 }
 
 export default withUserPage(TransferPage);
+
+export const metadata = { title: "New question" };

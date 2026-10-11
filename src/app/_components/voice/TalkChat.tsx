@@ -138,7 +138,7 @@ export function TalkChat({ userId, courseId, conceptId, opening, chatHref, silen
         <p role="status" className="m-0 text-sm text-ink-muted">{caption}</p>
         {error && <p role="alert" className="m-0 max-w-[420px] text-center text-xs text-ink-3">{error}</p>}
       </div>
-      <p aria-live="polite" className="m-0 line-clamp-3 min-h-[3.6em] max-w-[560px] text-center text-[13px] leading-[1.5] text-ink-3">{phase === "thinking" ? "" : forSpeech(shown)}</p>
+      <p aria-live="polite" className="m-0 line-clamp-3 min-h-[3.6em] max-w-[560px] text-center text-[0.8125rem] leading-[1.5] text-ink-3">{phase === "thinking" ? "" : forSpeech(shown)}</p>
     </div>
   );
 }

@@ -25,3 +25,5 @@ async function TalkPage({ params }: PageProps<"/course/[courseId]/practice/[conc
 
 export default withUserPage(TalkPage);
 
+
+export const metadata = { title: "Voice call" };

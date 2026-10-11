@@ -34,3 +34,5 @@ async function MisconceptionLogPage({ params }: PageProps<"/course/[courseId]/mi
 }
 
 export default withUserPage(MisconceptionLogPage);
+
+export const metadata = { title: "Misconceptions" };

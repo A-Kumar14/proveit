@@ -21,3 +21,5 @@ function CoursesPage() {
 }
 
 export default withUserPage(CoursesPage);
+
+export const metadata = { title: "Courses" };

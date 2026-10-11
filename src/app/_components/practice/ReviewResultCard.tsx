@@ -42,7 +42,7 @@ export function ReviewResultCard({ r }: { r: ReviewResultView }) {
           <Link href="/" className={buttonStyles({ variant: "secondary" })}>Dashboard</Link>
         </div>
       </Section>
-      <CardFooter left="Mastered means ProveIt has delayed retrieval evidence. Future spaced reviews can confirm that retention persists." />
+      <CardFooter left="Mastered means you showed it again after a delay. Future spaced reviews can confirm it sticks." />
     </AssistantCard>
   );
 }

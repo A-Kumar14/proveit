@@ -15,7 +15,7 @@ const atkinson = Atkinson_Hyperlegible({ variable: "--font-atkinson", subsets: [
 const andika = Andika({ variable: "--font-andika", subsets: ["latin"], weight: ["400", "700"], preload: false });
 
 export const metadata: Metadata = {
-  title: "Mastery",
+  title: { default: "Mastery", template: "%s · Mastery" },
   description: "Know what you actually know.",
 };
 

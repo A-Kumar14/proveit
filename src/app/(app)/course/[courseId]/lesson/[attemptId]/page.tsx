@@ -19,3 +19,5 @@ async function LessonPage({ params }: PageProps<"/course/[courseId]/lesson/[atte
 }
 
 export default withUserPage(LessonPage);
+
+export const metadata = { title: "Lesson" };

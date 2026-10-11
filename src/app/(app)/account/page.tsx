@@ -85,3 +85,5 @@ async function AccountPage({ searchParams }: PageProps<"/account">) {
 }
 
 export default withUserPage(AccountPage);
+
+export const metadata = { title: "Account" };

@@ -11,7 +11,7 @@ export default function SignBridgePage() {
           <header className="flex flex-wrap items-end justify-between gap-4">
             <div className="flex max-w-2xl flex-col gap-2">
               <span className="eyebrow">A sign-to-speech conversation</span>
-              <h1 className="m-0 text-[28px] font-semibold tracking-tight text-ink">SignBridge</h1>
+              <h1 className="m-0 text-[1.75rem] font-semibold tracking-tight text-ink">SignBridge</h1>
               <p className="m-0 text-sm leading-6 text-ink-muted">
                 Capture a held ASL letter or a short movement, review the result, and turn your signs into a spoken message.
               </p>
@@ -25,3 +25,5 @@ export default function SignBridgePage() {
     </AppShell>
   );
 }
+
+export const metadata = { title: "SignBridge" };

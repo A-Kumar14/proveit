@@ -22,3 +22,5 @@ async function QuizPage({ params, searchParams }: PageProps<"/course/[courseId]/
 }
 
 export default withUserPage(QuizPage);
+
+export const metadata = { title: "Quiz" };

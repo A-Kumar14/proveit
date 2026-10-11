@@ -18,3 +18,5 @@ async function TutorPage({ params }: PageProps<"/course/[courseId]/tutor">) {
 }
 
 export default withUserPage(TutorPage);
+
+export const metadata = { title: "Tutor" };
