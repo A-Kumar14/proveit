@@ -1614,7 +1614,7 @@ export function recordQuiz(input: { courseId: string; items: QuizItemRecord[] })
     const items = input.items.filter(it => it.conceptId === c.id);
     const choices = items.filter(it => it.format !== "explanation");
     if (choices.length) {
-      const coverage = new Set(choices.filter(it => it.picked === it.correct).map(it => rewardName(it.prompt))).size;
+      const coverage = choices.filter(it => it.picked === it.correct).map(it => it.prompt);
       record.pointsGained += awardAssessment(plan, c.name, "quiz", percentage, coverage, record.id).pointsGained;
     }
     const explanations = items.filter(it => it.format === "explanation");
