@@ -3,18 +3,20 @@ import { CourseMapCard } from "@proveit/app/_components/mastery/CourseMapCard";
 import { FilesPanel, MisconceptionPanel, PracticePanel, TutorPanel } from "@proveit/app/_components/course/CoursePanels";
 import { AppShell } from "@proveit/app/_components/shell/AppShell";
 import { orNotFound } from "@proveit/server/page";
-import { getCourse, getFiles, getMisconceptionLog, getReviewBase } from "@proveit/server/store";
+import { CourseRankBar } from "@proveit/app/_components/dashboard/CourseRankBar";
+import { getCourse, getCourseRanks, getFiles, getMisconceptionLog, getReviewBase } from "@proveit/server/store";
 
 export const dynamic = "force-dynamic";
 
 async function CoursePage({ params, searchParams }: PageProps<"/course/[courseId]">) {
   const { courseId } = await params;
   const { built } = await searchParams;
-  const { course, review, log, files } = orNotFound(() => ({
+  const { course, review, log, files, rank } = orNotFound(() => ({
     course: getCourse(courseId),
     review: getReviewBase(courseId),
     log: getMisconceptionLog(courseId),
     files: getFiles(courseId).files,
+    rank: getCourseRanks().find((r) => r.courseId === courseId),
   }));
   const first = course.concepts[0];
   return (
@@ -23,6 +25,7 @@ async function CoursePage({ params, searchParams }: PageProps<"/course/[courseId
         {first ? (
           <div className="flex flex-col gap-4">
             {built && <p role="status" className="m-0 rounded-md border border-mastered-line bg-mastered-bg px-3 py-2 text-[13px] text-mastered-text">{course.name} is ready. The concept map was built from your files.</p>}
+            {rank && <section aria-label="Course rank" className="rounded-md border border-line bg-surface px-4 py-3"><CourseRankBar rank={rank} /></section>}
             <CourseMapCard course={course} initialId={course.nextUp?.id ?? first.id} />
             <div className="grid grid-cols-2 items-start gap-4">
               <TutorPanel courseId={courseId} review={review} />

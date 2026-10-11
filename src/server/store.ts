@@ -10,7 +10,7 @@ import { followUpFor, GENERIC_FOLLOWUP } from "./followup";
 import { deleteUserJson, loadUserJson, saveUserJson } from "./persistence";
 import type { CourseSpec } from "@proveit/lib/courseSpec";
 import type { CalEvent } from "./calendar";
-import { POINTS, STREAK_CAP, standing, TIERS, type Standing } from "@proveit/lib/rewards";
+import { courseTiers, POINTS, STREAK_CAP, standing, TIERS, type Standing } from "@proveit/lib/rewards";
 import { aiEnabled } from "./ai";
 import { learningSourceViews, sourceIdUnion, type LearningSourceView } from "./sourceLineage";
 import { demoStateForTests } from "../test/demo-state";
@@ -1618,8 +1618,9 @@ export function getRewards(courseId?: string): Rewards {
     if (courseId) peaks[courseId] = peak; else db().peakPoints = peak;
     persistLearning();
   }
-  const s = standing(peak);
-  return { ...s, breakdown: rows, ladder: TIERS.map((t, i) => ({ id: t.id, name: t.name, min: t.min, reached: i <= s.tierIndex, current: i === s.tierIndex })) };
+  const tiers = courseId ? courseTiers(concepts.length) : TIERS;
+  const s = standing(peak, tiers);
+  return { ...s, breakdown: rows, ladder: tiers.map((t, i) => ({ id: t.id, name: t.name, min: t.min, reached: i <= s.tierIndex, current: i === s.tierIndex })) };
 }
 
 // ---- quiz evidence ----

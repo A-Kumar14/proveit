@@ -362,3 +362,7 @@ The no-auth `local` namespace keeps original keys and test reset hooks. Pre-auth
 
 `/course/[courseId]/practice/[conceptId]/talk` is a spoken two-way conversation with the same tutor as the chat. It shares the transcript with `SessionChat` through sessionStorage, so the student can switch both ways. Speech in uses the browser's recognition (silence for 1.6s ends a turn). Speech out goes through `/api/voice/speak`, which proxies ElevenLabs (`ELEVENLABS_API_KEY`, optional `ELEVENLABS_VOICE_ID`, `ELEVENLABS_MODEL`) and falls back to browser speech on a 501. Nothing is graded in speech mode; the check happens in the chat.
 After this backend hardening milestone, do one deliberate frontend/backend integration pass rather than chasing frontend commits piecemeal.
+
+## Rank ladder
+
+Overall tiers start at 0 / 1,000 / 5,000 / 10,000 / 50,000 / 100,000 / 500,000 points (Bronze to Legend, `TIERS` in `src/lib/rewards.ts`). Each course has its own ladder from `courseTiers(conceptCount)`: tiers sit at 0, 10, 25, 45, 70, 90 and 100% of `courseMaxPoints` (every concept mastered and quizzed, plus the course bonus). `CourseRankBar` shows it on the course map page and the dashboard course cards. Rank stores the peak points, so existing accounts re-tier on the new thresholds.
