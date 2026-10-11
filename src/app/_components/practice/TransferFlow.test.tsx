@@ -14,7 +14,7 @@ import { TransferFlow } from "./TransferFlow";
 
 const challenge: TransferChallengeView = {
   attemptId: "a1", courseId: "intro-stats", conceptId: "cii", conceptName: "CI interpretation", state: "developing",
-  transfer: { question: "100 researchers build 95% intervals. What should happen?", hint: "Think long-run coverage." },
+  transfer: { question: "100 researchers build 95% intervals. What should happen?", hint: "Think long-run coverage.", sources: [] },
 };
 
 beforeEach(() => { push.mockReset(); transfer.mockReset(); });
