@@ -107,13 +107,16 @@ function restoreLearning(): Db {
     const saved = stored.concepts?.[concept.id];
     if (saved) Object.assign(concept, saved);
   }
-  if (stored.rewardLedger?.version === 2) data.rewardLedger = stored.rewardLedger;
+  const hasAssessmentLedger = stored.rewardLedger?.version === 2;
+  if (hasAssessmentLedger) data.rewardLedger = stored.rewardLedger;
   if (Array.isArray(stored.attempts)) data.attempts = stored.attempts;
   if (Array.isArray(stored.quizzes)) data.quizzes = stored.quizzes;
   if (Array.isArray(stored.provenDays)) data.provenDays = new Set(stored.provenDays);
   if (Array.isArray(stored.taskDone)) data.taskDone = new Set(stored.taskDone);
-  if (Number.isFinite(stored.peakPoints)) data.peakPoints = stored.peakPoints;
-  if (stored.peakByCourse && typeof stored.peakByCourse === "object") data.peakByCourse = { ...stored.peakByCourse };
+  // Pre-redesign rank peaks came from mastery state, streaks and repair bonuses. They are not valid
+  // assessment points under the new contract, so only peaks created alongside the assessment ledger migrate.
+  if (hasAssessmentLedger && Number.isFinite(stored.peakPoints)) data.peakPoints = stored.peakPoints;
+  if (hasAssessmentLedger && stored.peakByCourse && typeof stored.peakByCourse === "object") data.peakByCourse = { ...stored.peakByCourse };
   if (Number.isFinite(stored.seq)) data.seq = stored.seq;
   if (stored.completedOverride === null || typeof stored.completedOverride === "boolean") data.course.completedOverride = stored.completedOverride;
   if (Array.isArray(stored.courses)) data.samples = stored.courses;
