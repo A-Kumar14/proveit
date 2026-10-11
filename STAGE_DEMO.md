@@ -30,6 +30,8 @@ Top right, **Reset demo** puts everything back to the starting state below. Use 
 
 ## Needs before going on stage
 
+- For the Sign beat: in a second terminal, `.venv-signbridge/bin/python examples/signbridge/service.py`. Allow the camera once.
+
 - `OPENROUTER_API_KEY`, `ELEVENLABS_API_KEY` and `ELEVENLABS_AGENT_ID` in `.env`. Without a model key the conversation falls back to the fixed question.
 - Allow the microphone in the browser once, ahead of time.
 - Run a full practice pass the day before. The model calls take a few seconds each.

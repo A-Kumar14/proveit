@@ -16,6 +16,7 @@ Before you start: tap **Reset demo** on the dashboard, check the microphone is a
 | 5 | Vague, then caught | Tap "Check what I've got" | Refuses to guess, then names the exact misconception | 1:30 |
 | 6 | Proves it | Answer the new question | Passes only on a different question, rank tips to Platinum | 0:40 |
 | 7 | Quiz | History, open the saved quiz | Right vs weak, and why a quiz never proves mastery | 0:30 |
+| 8 | Signs | Tap **Sign** in the tutor, spell a word on camera | The same tutor takes ASL letters as input | 0:40 |
 
 ## Beat 0. Frame it (0:20)
 
@@ -110,6 +111,14 @@ Open **History**. Show the saved quiz (4 of 6). Open it for the audit.
 What it shows: the right answers, the wrong ones, a left-blank question, and an explanation for each. The History line says what the student is right on and weak on.
 
 Say: *"A quiz tells us where to look. It never proves mastery. Only a new question can."*
+
+## Beat 8. Signs (0:40)
+
+Open the course tutor (course map, then **Tutor**). Tap **Sign** in the prompt bar, then **Start camera**. Hold an ASL letter steady for a moment; it lands in the letter strip. Spell something short, such as **HI** or **CI**. Tap **Use this**, and the word is in the message box. Send it.
+
+Say: *"A deaf student answers the same tutor with their hands. It spells letters, so short answers work best. It never sends until they say so."*
+
+Needs `service.py` running (see the setup note at the top). If the service is off, the panel says the exact command to start it and the camera stays off.
 
 ## If something goes sideways
 
