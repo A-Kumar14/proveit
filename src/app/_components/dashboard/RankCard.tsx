@@ -11,8 +11,8 @@ export function RankCard({ r, courses, previewable, userId = "local" }: { r: Rew
   const fmt = (n: number) => n.toLocaleString("en-US");
   return (
     <div id="rank" className="scroll-mt-4">
-      <Widget title="Overall rank" action={{ label: "All courses", href: "/courses" }}>
-        <TierCelebration key={userId} userId={userId} tierIndex={r.tierIndex} tierId={r.tier.id} tierName={r.tier.name} points={r.points} previewable={previewable} />
+      <Widget title="Overall rank" action={{ label: "All courses", href: "/courses" }}
+        aside={<TierCelebration key={userId} userId={userId} tierIndex={r.tierIndex} tierId={r.tier.id} tierName={r.tier.name} points={r.points} previewable={previewable} />}>
         <RankExpander
           collapsed={<RankTrack r={r} />}
           expanded={(

@@ -224,8 +224,8 @@ export function SessionChat({ userId, courseId, question, opening, resume, autoT
         <div ref={end} />
         </div>
       </Log>
-      <div className="mx-auto w-full max-w-[822px]">
       {signing && <SignInput onUse={(t) => setDraft((d) => (d.trim() ? `${d.trimEnd()} ${t}` : t))} onClose={() => setSigning(false)} />}
+      <div className="mx-auto w-full max-w-[822px]">
       <Composer
         value={draft} onChange={setDraft} onSubmit={submit} status={status} error={error}
         placeholder={mode === "check" ? "Explain it in your own words" : talked ? "Reply to your tutor" : "Tell me what you think"}
@@ -248,4 +248,3 @@ export function SessionChat({ userId, courseId, question, opening, resume, autoT
     </>
   );
 }
-
