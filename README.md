@@ -132,7 +132,7 @@ Built: course upload/import and concept maps, source-grounded generated mastery 
 
 Important remaining production/integration work:
 
-- one deliberate end-to-end UI integration/smoke pass against the latest frontend;
+- live end-to-end browser/device smoke against the latest frontend;
 - hosted/durable production storage instead of local SQLite;
 - real account-switch, connector callback/import, Gemini, calendar, mic/camera and presentation-device smoke tests;
 - production browser E2E/error/loading hardening;
