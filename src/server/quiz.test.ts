@@ -110,14 +110,22 @@ describe("startQuiz with a model", () => {
     await expect(startQuiz("intro-stats", 4)).rejects.toThrow(/too few/);
   });
 
-  it("writes a long quiz as two parallel calls that share no concept", async () => {
+  it("writes a long quiz as parallel calls that share no concept", async () => {
     ai = true;
     quizModel();
     const q = await startQuiz("intro-stats", 8);
-    expect(generateText).toHaveBeenCalledTimes(2);
-    const [a, b] = generateText.mock.calls.map((c) => (JSON.parse(c[0].prompt).concepts as { name: string }[]).map((x) => x.name));
-    expect(a!.filter((n) => b!.includes(n))).toEqual([]);
+    expect(generateText).toHaveBeenCalledTimes(4);
+    const parts = generateText.mock.calls.map((c) => (JSON.parse(c[0].prompt).concepts as { name: string }[]).map((x) => x.name));
+    const all = parts.flat();
+    expect(new Set(all).size).toBe(all.length);
     expect(q.questions).toHaveLength(8);
+  });
+
+  it("writes a medium quiz as two parallel calls", async () => {
+    ai = true;
+    quizModel();
+    await startQuiz("intro-stats", 6);
+    expect(generateText).toHaveBeenCalledTimes(2);
   });
 
   it("puts uploaded notes in front of the model", async () => {

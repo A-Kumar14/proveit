@@ -30,7 +30,7 @@ async function CalendarPage({ searchParams }: PageProps<"/calendar">) {
 
   return (
     <AppShell active="calendar" crumbs={[{ label: "Calendar" }]} right={<CalendarControls compact connected={connected} connectHref={`/calendar?m=${month}&d=${selected}&connect=1`} />}>
-      <div className="flex min-h-0 flex-1 gap-6 overflow-y-auto px-7 py-6">
+      <div className="flex min-h-0 flex-1 gap-6 overflow-y-auto px-4 lg:px-7 py-6">
         <section aria-label="Month" className="flex min-w-0 flex-1 flex-col gap-3">
           <div className="flex items-center justify-between">
             <div>
@@ -75,3 +75,5 @@ async function CalendarPage({ searchParams }: PageProps<"/calendar">) {
 }
 
 export default withUserPage(CalendarPage);
+
+export const metadata = { title: "Calendar" };

@@ -40,3 +40,5 @@ function HistoryPage() {
 }
 
 export default withUserPage(HistoryPage);
+
+export const metadata = { title: "History" };

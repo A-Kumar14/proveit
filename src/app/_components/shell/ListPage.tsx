@@ -1,7 +1,7 @@
 /** Plain scrolling page for list screens (review queue, history, logs). */
 export function ListPage({ eyebrow, title, children }: { eyebrow: string; title: string; children: React.ReactNode }) {
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto px-7 py-6">
+    <div className="min-h-0 flex-1 overflow-y-auto px-4 lg:px-7 py-6">
       <div className="mx-auto flex max-w-[780px] flex-col gap-4">
         <div>
           <div className="eyebrow">{eyebrow}</div>

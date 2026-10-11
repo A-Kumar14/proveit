@@ -109,7 +109,6 @@ function demoRuntimeState(): Db {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   };
   const pop = data.course.concepts.find((c) => c.id === "pop")!;
-  const cic = data.course.concepts.find((c) => c.id === "cic")!;
   const cii = data.course.concepts.find((c) => c.id === "cii")!;
   const se = data.course.concepts.find((c) => c.id === "se")!;
   se.state = "provisional";
@@ -151,32 +150,10 @@ function demoRuntimeState(): Db {
       parentAttemptId: "a2", rootAttemptId: "a2", answer: sePass, previousState: "needs_work", createdAt: base + 120_000, evaluation: null,
     },
     {
-      id: "a4", courseId: "intro-stats", conceptId: "var", kind: "initial", outcome: "correct",
-      parentAttemptId: null, rootAttemptId: "a4", answer: "Different random samples can give different statistics even when the sampling method is unchanged.",
-      previousState: "not_started", createdAt: base + 180_000,
-      evaluation: {
-        verdict: "correct", errorType: "none", misconceptionId: null, misconceptionName: null, evidenceQuote: null, gapSentence: null,
-        skills: [{ label: "Application", pct: 75 }], votes: { agree: 3, of: 3 }, followUp: null,
-        recommendation: "Prove it on a materially different question before calling it mastered.",
-      },
-    },
-    {
       id: "a5", courseId: "intro-stats", conceptId: "pop", kind: "review", outcome: "pass",
       parentAttemptId: null, rootAttemptId: "a5",
       answer: "A population is the whole group we want to reason about; a sample is the observed subset we actually measured.",
       previousState: "provisional", createdAt: base + 240_000, evaluation: null,
-    },
-    {
-      id: "a6", courseId: "intro-stats", conceptId: "cic", kind: "initial", outcome: "uncertain",
-      parentAttemptId: null, rootAttemptId: "a6",
-      answer: "You take the estimate and add something around it, but I am not sure exactly what controls that amount.",
-      previousState: "developing", createdAt: base + 300_000,
-      evaluation: {
-        verdict: "uncertain", errorType: "uncertain", misconceptionId: null, misconceptionName: null, evidenceQuote: null, gapSentence: null,
-        skills: cic.skills ?? [{ label: "Application", pct: 60 }], votes: { agree: 1, of: 3 },
-        followUp: "What two ingredients determine the distance from the point estimate to either confidence-interval endpoint?",
-        recommendation: "Give one more precise answer before mastery changes.",
-      },
     },
   ];
   const q = (conceptId: string, concept: string, prompt: string, options: string[], correct: number, picked: number | null, explanation: string) => ({ conceptId, concept, prompt, options, correct, picked, explanation });
@@ -194,13 +171,34 @@ function demoRuntimeState(): Db {
   }];
   data.provenDays = new Set([day(-2), day(-1), day(0)]);
   data.taskDone = new Set(["pv"]);
-  data.peakPoints = 6000;
+  // Rank comes from the reward ledger. Intro Statistics ends about 260 points short of its Platinum, and the whole account about 220 short,
+  // so one proved concept on stage tips both. Courses keep the quiz and explanation points their concepts have earned.
+  const ledger = emptyRewardLedger();
+  data.rewardLedger = ledger;
+  const earn = (course: Course, names: string[]) => {
+    const plan = planFor(ledger, course);
+    for (const name of names) {
+      awardAssessment(plan, name, "explanation", 95, 1, `seed-e-${course.id}-${name}`);
+      awardAssessment(plan, name, "quiz", 100, [1, 2, 3, 4].map((n) => `seed-${course.id}-${name}-${n}`), `seed-q-${course.id}-${name}`);
+    }
+    return plan;
+  };
+  const named = (course: Course, ids: string[]) => ids.map((id) => course.concepts.find((c) => c.id === id)!.name);
+  const introPlan = earn(data.course, named(data.course, ["pop", "par", "clt", "size", "moe", "se"]));
+  const [variability] = named(data.course, ["var"]);
+  awardAssessment(introPlan, variability!, "quiz", 100, [1, 2, 3, 4].map((n) => `seed-var-${n}`), "seed-q-var");
+  const [algebra, finance] = data.samples;
+  if (algebra) awardCourseBonus(earn(algebra, algebra.concepts.map((c) => c.name)), true, "seed-bonus-algebra");
+  if (finance) earn(finance, named(finance, ["pf-bud", "pf-emg", "pf-crs", "pf-cmp"]));
+  data.peakPoints = 0;
+  data.peakByCourse = {};
   data.seq = 6;
   return data;
 }
 
 function snapshotLearning(current: Db): StoredLearning {
   return {
+    rewardLedger: current.rewardLedger,
     concepts: Object.fromEntries(current.course.concepts.map((c) => [c.id, { state: c.state, skills: c.skills, evidence: c.evidence, nextReview: c.nextReview }])),
     peakByCourse: current.peakByCourse,
     courses: current.samples,
@@ -313,6 +311,9 @@ export function removeAddedCourse(id: string): boolean {
 }
 
 export const addedCourseIds = (): string[] => db().samples.flatMap((c) => (c.spec ? [c.id] : []));
+
+/** True for courses added at runtime (uploads, imports, the catalog), whose learning content is written on demand. */
+export const isRuntimeCourse = (courseId: string): boolean => Boolean(courseFor(courseId).runtime);
 
 /** The notes a course was built from, or null for a course with authored content only. */
 export function courseSpec(courseId: string): CourseSpec | null {
@@ -1648,7 +1649,10 @@ export type Rewards = Standing & {
  */
 /** Plans and awards survive course deletion and are shared by duplicate imports of the same source. */
 function rewardsForCourse(course: Course) {
-  const ledger = db().rewardLedger ??= emptyRewardLedger();
+  return planFor(db().rewardLedger ??= emptyRewardLedger(), course);
+}
+
+function planFor(ledger: RewardLedger, course: Course) {
   const identity = course.rewardIdentity ??= rewardFingerprint(course.concepts.map(c => rewardName(c.name)).sort().join("|"));
   return ledger.courses[identity] ??= makeCourseRewards(course.concepts.map(c => ({
     name: c.name,

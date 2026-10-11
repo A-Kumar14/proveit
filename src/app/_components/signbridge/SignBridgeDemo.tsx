@@ -491,7 +491,7 @@ export function SignBridgeDemo() {
           )}
           {prediction?.handDetected && prediction.source === "static" && prediction.confidence !== null && (
             <div className="pointer-events-none absolute bottom-3 right-3 rounded-xl bg-black/75 px-4 py-2 text-white">
-              <span className="block text-[10px] uppercase tracking-widest text-white/65">Possible letter</span>
+              <span className="block text-[0.625rem] uppercase tracking-widest text-white/65">Possible letter</span>
               <span className="text-3xl font-semibold">{prediction.label}</span>
               <span className="ml-2 text-xs text-white/70">{Math.round(prediction.confidence * 100)}%</span>
             </div>

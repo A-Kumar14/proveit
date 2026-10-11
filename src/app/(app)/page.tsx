@@ -32,7 +32,7 @@ async function Dashboard({ searchParams }: PageProps<"/">) {
       crumbs={[{ label: head.greeting }, { label: head.dateLabel }]}
       right={<div className="flex items-center gap-3"><RankChip r={rewards} /><DemoResetButton /><Link href="/?add=1" className={buttonStyles({ size: "md" })}><Plus size={13} strokeWidth={2.4} aria-hidden />Add a course</Link></div>}
     >
-      <div className="min-h-0 flex-1 overflow-y-auto px-7 py-6">
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 lg:px-7 py-6">
         <div className="flex flex-col gap-8">
           <RankCard key={userId} userId={userId} r={rewards} courses={ranks} previewable />
 
@@ -58,3 +58,5 @@ async function Dashboard({ searchParams }: PageProps<"/">) {
 }
 
 export default withUserPage(Dashboard);
+
+export const metadata = { title: "Dashboard" };

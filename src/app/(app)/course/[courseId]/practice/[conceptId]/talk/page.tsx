@@ -17,11 +17,13 @@ async function TalkPage({ params }: PageProps<"/course/[courseId]/practice/[conc
   return (
     <AppShell active="practice" courseId={courseId} state={q.state} crumbs={[{ label: q.courseName, href: `/course/${courseId}` }, { label: q.conceptName, href: `/course/${courseId}/practice/${conceptId}` }, { label: "Speech mode" }]}>
       {process.env.ELEVENLABS_API_KEY && process.env.ELEVENLABS_AGENT_ID
-        ? <AgentTalk key={scopedUserId()} userId={scopedUserId()} courseId={courseId} conceptId={conceptId} chatHref={`/course/${courseId}/practice/${conceptId}`} />
-        : <TalkChat silenceMs={getPrefs().pauseSeconds * 1000} key={scopedUserId()} userId={scopedUserId()} courseId={courseId} conceptId={conceptId} opening={sessionOpening(courseId, conceptId)} chatHref={`/course/${courseId}/practice/${conceptId}`} />}
+        ? <AgentTalk key={scopedUserId()} userId={scopedUserId()} courseId={courseId} conceptId={conceptId} chatHref={`/course/${courseId}/practice/${conceptId}?type=1`} />
+        : <TalkChat silenceMs={getPrefs().pauseSeconds * 1000} key={scopedUserId()} userId={scopedUserId()} courseId={courseId} conceptId={conceptId} opening={sessionOpening(courseId, conceptId)} chatHref={`/course/${courseId}/practice/${conceptId}?type=1`} />}
     </AppShell>
   );
 }
 
 export default withUserPage(TalkPage);
 
+
+export const metadata = { title: "Voice call" };

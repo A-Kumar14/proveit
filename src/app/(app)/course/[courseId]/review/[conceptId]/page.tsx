@@ -19,3 +19,5 @@ async function ReviewConceptPage({ params }: PageProps<"/course/[courseId]/revie
 }
 
 export default withUserPage(ReviewConceptPage);
+
+export const metadata = { title: "Review question" };

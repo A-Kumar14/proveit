@@ -21,3 +21,5 @@ async function ReviewResultPage({ params }: PageProps<"/course/[courseId]/review
 }
 
 export default withUserPage(ReviewResultPage);
+
+export const metadata = { title: "Review result" };

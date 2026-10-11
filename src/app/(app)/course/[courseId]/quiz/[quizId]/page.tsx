@@ -23,3 +23,5 @@ async function QuizAuditPage({ params }: PageProps<"/course/[courseId]/quiz/[qui
 }
 
 export default withUserPage(QuizAuditPage);
+
+export const metadata = { title: "Quiz review" };

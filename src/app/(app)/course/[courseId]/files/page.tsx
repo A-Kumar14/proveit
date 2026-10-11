@@ -26,3 +26,5 @@ async function CourseFilesPage({ params }: PageProps<"/course/[courseId]/files">
 }
 
 export default withUserPage(CourseFilesPage);
+
+export const metadata = { title: "Course files" };

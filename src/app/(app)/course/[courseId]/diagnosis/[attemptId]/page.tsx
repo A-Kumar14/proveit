@@ -32,3 +32,5 @@ async function DiagnosisPage({ params }: PageProps<"/course/[courseId]/diagnosis
 }
 
 export default withUserPage(DiagnosisPage);
+
+export const metadata = { title: "What we found" };

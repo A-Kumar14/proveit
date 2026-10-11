@@ -18,7 +18,7 @@ export function BuildProgress({ job, onCancel }: { job: CourseJobView; onCancel?
       <ol className="m-0 flex list-none flex-col gap-1.5 p-0" aria-label="Stages">
         {job.stages.map((s) => (
           <li key={s.id} aria-current={s.state === "active" ? "step" : undefined} className="flex flex-col gap-1">
-            <div className={cn("flex items-center gap-2 text-[13px]", s.state === "waiting" ? "text-ink-faint" : s.state === "failed" ? "text-needswork-text" : "text-ink")}>
+            <div className={cn("flex items-center gap-2 text-[0.8125rem]", s.state === "waiting" ? "text-ink-faint" : s.state === "failed" ? "text-needswork-text" : "text-ink")}>
               {s.state === "done" ? <Check size={14} strokeWidth={2.4} className="text-mastered-text" aria-hidden />
                 : s.state === "active" ? <LoaderCircle size={14} className="animate-spin" aria-hidden />
                 : s.state === "failed" ? <X size={14} strokeWidth={2.4} aria-hidden />

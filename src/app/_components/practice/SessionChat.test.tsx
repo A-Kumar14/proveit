@@ -4,8 +4,9 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const push = vi.fn();
+const replace = vi.fn();
 const { api, streamTutor } = vi.hoisted(() => ({ api: { assess: vi.fn() }, streamTutor: vi.fn() }));
-vi.mock("next/navigation", () => ({ useRouter: () => ({ push }) }));
+vi.mock("next/navigation", () => ({ useRouter: () => ({ push, replace }) }));
 vi.mock("@proveit/lib/api", () => ({ api }));
 vi.mock("@proveit/lib/tutorStream", () => ({ streamTutor }));
 // jsdom has no layout, so scrolling into view is a no-op here.
@@ -16,6 +17,7 @@ import type { QuestionView } from "@proveit/server/store";
 
 const question: QuestionView = { courseName: "Intro Statistics", conceptId: "cii", conceptName: "CI interpretation", state: "needs_work", prompt: "Explain what a 95% confidence interval means.", why: "Why", probe: "Probe?", source: "Unit 03", sources: [] };
 const OPENING = "Let's talk about CI interpretation. What do you think it means?";
+const mountAuto = () => render(<SessionChat userId="u" courseId="intro-stats" question={question} opening={OPENING} autoTalk />);
 const mount = (resume?: { attemptId: string; answer: string; followUp: string }) => render(<SessionChat userId="user_a" courseId="intro-stats" question={question} opening={OPENING} resume={resume} />);
 /** A tutor that replies with the given texts, one per call, streaming each in two pieces. */
 const tutor = (...replies: string[]) => replies.forEach((r) => streamTutor.mockImplementationOnce(async (_i: unknown, onText: (t: string) => void) => { onText(r.slice(0, 6)); onText(r); return r; }));
@@ -188,3 +190,22 @@ describe("Test this concept, as a conversation", () => {
   });
 });
 
+
+describe("answer by talk", () => {
+  afterEach(() => { localStorage.clear(); delete (window as unknown as { webkitSpeechRecognition?: unknown }).webkitSpeechRecognition; });
+
+  it("opens the live call when the student chose Talk and the browser can listen", async () => {
+    localStorage.setItem("proveit.settings", JSON.stringify({ answerMode: "talk" }));
+    (window as unknown as { webkitSpeechRecognition: unknown }).webkitSpeechRecognition = function Recognition() {};
+    mountAuto();
+    await waitFor(() => expect(replace).toHaveBeenCalledWith("/course/intro-stats/practice/cii/talk"));
+  });
+
+  it("stays in the chat when they chose Type", async () => {
+    (window as unknown as { webkitSpeechRecognition: unknown }).webkitSpeechRecognition = function Recognition() {};
+    replace.mockClear();
+    mountAuto();
+    await new Promise((r) => setTimeout(r, 20));
+    expect(replace).not.toHaveBeenCalled();
+  });
+});

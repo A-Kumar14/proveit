@@ -9,6 +9,8 @@ import { useRouter } from "next/navigation";
 import { api } from "@proveit/lib/api";
 import { splitOptions } from "@proveit/lib/sessionText";
 import { streamTutor } from "@proveit/lib/tutorStream";
+import { useSettings } from "@proveit/lib/settings";
+import { useVoiceSupport } from "../voice/speech";
 import { sessionStorageKey } from "@proveit/lib/sessionStorageKey";
 import { cn } from "@proveit/lib/cn";
 import type { QuestionView } from "@proveit/server/store";
@@ -44,10 +46,12 @@ export function allowedOptions(options: string[], prevUser: string | undefined):
 const chip = "h-9 cursor-pointer rounded-full border px-3.5 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50";
 
 /** Test this concept, as a conversation first. The student says what they think, the tutor agrees or corrects, and a graded check comes only when they ask for it. */
-export function SessionChat({ userId, courseId, question, opening, resume }: {
-  userId: string; courseId: string; question: QuestionView; opening: string; resume?: { attemptId: string; answer: string; followUp: string; reward?: AssessmentReward };
+export function SessionChat({ userId, courseId, question, opening, resume, autoTalk = false }: {
+  /** Open the live call at once when the student chose "Talk" under Settings, Learning. */ autoTalk?: boolean; userId: string; courseId: string; question: QuestionView; opening: string; resume?: { attemptId: string; answer: string; followUp: string; reward?: AssessmentReward };
 }) {
   const router = useRouter();
+  const [settings] = useSettings();
+  const canTalk = useVoiceSupport();
   const storeKey = sessionStorageKey(userId, courseId, question.conceptId);
   const nextId = useRef(resume ? 4 : 2);
   const [items, setItems] = useState<Item[]>(() => {
@@ -66,6 +70,10 @@ export function SessionChat({ userId, courseId, question, opening, resume }: {
   const end = useRef<HTMLDivElement>(null);
   const restored = useRef(Boolean(resume));
   const put = useCallback((next: Item[]) => { itemsRef.current = next; setItems(next); }, []);
+
+  useEffect(() => {
+    if (autoTalk && canTalk && settings.answerMode === "talk") router.replace(`/course/${courseId}/practice/${question.conceptId}/talk`);
+  }, [autoTalk, canTalk, settings.answerMode, courseId, question.conceptId, router]);
 
   // Pick the conversation back up after a reload. Deferred, so the first render matches the server's.
   useEffect(() => {
@@ -178,7 +186,7 @@ export function SessionChat({ userId, courseId, question, opening, resume }: {
             return (
               <AssistantMessage key={it.id}>
                 <AssistantCard ariaLabel="Check" label={`Check · ${question.conceptName}`} headline={<span className="text-base leading-normal">{it.text}</span>}>
-                  <p className="m-0 px-[18px] py-3 text-[13px] text-ink-muted">Answer in your own words. This one is graded, and it moves your course map. You can keep talking first if you want.</p>
+                  <p className="m-0 px-[18px] py-3 text-[0.8125rem] text-ink-muted">Answer in your own words. This one is graded, and it moves your course map. You can keep talking first if you want.</p>
                   <SourceLineage sources={question.sources} />
                 </AssistantCard>
               </AssistantMessage>

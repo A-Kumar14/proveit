@@ -127,7 +127,7 @@ export function TalkChat({ userId, courseId, conceptId, opening, chatHref, silen
     : "";
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col items-center justify-between px-7 py-8">
+    <div className="flex min-h-0 flex-1 flex-col items-center justify-between px-4 lg:px-7 py-8">
       <div className="flex w-full max-w-[640px] justify-end">
         <Link href={chatHref} className={cn("inline-flex h-9 items-center gap-2 rounded-full border border-line bg-surface px-3.5 text-xs font-medium text-ink-3 no-underline hover:bg-surface-hover")}>
           <MessageSquare size={13} aria-hidden />Back to chat
@@ -138,7 +138,7 @@ export function TalkChat({ userId, courseId, conceptId, opening, chatHref, silen
         <p role="status" className="m-0 text-sm text-ink-muted">{caption}</p>
         {error && <p role="alert" className="m-0 max-w-[420px] text-center text-xs text-ink-3">{error}</p>}
       </div>
-      <p aria-live="polite" className="m-0 line-clamp-3 min-h-[3.6em] max-w-[560px] text-center text-[13px] leading-[1.5] text-ink-3">{phase === "thinking" ? "" : forSpeech(shown)}</p>
+      <p aria-live="polite" className="m-0 line-clamp-3 min-h-[3.6em] max-w-[560px] text-center text-[0.8125rem] leading-[1.5] text-ink-3">{phase === "thinking" ? "" : forSpeech(shown)}</p>
     </div>
   );
 }
