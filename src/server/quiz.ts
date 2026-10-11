@@ -89,7 +89,7 @@ async function written(courseId: string, courseName: string, concepts: Weak[], c
   // A small course, or a one-concept quiz, asks about the same concept again from another angle until there are enough questions.
   const picked = pick(concepts, count);
   const slots = Array.from({ length: Math.min(count, Math.max(picked.length, count)) }, (_, i) => picked[i % picked.length]!);
-  const parts = splitByConcept(slots, count >= PARALLEL_FROM ? 2 : 1);
+  const parts = splitByConcept(slots, count >= 8 ? 4 : count >= PARALLEL_FROM ? 2 : 1);
   const norm = (n: string) => n.trim().toLowerCase();
   const results = await Promise.all(parts.map(async (slots) => {
     const wanted = new Map<string, { c: Weak; n: number }>();
