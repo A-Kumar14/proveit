@@ -168,7 +168,7 @@ Quiz evidence is deliberately weaker:
 - never grants transfer/provisional/mastered;
 - never schedules review;
 - never demotes stronger mastery;
-- never directly awards rank;
+- never directly changes rank as a mastery-state transition; separately, a server-scored 90%+ quiz assessment may earn its one-time quiz-point allocation;
 - never invalidates an in-flight mastery episode.
 
 ## Source lineage
@@ -247,13 +247,13 @@ This is a local hackathon adapter, not a production hosted DB. There is no multi
 - Courses/to-dos/calendar/rank UI.
 - iCal connection with SSRF protections.
 - SQLite-backed local learner/calendar persistence.
-- Practice hub (`/course/[id]/practice`): sample paper plus answer key and study notes as LaTeX-built PDFs (`tectonic`, local only), and an 8-question quiz with a score and review. Answered quiz questions can start an unseen concept as Developing; they never diagnose, demote, prove mastery or award rank.
+- Practice hub (`/course/[id]/practice`): sample paper plus answer key and study notes as LaTeX-built PDFs (`tectonic`, local only), plus multiple-choice, explanation/FRQ and mixed assessments. Answered quiz questions can start an unseen concept as Developing; they never diagnose, demote or prove mastery. A 90%+ server-scored assessment can earn the corresponding one-time reward allocation without changing those mastery rules.
 - Overall rank on the dashboard, and a rank per course on the same ladder (`getRewards(courseId?)`, `getCourseRanks()`).
 - Browse courses (`/courses/browse`): five curated courses written as markdown in `content/courses/`. Adding one creates a runtime course (`CourseSpec`, persisted under `added_courses`). Runtime courses have a map, tutor, notes, paper and quiz. Source-grounded learning specs are generated on demand and drive diagnosis, targeted remediation, transfer and delayed review.
 - Course files upload (`/course/[id]/files`): md, txt, PDF and images become extra context (`server/materials.ts`). PDFs and images are read by the model.
 - Course build pipeline (`server/courseJobs.ts`): uploading returns a job id at once and the build runs after the response, in four stages the modal shows (reading, topics, map, notes) with per-file status, a timer and Cancel. Typeset PDFs and text are read locally (`unpdf`, about 50 ms each). Only scans and images go to the model, in parallel, at low reasoning effort, with timeouts. Job state lives in SQLite so any server process can answer the poll. It replaced a pipeline that transcribed every PDF with the model, one at a time, which took minutes per file.
-- Test this concept is a conversation first (`SessionChat`, `server/session.ts`, `/api/session`). The tutor opens by asking what the student thinks, with no question on screen. It then agrees or corrects, teaches when asked, and asks the next question, and none of that is graded or changes mastery. "I don't know yet" makes it ask which part is confusing, with quick replies (an `OPTIONS:` line the screen parses), and "Teach me from scratch" makes it teach in small steps before asking questions. The graded question appears only when the student taps "Check what I've got" or accepts the tutor's offer, and from there the old evidence flow runs unchanged (assess, follow-up, diagnosis, lesson, transfer). Without a model the screen falls back to the fixed question and offline judges. Voice (ElevenLabs) is not built, and the older voice routes are hidden while the model is on.
-- Quiz evidence (`recordQuiz` in `store.ts`): finished quizzes are saved per user and reopen from History. Answered questions feed `recordQuizEvidence`; blanks supply no evidence. An unseen concept may become Developing, but quiz performance never diagnoses, demotes, proves mastery, schedules review or awards rank. Runtime course concept checks generate canonical content on demand.
+- Test this concept is a conversation first (`SessionChat`, `server/session.ts`, `/api/session`). The tutor opens by asking what the student thinks, with no question on screen. It then agrees or corrects, teaches when asked, and asks the next question, and none of that is graded or changes mastery. "I don't know yet" makes it ask which part is confusing, with quick replies (an `OPTIONS:` line the screen parses), and "Teach me from scratch" makes it teach in small steps before asking questions. The graded question appears only when the student taps "Check what I've got" or accepts the tutor's offer, and from there the evidence flow runs unchanged (assess, follow-up, diagnosis, lesson, transfer). With ElevenLabs agent credentials, Speech mode runs the same tutor brief as a live WebRTC call and shares the transcript with chat; without them it falls back to the browser-recognition speech page. Voice conversation itself never changes mastery.
+- Quiz evidence (`recordQuiz` in `store.ts`): finished assessments are saved per user and reopen from History. Answered questions feed `recordQuizEvidence`; blanks supply no mastery evidence. An unseen concept may become Developing, but quiz performance never diagnoses, demotes, proves mastery or schedules review. Reward accounting is separate: 90%+ assessments can earn frozen quiz/explanation allocations once, with repeated question identities blocked from farming. Runtime course concept checks generate canonical content on demand.
 - Paper, notes and quiz are written as 2 to 4 parallel model calls over disjoint concepts (`server/parallel.ts`), which is what brought a paper from 21 s to 7 s. Compile is 0.3 s.
 - Add a course: upload notes (markdown headings keep their structure, other notes go to the model for an outline), browse curated, or import from Granola or Wispr Flow.
 - Granola and Wispr Flow: real MCP OAuth (dynamic client registration) in `server/integrations.ts`, per-user tokens in SQLite, a read-only import agent, connect and disconnect on the Account page. Connect was checked against both live servers up to the sign-in page. The callback and the import itself have not run, because they need real accounts.
@@ -263,7 +263,7 @@ This is a local hackathon adapter, not a production hosted DB. There is no multi
 - study notes/sample papers use canonical course truth;
 - generated runtime specs can drive these modalities;
 - spoken follow-up/audit uses the canonical spec;
-- low-stakes quiz results are recorded as supporting evidence only.
+- quiz results remain supporting mastery evidence only; assessment scores are also passed separately to the reward ledger.
 
 ## Important backend paths
 
@@ -283,7 +283,8 @@ This is a local hackathon adapter, not a production hosted DB. There is no multi
 | `src/server/materials.ts` | saved course material |
 | `src/server/ingest.ts` | imported note/course construction |
 | `src/server/practice.ts` | notes/paper/weakness views |
-| `src/server/quiz.ts` | quiz generation/grading + weak evidence |
+| `src/server/quiz.ts` | quiz/FRQ generation, grading + weak mastery evidence |
+| `src/server/rewardLedger.ts` | weighted assessment-point ledger and anti-farming rules |
 | `src/server/converse.ts` | spoken follow-up/audit |
 | `src/server/calendar.ts` / `schedule.ts` | calendar/review scheduling |
 
@@ -306,7 +307,7 @@ Do not merge PR #5 demo data into `main`.
 
 Backend semantics are now substantially complete for the hackathon scope. Remaining work is mostly integration/deployment hardening:
 
-- broad end-to-end UI smoke/integration against the latest frontend;
+- live end-to-end browser/device smoke against the latest frontend (the repo-wide integration hardening pass is merged);
 - hosted durable database/storage adapter;
 - real Clerk account-switch browser smoke;
 - live Gemini/OpenRouter presentation-device smoke;
@@ -323,7 +324,7 @@ Backend semantics are now substantially complete for the hackathon scope. Remain
 - Never demote or diagnose from `uncertain`.
 - Never silently fall back from failed model evaluation.
 - Hand-ticking tasks/manual course completion is not mastery evidence.
-- Quiz signals are not mastery evidence.
+- Quiz signals are supporting mastery evidence only; point rewards from scored assessments never substitute for transfer or delayed retrieval.
 - Never overwrite old evidence/spec revisions.
 - Never fabricate source excerpts or convert authored metadata into a quote.
 - Never put presentation/sample state on `main`.
@@ -361,13 +362,19 @@ The no-auth `local` namespace keeps original keys and test reset hooks. Pre-auth
 ## Speech mode
 
 `/course/[courseId]/practice/[conceptId]/talk` is a spoken two-way conversation with the same tutor as the chat. It shares the transcript with `SessionChat` through sessionStorage, so the student can switch both ways. Speech in uses the browser's recognition (silence for 1.6s ends a turn). Speech out goes through `/api/voice/speak`, which proxies ElevenLabs (`ELEVENLABS_API_KEY`, optional `ELEVENLABS_VOICE_ID`, `ELEVENLABS_MODEL`) and falls back to browser speech on a 501. Nothing is graded in speech mode; the check happens in the chat.
-After this backend hardening milestone, do one deliberate frontend/backend integration pass rather than chasing frontend commits piecemeal.
+The deliberate frontend/backend integration pass landed in PR #14. Re-run focused hardening when teammate changes land on top of it rather than re-auditing stable subsystems from scratch.
 
 
 ## Rank ladder
 
-Overall tiers start at 0 / 1,000 / 5,000 / 10,000 / 50,000 / 100,000 / 500,000 points (Bronze to Legend). Each course uses `courseTiers(conceptCount)`, at 0, 10, 25, 45, 70, 90 and 100% of the course mastery point budget. Quiz answers award no rank. The course map and dashboard use `CourseRankBar`. Historical peak totals remain preserved.
+Overall tiers start at 0 / 1,000 / 5,000 / 10,000 / 50,000 / 100,000 / 500,000 points (Bronze to Legend). A standard 20-topic course has a frozen 12,000-point ceiling: 3,000 quiz assessment points, 7,000 explanation/FRQ points, and a 2,000 one-time course bonus; smaller maps scale proportionally. Topic allocations are weighted 1/2/3 from class-map importance (supporting/important/core, default 2 when unclear). Each course uses `courseTiers(conceptCount)` at 0, 10, 25, 45, 70, 90 and 100% of that course budget.
+
+70% is Proficient and earns no points; 90% is Assessment mastered and can earn the relevant allocation. Four distinct mastered quiz questions cumulatively fill one topic's quiz allocation; repeats do not pay twice. Explanation allocation is one-time per topic. The course bonus requires every topic's quiz + explanation allocation and every concept durably `mastered`. Old pre-redesign mastery/streak/repair peaks are not imported as assessment points. The course map and dashboard use `CourseRankBar`.
 
 ## Voice calls (ElevenLabs agent)
 
 `/course/[courseId]/practice/[conceptId]/talk` runs a live WebRTC call with an ElevenLabs agent when `ELEVENLABS_API_KEY` and `ELEVENLABS_AGENT_ID` are set (`AgentTalk`, `@elevenlabs/react` 1.16.0). Without them it falls back to the older browser-recognition page (`TalkChat`). `/api/voice/session` keeps the key on the server, returns a conversation token, and sends the concept's tutor brief (`voiceBrief` in `server/session.ts`) as a prompt override plus the chat so far, so the call carries on from the chat. The agent needs Security overrides on for system prompt and first message. The transcript goes into the same sessionStorage thread as the chat, and nothing said on a call is graded. Not built yet: a voice picker in settings (override `tts.voiceId`).
+
+## Settings and account
+
+Settings has five tabs: Learning, Tutor, Voice, Data and privacy, Accessibility. Tutor, voice and quiz choices are stored per account (`server/prefs.ts`, key `prefs`, schema in `lib/prefs.ts`) and saved through `/api/prefs`. A patch never overwrites fields it doesn't name, and unknown keys are refused. The tutor reads the choices on the server (`sessionSystem`), so they can't be changed from a chat message. The voice list is fixed in `TUTOR_VOICES`, and only those ids reach ElevenLabs (the call override and `/api/voice/speak` previews). Calls report their length to `/api/voice/usage`, counted at most 30 minutes each. `VOICE_MINUTES_CAP` sets a per-account limit, enforced when a call starts. Data and privacy has a JSON export (`/api/account/export`), clear tutor chats on this device, and start a course over (`/api/courses/reset`, typed confirmation, rank points stay). The account page now shows streak, best streak, concepts by state, quizzes taken, voice minutes and the calendar connection. The decorative "Free plan" badge is gone. Not built: delete account (Clerk's Manage account has it), per-account reminders.

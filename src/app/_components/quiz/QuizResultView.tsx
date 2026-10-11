@@ -1,3 +1,5 @@
+import { SourceLineage } from "../practice/SourceLineage";
+import { assessmentLevel } from "@proveit/lib/rewards";
 import Link from "next/link";
 import { ArrowRight, Check, X } from "lucide-react";
 import { cn } from "@proveit/lib/cn";
@@ -15,7 +17,7 @@ export function QuizResultView({ result, onRetake, saved = true }: { result: Qui
     <section aria-label="Quiz results" className="flex max-w-2xl flex-col gap-5">
       <div className="flex flex-col gap-3 rounded-md border border-line bg-surface p-5">
         <div className="eyebrow">Your score</div>
-        <div className="flex items-baseline gap-3"><span className="text-[32px] font-semibold leading-none tabular-nums">{result.score} / {result.total}</span><span className="text-sm text-ink-muted">{result.pct}%</span></div>
+        <div className="flex items-baseline gap-3"><span className="text-[32px] font-semibold leading-none tabular-nums">{Number(result.score.toFixed(2))} / {result.total} marks</span><span className="text-sm text-ink-muted">{result.pct}%</span></div>
         <ul className="m-0 flex list-none flex-col gap-1.5 p-0" aria-label="By concept">
           {result.byConcept.map((c) => (
             <li key={c.conceptId} className="flex items-center gap-3 text-[13px]">
@@ -41,7 +43,7 @@ export function QuizResultView({ result, onRetake, saved = true }: { result: Qui
             ))}
           </ul>
         ) : <p className="m-0 text-[13px] text-ink-muted">No concept changed state. Answered questions can start a concept as Developing. Proving transfer and retaining it later require separate checks.</p>}
-        <p className="m-0 text-[13px]">Quiz answers are practice signals. They do not earn rank points or prove mastery.</p>
+        <p className="m-0 text-[13px]">{assessmentLevel(result.total ? 100 * result.score / result.total : 0)} · +{result.pointsGained} points. At 90%, covered quiz allocations earn points once. At 70%, proficiency earns no points. Transfer and delayed review still establish durable mastery.</p>
         {saved && <p className="m-0 text-xs text-ink-faint">Saved to your <Link href="/history" className="text-ink-muted">History</Link>. You can open this review again from there.</p>}
       </section>
 
@@ -62,9 +64,10 @@ export function QuizResultView({ result, onRetake, saved = true }: { result: Qui
           return (
             <li key={`${it.id}-${i}`} className={cn("flex flex-col gap-2 rounded-md border bg-surface p-4", right ? "border-mastered-line" : "border-needswork-line")}>
               <div className="flex items-start gap-2">
-                {right ? <Check size={16} className="mt-0.5 shrink-0 text-mastered-text" aria-label="Correct" /> : <X size={16} className="mt-0.5 shrink-0 text-needswork-text" aria-label="Incorrect" />}
+                {right ? <Check size={16} className="mt-0.5 shrink-0 text-mastered-text" aria-label="Correct" /> : <X size={16} className="mt-0.5 shrink-0 text-needswork-text" aria-label={it.format === "explanation" ? "Below assessment mastery" : "Incorrect"} />}
                 <div className="min-w-0"><div className="text-[11px] text-ink-faint">{i + 1}. {it.concept}</div><div className="text-sm font-semibold leading-normal">{it.prompt}</div></div>
               </div>
+              {it.format === "explanation" && <div className="text-sm"><p>Your response: {it.response || "Left blank"}</p><p>{it.explanationScore ?? 0}% · {Number((it.earnedMarks ?? 0).toFixed(2))} / {it.marks ?? 4} marks</p></div>}
               <ul className="m-0 flex list-none flex-col gap-1 p-0 text-[13px]">
                 {it.options.map((o, j) => (
                   <li key={j} className={cn("rounded-sm px-2.5 py-1.5", j === it.correct ? "bg-mastered-bg text-mastered-text" : j === it.picked ? "bg-needswork-bg text-needswork-text" : "text-ink-muted")}>
@@ -72,6 +75,8 @@ export function QuizResultView({ result, onRetake, saved = true }: { result: Qui
                   </li>
                 ))}
               </ul>
+              {it.sources && <SourceLineage sources={it.sources} showExcerpt compact />}
+              {it.learningSpecRevision && <p className="m-0 text-xs text-ink-faint">Content revision {it.learningSpecRevision}</p>}
               {it.picked === null && <p className="m-0 text-xs text-ink-faint">You left this one blank.</p>}
               <p className="m-0 text-xs leading-normal text-ink-muted">{it.explanation}</p>
             </li>

@@ -189,14 +189,24 @@ describe("what a quiz does to the map, the history and the rank", () => {
     for (const c of getCourse("intro-stats").concepts) if (["mastered", "provisional", "needs_work"].includes(before[c.id]!)) expect(c.state).toBe(before[c.id]);
   });
 
-  it("records weak evidence and never awards rank, including on retakes", async () => {
+  it("keeps quiz evidence weak for mastery while awarding only mastered assessment allocations", async () => {
     addCatalogCourse(NM);
     const n = names();
     const start = getRewards().points;
     expect((await take([n[0]!, n[1]!])).pointsGained).toBe(0);
     expect((await take([n[0]!, n[2]!])).pointsGained).toBe(0);
     expect(getCourseRanks().find((r) => r.courseId === NM)!.points).toBe(0);
-    expect(getRewards().points).toBe(start);
+    expect(getCourse(NM).concepts.every((c) => c.state === "developing")).toBe(true);
+
+    const mastered = await take(n);
+    expect(mastered.pointsGained).toBeGreaterThan(0);
+    const after = getRewards().points;
+    expect(after).toBeGreaterThan(start);
+    expect(getCourseRanks().find((r) => r.courseId === NM)!.points).toBeGreaterThan(0);
+    expect(getCourse(NM).concepts.every((c) => c.state === "developing")).toBe(true);
+
+    expect((await take(n)).pointsGained).toBe(0);
+    expect(getRewards().points).toBe(after);
     expect(getHistory().filter((e) => e.quizPct === undefined).length).toBeGreaterThan(0);
   });
 
@@ -206,7 +216,7 @@ describe("what a quiz does to the map, the history and the rank", () => {
     const r = await take([n[0]!]);
     const ev = getHistory().find((e) => e.id === r.quizId)!;
     expect(ev).toMatchObject({ title: `Quiz on Network Management: 1 of ${n.length}`, tone: "bad", href: `/course/${NM}/quiz/${r.quizId}` });
-    expect(ev.quizPct).toBe(13);
+    expect(ev.quizPct).toBe(12.5);
     // Every other event is an attempt with an evidence record, which the History page looks up. A quiz must not be one of them.
     expect(getHistory().filter((e) => e.quizPct === undefined).every((e) => { try { return Boolean(getEvidenceAttempt(e.id)); } catch { return false; } })).toBe(true);
     expect(() => getEvidenceAttempt(r.quizId)).toThrow();

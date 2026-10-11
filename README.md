@@ -71,7 +71,7 @@ Evidence kinds:
 - `review`
 - `quiz`
 
-Quiz answers are intentionally low-stakes signals. They may move an unseen concept to `developing` and influence what ProveIt recommends studying, but they never diagnose a misconception, grant transfer proof, schedule a review, demote stronger mastery, or directly award rank.
+Quiz answers are intentionally low-stakes **mastery evidence**. They may move an unseen concept to `developing` and influence what ProveIt recommends studying, but they never diagnose a misconception, grant transfer proof, schedule a review, or demote stronger mastery. Separately, a server-scored quiz assessment at 90%+ can earn its one-time quiz-point allocation; that reward does not make the concept Provisional or Mastered.
 
 Mastery states:
 
@@ -122,17 +122,18 @@ SQLite is the hackathon/local persistence adapter, **not** a hosted production d
 | `src/server/userScope.ts` / `userBoundary.ts` | Trusted per-user server isolation |
 | `src/server/persistence.ts` | SQLite persistence adapter |
 | `src/server/materials.ts` / `ingest.ts` | Course material and ingestion |
-| `src/server/practice.ts` / `quiz.ts` / `converse.ts` | Study modalities and low-stakes evidence |
+| `src/server/practice.ts` / `quiz.ts` / `converse.ts` | Study modalities, scored assessments and low-stakes mastery evidence |
+| `src/server/rewardLedger.ts` | Weighted, anti-farming quiz/explanation point allocations |
 | `src/server/calendar.ts` / `schedule.ts` | Calendar and review scheduling |
 | `examples/signbridge/service.py` | Local model-service entry point for the isolated SignBridge feature |
 
 ## Current scope
 
-Built: course upload/import and concept maps, source-grounded generated mastery content, practice, misconception diagnosis, clarification, targeted remediation, transfer proof, delayed review/retention, evidence history, source lineage, review queue, tutor/spoken flows, quizzes and practice documents, rank/to-dos, Clerk account isolation, iCal integration, local persistence, curated courses, and Granola/Wispr Flow connector plumbing.
+Built: course upload/import and concept maps, source-grounded generated mastery content, practice, misconception diagnosis, clarification, targeted remediation, transfer proof, delayed review/retention, evidence history, source lineage, review queue, tutor/spoken flows, quizzes and practice documents, class-map-weighted assessment points and course/overall rank, to-dos, Clerk account isolation, iCal integration, local persistence, curated courses, and Granola/Wispr Flow connector plumbing.
 
 Important remaining production/integration work:
 
-- one deliberate end-to-end UI integration/smoke pass against the latest frontend;
+- live end-to-end browser/device smoke against the latest frontend;
 - hosted/durable production storage instead of local SQLite;
 - real account-switch, connector callback/import, Gemini, calendar, mic/camera and presentation-device smoke tests;
 - production browser E2E/error/loading hardening;

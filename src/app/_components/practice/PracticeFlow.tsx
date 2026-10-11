@@ -1,5 +1,7 @@
 "use client";
 
+import { AssessmentScore } from "./AssessmentScore";
+import type { AssessmentReward } from "@proveit/lib/schemas";
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useSettings } from "@proveit/lib/settings";
@@ -17,7 +19,7 @@ import { Paperclip, X } from "lucide-react";
 import { api } from "@proveit/lib/api";
 import type { QuestionView } from "@proveit/server/store";
 
-type Turn = { answer: string; followUp: string };
+type Turn = { answer: string; followUp: string; reward?: AssessmentReward };
 
 export function PracticeFlow({ courseId, question, resume, uploads, modeParam }: {
   courseId: string; question: QuestionView; resume?: { attemptId: string; answer: string; followUp: string }; uploads: { enabled: boolean; demo: boolean }; modeParam?: string;
@@ -53,7 +55,7 @@ export function PracticeFlow({ courseId, question, resume, uploads, modeParam }:
     try {
       const { attemptId, evaluation } = await api.assess({ courseId, conceptId: question.conceptId, learningSpecRevision: question.learningSpecRevision, answer, followUpTo, imageSummary: upload?.ok ? upload.summary : undefined, imageName: upload?.ok ? upload.name : undefined });
       if (evaluation.verdict === "uncertain") {
-        setTurns((t) => [...t, { answer, followUp: evaluation.followUp ?? "Say a bit more." }]);
+        setTurns((t) => [...t, { answer, followUp: evaluation.followUp ?? "Say a bit more.", reward: evaluation.assessmentReward }]);
         setFollowUpTo(attemptId);
         setAnswer("");
         setUpload(null);
@@ -76,7 +78,7 @@ export function PracticeFlow({ courseId, question, resume, uploads, modeParam }:
         {turns.map((t, i) => (
           <div key={i} className="contents">
             <UserBubble>{t.answer}</UserBubble>
-            <AssistantMessage><ClarificationCard text={t.followUp} /></AssistantMessage>
+            <AssistantMessage><AssessmentScore reward={t.reward} /><ClarificationCard text={t.followUp} /></AssistantMessage>
           </div>
         ))}
         {status === "evaluating" && <AssistantMessage><Typing /></AssistantMessage>}

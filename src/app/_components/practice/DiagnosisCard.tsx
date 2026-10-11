@@ -1,3 +1,4 @@
+import { AssessmentScore } from "./AssessmentScore";
 import Link from "next/link";
 import { buttonStyles } from "../Button";
 import { AssistantCard, CalloutRow, Callout, CardFooter, CardTable, Cell, Row, Section } from "../chat/AssistantCard";
@@ -10,7 +11,7 @@ import type { AttemptView, EvidenceAttemptView } from "@proveit/server/store";
 import { AlertTriangle } from "lucide-react";
 
 const ERROR_LABEL = { none: "", conceptual: "conceptual error", procedural: "procedural error", slip: "calculation slip", interpretation: "interpretation error", flawed_reasoning: "flawed-reasoning answer", uncertain: "" } as const;
-const STATUS = { good: "Mastered", warn: "Transfer pending", bad: "Reteaching", none: "No data" } as const;
+const STATUS = { good: "Strong evidence", warn: "Transfer pending", bad: "Reteaching", none: "No data" } as const;
 
 export function DiagnosisCard({ a, trail = [] }: { a: AttemptView; trail?: EvidenceAttemptView[] }) {
   const e = a.evaluation;
@@ -26,6 +27,7 @@ export function DiagnosisCard({ a, trail = [] }: { a: AttemptView; trail?: Evide
       ariaLabel="Diagnosis" edge={wrong ? "bad" : "good"} label="Diagnosis" meta={meta}
       headline={wrong ? `1 ${ERROR_LABEL[e.errorType]} found` : "No misconception found"}
     >
+      <AssessmentScore reward={e.assessmentReward} />
       <CardTable head={["SKILL", "LEVEL", "STATUS", "MISCONCEPTION"]}>
         {e.skills.map((s) => {
           const tone = toneForPct(s.pct);
@@ -71,3 +73,4 @@ export function DiagnosisCard({ a, trail = [] }: { a: AttemptView; trail?: Evide
     </AssistantCard>
   );
 }
+

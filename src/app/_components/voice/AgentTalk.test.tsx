@@ -3,7 +3,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const hook = vi.hoisted(() => ({ startSession: vi.fn(), endSession: vi.fn(), setMuted: vi.fn(), cb: {} as { onMessage?: (m: { message: string; source: "user" | "ai" }) => void }, status: "disconnected" }));
+const hook = vi.hoisted(() => ({ startSession: vi.fn(), endSession: vi.fn(), setMuted: vi.fn(), cb: {} as { onMessage?: (m: { message: string; source: "user" | "ai" }) => void; onError?: (message: string) => void }, status: "disconnected" }));
 vi.mock("@elevenlabs/react", () => ({
   ConversationProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
   useConversation: (cb: typeof hook.cb) => { hook.cb = cb; return { startSession: hook.startSession, endSession: hook.endSession, setMuted: hook.setMuted, status: hook.status, isMuted: false, isSpeaking: false }; },
@@ -18,6 +18,11 @@ const mount = () => render(<AgentTalk userId="u1" courseId="intro-stats" concept
 beforeEach(() => {
   sessionStorage.clear();
   hook.startSession.mockReset();
+  const stop = vi.fn();
+  Object.defineProperty(navigator, "mediaDevices", {
+    configurable: true,
+    value: { getUserMedia: vi.fn(async () => ({ getTracks: () => [{ stop }] } as unknown as MediaStream)) },
+  });
   vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ conversationToken: "tok", prompt: "BRIEF", firstMessage: "Hello there" }), { status: 200 })));
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); });
@@ -48,5 +53,27 @@ describe("AgentTalk", () => {
     await userEvent.click(screen.getByRole("button", { name: "Start the call" }));
     expect((await screen.findByRole("alert")).textContent).toBe("no key");
     expect(hook.startSession).not.toHaveBeenCalled();
+  });
+
+  it("fails before requesting a voice token when microphone permission is blocked", async () => {
+    Object.defineProperty(navigator, "mediaDevices", {
+      configurable: true,
+      value: { getUserMedia: vi.fn(async () => { throw new DOMException("denied", "NotAllowedError"); }) },
+    });
+    mount();
+    await userEvent.click(screen.getByRole("button", { name: "Start the call" }));
+    expect((await screen.findByRole("alert")).textContent).toContain("Microphone access is blocked");
+    expect(fetch).not.toHaveBeenCalled();
+    expect(hook.startSession).not.toHaveBeenCalled();
+  });
+
+  it("allows a retry after the ElevenLabs SDK reports a connection error", async () => {
+    mount();
+    await userEvent.click(screen.getByRole("button", { name: "Start the call" }));
+    hook.cb.onError?.("WebRTC failed");
+    expect((await screen.findByRole("alert")).textContent).toBe("WebRTC failed");
+    await userEvent.click(screen.getByRole("button", { name: "Start the call" }));
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(hook.startSession).toHaveBeenCalledTimes(2);
   });
 });

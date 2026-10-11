@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { getRewards, listCourses, setCoursesCompleted, setTaskDone } from "./store";
+import { getRewards, listCourses, recordQuiz, setCoursesCompleted, setTaskDone } from "./store";
 import { assess, clarify, getAttempt, getEvidenceAttempt, getCourse, getDashboard, getQuestion, getRemediation, getFiles, getHistory, getMisconceptionLog, getResult, getReviewBase, getReviewChallenge, getReviewResult, getReviews, getSidebar, getTransferChallenge, InvalidAttemptLinkError, NotFoundError, ReviewNotDueError, submitReview, submitTransfer } from "./store";
 
 const WRONG = "It means there's a 95% probability that the true population mean is inside our interval.";
@@ -361,10 +361,7 @@ describe("delayed review and retained mastery", () => {
 
   it("promotes provisional to mastered only after a due delayed-retrieval pass", async () => {
     await provisionalDue();
-    const evidencePoints = () => getRewards().breakdown
-      .filter((row) => row.label !== "Streak days, up to 7")
-      .reduce((sum, row) => sum + row.points, 0);
-    const beforePoints = evidencePoints();
+    const beforePoints = getRewards().points;
     const challenge = getReviewChallenge("intro-stats", "cii", reviewNow);
     expect(challenge.review.question).toContain("A report says");
     expect(challenge.state).toBe("provisional");
@@ -377,9 +374,9 @@ describe("delayed review and retained mastery", () => {
       kind: "review", outcome: "pass", parentAttemptId: null, rootAttemptId: result.resultAttemptId, previousState: "provisional", evaluation: null,
     });
     expect(getReviewResult(result.resultAttemptId)).toMatchObject({
-      previous: "provisional", next: "mastered", nextReview: "Oct 17", pointsEarned: 100,
+      previous: "provisional", next: "mastered", nextReview: "Oct 17", pointsEarned: 0,
     });
-    expect(evidencePoints()).toBe(beforePoints + 100);
+    expect(getRewards().points).toBe(beforePoints);
     expect(getHistory()[0]).toMatchObject({ title: "Passed delayed review on CI interpretation", detail: "Mastered with delayed retrieval", tone: "good" });
   });
 
@@ -680,64 +677,54 @@ describe("ticker rows", () => {
   });
 });
 
-describe("rank points", () => {
-  it("starts from the seeded evidence and explains every point", () => {
+describe("assessment-ledger rank points", () => {
+  const masteredQuiz = () => recordQuiz({
+    courseId: "intro-stats",
+    items: ["A", "B", "C", "D"].map((suffix) => ({
+      conceptId: "cii",
+      concept: "CI interpretation",
+      prompt: `CI coverage ${suffix}`,
+      options: ["right", "wrong"],
+      picked: 0,
+      correct: 0,
+      explanation: "right",
+    })),
+  });
+
+  it("starts at zero even when the demo seed contains mastery, streak and repaired-state evidence", () => {
     const r = getRewards();
-    expect(r.points).toBe(6000);
-    expect(r.tier.name).toBe("Gold");
-    expect(r.breakdown.reduce((n, b) => n + b.points, 0)).toBe(6000);
-    expect(r.breakdown.find((b) => b.label === "Concepts mastered")).toMatchObject({ count: 16, points: 4800 });
-    expect(r.breakdown.find((b) => b.label === "Courses mastered end to end")).toMatchObject({ count: 1, points: 1000 });
-    expect(getRewards()).toEqual(r);
-  });
-
-  it("adds exactly the proved, repaired, first-try and streak points when a transfer question is passed", async () => {
-    const { attemptId } = await run(WRONG);
-    const pass = await submitTransfer(attemptId, RIGHT_TRANSFER);
-    if (pass.result !== "pass") throw new Error("expected pass");
-    expect(getRewards().points).toBe(6000 + 200 + 100 + 50 + 25);
-    expect(getResult(pass.resultAttemptId).points.reduce((n, p) => n + p.points, 0)).toBe(350);
-  });
-
-  it("does not award a repair bonus when a sound first answer proves transfer directly", async () => {
-    const first = await run("Over repeated samples, about 95% of intervals made by the method contain the true mean.");
-    const pass = await submitTransfer(first.attemptId, RIGHT_TRANSFER);
-    if (pass.result !== "pass") throw new Error("expected pass");
-    expect(getRewards().points).toBe(6000 + 200 + 50 + 25);
-    const resultPoints = getResult(pass.resultAttemptId).points;
-    expect(resultPoints).toEqual([
-      { label: "Proved the concept", points: 200 },
-      { label: "Passed on the first try", points: 50 },
+    expect(r.points).toBe(0);
+    expect(r.breakdown.map((b) => b.label)).toEqual([
+      "Quiz assessment mastery",
+      "Explanation assessment mastery",
+      "Course mastery bonuses",
     ]);
+    expect(r.breakdown.reduce((n, b) => n + b.points, 0)).toBe(0);
   });
 
-    it("earns nothing for ticking a task or marking a course done by hand", () => {
-    setTaskDone("pv", true);
-    setCoursesCompleted(["intro-stats", "personal-finance"], true);
-    expect(getRewards().points).toBe(6000);
+  it("awards points from a 90%+ non-FRQ quiz without treating the quiz as mastery proof", () => {
+    const beforeState = state("cii");
+    const result = masteredQuiz();
+    expect(result.pointsGained).toBeGreaterThan(0);
+    expect(getRewards().points).toBe(result.pointsGained);
+    expect(state("cii")).toBe(beforeState === "not_started" ? "developing" : beforeState);
   });
 
-  it("does not pay a second time for the same concept, so a wrong answer can't be cycled for points", async () => {
-    const first = await run(WRONG);
-    await submitTransfer(first.attemptId, RIGHT_TRANSFER);
+  it("does not award the same quiz allocation twice", () => {
+    masteredQuiz();
     const after = getRewards().points;
-    const again = await run(WRONG);
-    await submitTransfer(again.attemptId, RIGHT_TRANSFER);
+    expect(masteredQuiz().pointsGained).toBe(0);
     expect(getRewards().points).toBe(after);
   });
 
-  it("never lets rank drop when a concept slips back", async () => {
-    const { attemptId } = await run(WRONG);
-    await submitTransfer(attemptId, RIGHT_TRANSFER);
-    const high = getRewards().points;
-    await run(WRONG);
-    expect(getRewards().points).toBe(high);
-  });
-
-  it("pays the course bonus only when concepts earned it, not for a hand-marked course", () => {
-    setCoursesCompleted(["linear-algebra"], false);
-    setCoursesCompleted(["linear-algebra"], true);
-    expect(getRewards().breakdown.find((b) => b.label === "Courses mastered end to end")?.count).toBe(0);
+  it("does not award points merely for transfer, review state, task clicks or manual course completion", async () => {
+    const first = await run(WRONG);
+    const transfer = await submitTransfer(first.attemptId, RIGHT_TRANSFER);
+    if (transfer.result !== "pass") throw new Error("expected transfer pass");
+    expect(getRewards().points).toBe(0);
+    setTaskDone("pv", true);
+    setCoursesCompleted(["intro-stats", "personal-finance"], true);
+    expect(getRewards().points).toBe(0);
   });
 });
 

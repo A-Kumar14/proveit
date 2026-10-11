@@ -4,6 +4,7 @@ import { AgentTalk } from "@proveit/app/_components/voice/AgentTalk";
 import { TalkChat } from "@proveit/app/_components/voice/TalkChat";
 import { orNotFoundAsync } from "@proveit/server/page";
 import { sessionOpening } from "@proveit/server/session";
+import { getPrefs } from "@proveit/server/prefs";
 import { ensureQuestion } from "@proveit/server/store";
 
 import { scopedUserId } from "@proveit/server/userScope";
@@ -17,7 +18,7 @@ async function TalkPage({ params }: PageProps<"/course/[courseId]/practice/[conc
     <AppShell active="practice" courseId={courseId} state={q.state} crumbs={[{ label: q.courseName, href: `/course/${courseId}` }, { label: q.conceptName, href: `/course/${courseId}/practice/${conceptId}` }, { label: "Speech mode" }]}>
       {process.env.ELEVENLABS_API_KEY && process.env.ELEVENLABS_AGENT_ID
         ? <AgentTalk key={scopedUserId()} userId={scopedUserId()} courseId={courseId} conceptId={conceptId} chatHref={`/course/${courseId}/practice/${conceptId}`} />
-        : <TalkChat key={scopedUserId()} userId={scopedUserId()} courseId={courseId} conceptId={conceptId} opening={sessionOpening(courseId, conceptId)} chatHref={`/course/${courseId}/practice/${conceptId}`} />}
+        : <TalkChat silenceMs={getPrefs().pauseSeconds * 1000} key={scopedUserId()} userId={scopedUserId()} courseId={courseId} conceptId={conceptId} opening={sessionOpening(courseId, conceptId)} chatHref={`/course/${courseId}/practice/${conceptId}`} />}
     </AppShell>
   );
 }

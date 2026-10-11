@@ -56,3 +56,40 @@ Browser inspection was attempted, but the cloud browser could not reach the loca
 ## Review order
 
 Review the course-scoped upload patch first, then the account/evidence/revision/removal integration patch and incorporated teammate rank update, then the material-race guard and report. Keep PR #5/sample seed data out of main. No merge was performed.
+
+
+## Post-merge continuation
+
+PR #14 was merged into `main` at `b8ebb719e82a6c8e2990e603b02606fc1464c2ad`. The next three `main` commits added the live ElevenLabs agent speech path and adjusted the session UI, so the hardening pass was resumed from that exact delta rather than re-auditing already-merged subsystems.
+
+Focused review of the new voice path verified these preserved boundaries:
+
+- `/api/voice/session` is wrapped by the trusted user route boundary and resolves the current course/concept before issuing a short-lived ElevenLabs token;
+- the API key stays server-side;
+- the per-call prompt is built from the same user-scoped course/spec/material context as Tutor chat;
+- voice transcripts reuse the account/course/concept-scoped browser thread introduced by PR #14;
+- voice conversation remains explicitly non-grading and cannot directly change mastery, evidence, review scheduling or rank;
+- replaced/removed courses fail through current question resolution rather than reviving stale concepts;
+- prompt and first-message overrides are checked before the token request when the agent configuration can be read.
+
+This continuation also hardened the client start path for demo reliability: microphone permission is requested before spending a voice token, permission denial surfaces a direct recovery message, and SDK errors clear the local connecting lock so the student can retry instead of being stuck in "Connecting...". Regression tests cover blocked microphone access and retry after a reported SDK connection failure.
+
+The live provider/device checks below are still environment-dependent; passing mocked tests cannot prove microphone hardware, WebRTC network traversal, ElevenLabs account configuration or real model quality.
+
+
+## Weighted points finalization
+
+PR #16 superseded the earlier point-policy notes in this report. The final reward system keeps quiz evidence weak for mastery while separately rewarding high-scoring assessments:
+
+- course budgets are derived from the class/concept map and normalized to 3,000 quiz + 7,000 explanation + 2,000 completion points for a standard 20-topic course;
+- topic allocations use 1/2/3 importance weights, with uploaded AI-built maps deriving importance from source emphasis and prerequisite structure;
+- 70% is Proficient with zero points; 90% is Assessment mastered and can earn the relevant allocation;
+- non-FRQ quiz questions and explanation/FRQ/student-explanation assessments are the earning evidence, plus the explicit one-time fully-mastered-course bonus;
+- four distinct mastered quiz questions fill a topic's quiz allocation cumulatively across assessments; repeats are fingerprinted and do not pay twice;
+- explanation allocation is one-time per topic;
+- course bonus requires every reward allocation plus durable Mastered state for every concept;
+- pre-redesign mastery/streak/repair rank peaks are not imported into the assessment ledger;
+- reward state is user-scoped and persisted with the existing learning state;
+- mastery remains independent: quiz evidence cannot diagnose/demote/prove mastery, transfer alone establishes Provisional, and delayed retrieval alone establishes Mastered.
+
+The hardening audit added direct reward-ledger, class-map wiring, migration, account-isolation, anti-farming and UI/course-rank regressions. The exact PR #16 head passed route type generation, TypeScript, ESLint, 524 tests across 74 files, and the production build before merge.

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { MessageSquare, PhoneOff } from "lucide-react";
 import { ConversationProvider, useConversation } from "@elevenlabs/react";
@@ -27,6 +27,9 @@ function Call({ userId, courseId, conceptId, chatHref }: { userId: string; cours
   const [starting, setStarting] = useState(false);
   const saved = useRef<Saved>({ items: [] });
   const opening = useRef<string | null>(null);
+  const muteOnConnect = useRef(false);
+  const connectedAt = useRef<number | null>(null);
+  const conv = useRef<{ setMuted: (m: boolean) => void } | null>(null);
 
   const add = (role: "user" | "assistant", text: string) => {
     const items = saved.current.items;
@@ -46,9 +49,24 @@ function Call({ userId, courseId, conceptId, chatHref }: { userId: string; cours
         add("assistant", text);
       } else add("user", text);
     },
-    onError: (message) => setError(message || "The call dropped. Start it again."),
-    onDisconnect: () => setStarting(false),
+    onError: (message) => {
+      setStarting(false);
+      setError(message || "The call dropped. Start it again.");
+    },
+    onConnect: () => {
+      connectedAt.current = Date.now();
+      if (muteOnConnect.current) conv.current?.setMuted(true);
+    },
+    onDisconnect: () => {
+      setStarting(false);
+      // Count the call toward this account's voice minutes.
+      const began = connectedAt.current;
+      connectedAt.current = null;
+      if (began) void fetch("/api/voice/usage", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ seconds: Math.round((Date.now() - began) / 1000) }), keepalive: true }).catch(() => {});
+    },
   });
+
+  useEffect(() => { conv.current = c; });
 
   const live = c.status === "connected";
 
@@ -58,18 +76,27 @@ function Call({ userId, courseId, conceptId, chatHref }: { userId: string; cours
     saved.current = read(storeKey) ?? { items: [] };
     const history = saved.current.items.flatMap((i) => (i.kind === "chat" && i.role && i.text?.trim() ? [{ role: i.role, text: i.text.slice(0, 2000) }] : [])).slice(-24);
     try {
+      if (!navigator.mediaDevices?.getUserMedia) throw new Error("Voice calls need microphone access in this browser.");
+      const permissionStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      permissionStream.getTracks().forEach((track) => track.stop());
+
       const res = await fetch("/api/voice/session", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ courseId, conceptId, history }) });
-      const json = (await res.json().catch(() => null)) as { conversationToken?: string; prompt?: string; firstMessage?: string; error?: string } | null;
+      const json = (await res.json().catch(() => null)) as { conversationToken?: string; prompt?: string; firstMessage?: string; voiceId?: string; startMuted?: boolean; error?: string } | null;
       if (!res.ok || !json?.conversationToken) throw new Error(json?.error ?? "Couldn't start the call. Try again.");
+      muteOnConnect.current = Boolean(json.startMuted);
       opening.current = history.length === 0 ? json.firstMessage ?? null : null;
-      c.startSession({
+      await Promise.resolve(c.startSession({
         conversationToken: json.conversationToken,
         connectionType: "webrtc",
-        overrides: { agent: { prompt: { prompt: json.prompt }, firstMessage: json.firstMessage } },
-      });
+        overrides: { agent: { prompt: { prompt: json.prompt }, firstMessage: json.firstMessage }, ...(json.voiceId ? { tts: { voiceId: json.voiceId } } : {}) },
+      }));
     } catch (e) {
       setStarting(false);
-      setError(e instanceof Error ? e.message : "Couldn't start the call. Try again.");
+      if (e instanceof DOMException && (e.name === "NotAllowedError" || e.name === "SecurityError")) {
+        setError("Microphone access is blocked. Allow it in your browser and try again.");
+      } else {
+        setError(e instanceof Error ? e.message : "Couldn't start the call. Try again.");
+      }
     }
   }
 

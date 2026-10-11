@@ -26,6 +26,12 @@ describe("tiers", () => {
     expect(standing(999999)).toMatchObject({ tier: { name: "Legend" }, next: null, toNext: 0, pct: 100 });
   });
 
+  it("keeps Legend a long-term multi-course target", () => {
+    const standardCourseMax = courseMaxPoints(20);
+    expect(standardCourseMax).toBe(12000);
+    expect(Math.ceil(TIERS.at(-1)!.min / standardCourseMax)).toBe(42);
+  });
+
   it("ignores negative and fractional totals", () => {
     expect(standing(-50).points).toBe(0);
     expect(standing(1999.9).points).toBe(1999);
@@ -35,10 +41,10 @@ describe("tiers", () => {
 describe("course tiers", () => {
   it("scale to the course, and Legend is everything mastered", () => {
     const t = courseTiers(10);
-    expect(courseMaxPoints(10)).toBe(4000);
-    expect(t.map((x) => x.min)).toEqual([0, 400, 1000, 1800, 2800, 3600, 4000]);
-    expect(standing(4000, t).tier.name).toBe("Legend");
-    expect(standing(3999, t).tier.name).toBe("Master");
+    expect(courseMaxPoints(10)).toBe(6000);
+    expect(t.map((x) => x.min)).toEqual([0, 600, 1500, 2700, 4200, 5400, 6000]);
+    expect(standing(6000, t).tier.name).toBe("Legend");
+    expect(standing(5999, t).tier.name).toBe("Master");
   });
   it("keeps every tier above the last, even for a tiny course", () => {
     const mins = courseTiers(1).map((x) => x.min);

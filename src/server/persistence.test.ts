@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { demoStateForTests } from "../test/demo-state";
 import { closePersistenceForTests, loadJson, saveJson } from "./persistence";
-import { assess, createCourse, getCourse, listCourses } from "./store";
+import { assess, createCourse, getCourse, getRewards, listCourses } from "./store";
 
 const DB = join(tmpdir(), "proveit-persistence-test.sqlite");
 type TestGlobal = { __proveit?: unknown; __proveitTestSeedFactory?: () => unknown };
@@ -52,6 +52,19 @@ describe("SQLite persistence", () => {
     closePersistenceForTests();
 
     expect(getCourse("intro-stats").concepts.find((c) => c.id === "cii")?.state).toBe("developing");
+  });
+
+
+  it("does not migrate pre-redesign rank peaks into assessment points", () => {
+    saveJson("learning", {
+      concepts: {}, attempts: [], quizzes: [], provenDays: [], taskDone: [],
+      peakPoints: 6000, peakByCourse: { "intro-stats": 4000 }, seq: 0, completedOverride: null,
+    });
+    (globalThis as unknown as TestGlobal).__proveit = undefined;
+    closePersistenceForTests();
+
+    expect(getRewards().points).toBe(0);
+    expect(getRewards("intro-stats").points).toBe(0);
   });
 
   it("keeps uploaded courses after the in-memory cache is cleared", () => {

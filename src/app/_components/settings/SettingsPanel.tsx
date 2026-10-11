@@ -4,18 +4,24 @@ import { useState } from "react";
 import { cn } from "@proveit/lib/cn";
 import { useSettings } from "@proveit/lib/settings";
 import { useVoiceSupport } from "../voice/speech";
+import type { Prefs } from "@proveit/lib/prefs";
 import { AccessibilitySettings } from "./AccessibilitySettings";
+import { DataSettings } from "./DataSettings";
+import { TutorSettings } from "./TutorSettings";
+import { usePrefs } from "./usePrefs";
+import { VoiceSettings } from "./VoiceSettings";
 import { Segmented } from "./Segmented";
 import { SettingRow } from "./SettingRow";
 import { Switch } from "./Switch";
 
-const TABS = [{ id: "learning", label: "Learning" }, { id: "accessibility", label: "Accessibility Features" }] as const;
+const TABS = [{ id: "learning", label: "Learning" }, { id: "tutor", label: "Tutor" }, { id: "voice", label: "Voice" }, { id: "data", label: "Data and privacy" }, { id: "accessibility", label: "Accessibility Features" }] as const;
 
 /** Only settings that change behavior are listed. Each is stored in this browser. */
-export function SettingsPanel() {
+export function SettingsPanel({ initialPrefs, courses }: { initialPrefs: Prefs; courses: { id: string; name: string }[] }) {
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("learning");
   const [s, update] = useSettings();
   const canTalk = useVoiceSupport();
+  const { prefs, update: updatePrefs, error } = usePrefs(initialPrefs);
   return (
     <div className="flex gap-8">
       <div role="tablist" aria-label="Settings sections" aria-orientation="vertical" className="flex w-[200px] shrink-0 flex-col gap-0.5">
@@ -38,7 +44,11 @@ export function SettingsPanel() {
             </SettingRow>
           </>
         )}
+        {tab === "tutor" && <TutorSettings prefs={prefs} update={updatePrefs} />}
+        {tab === "voice" && <VoiceSettings prefs={prefs} update={updatePrefs} />}
+        {tab === "data" && <DataSettings courses={courses} />}
         {tab === "accessibility" && <AccessibilitySettings />}
+        {error && <p role="alert" className="mt-3 text-xs text-needswork-text">{error}</p>}
       </section>
     </div>
   );
