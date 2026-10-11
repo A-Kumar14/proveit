@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Convenience entry point for the local SignBridge model service."""
+"""Convenience entry point for the local ASL Assistant model service."""
 
 import sys
 from pathlib import Path

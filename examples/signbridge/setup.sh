@@ -23,7 +23,7 @@ fi
 "$VENV/bin/python" "$SCRIPT_DIR/download_landmark_model.py"
 
 echo
-echo "SignBridge setup is complete."
+echo "ASL Assistant setup is complete."
 echo "Check the model installation with:"
 echo "  \"$VENV/bin/python\" \"$SCRIPT_DIR/check_environment.py\""
 echo "Start the model service with:"

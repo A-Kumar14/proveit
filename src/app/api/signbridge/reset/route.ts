@@ -14,7 +14,7 @@ export async function POST(request: Request) {
     await resetSignBridgeSession(parsed.data.sessionId);
     return NextResponse.json({ reset: true }, { headers: { "Cache-Control": "no-store" } });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "The SignBridge session could not be reset.";
+    const message = error instanceof Error ? error.message : "The ASL Assistant session could not be reset.";
     return NextResponse.json({ error: message }, { status: 503 });
   }
 }

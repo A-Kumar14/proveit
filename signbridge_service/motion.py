@@ -1,4 +1,4 @@
-"""Opt-in multi-frame ASL recognition using the SignBridge vision model."""
+"""Opt-in multi-frame ASL recognition using the configured vision model."""
 
 from __future__ import annotations
 

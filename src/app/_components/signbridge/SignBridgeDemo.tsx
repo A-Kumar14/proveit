@@ -19,6 +19,12 @@ const FACE_CONNECTIONS = [
   [0, 1], [1, 2], [2, 3], [3, 0], [4, 5], [6, 7], [8, 9], [10, 11],
 ] as const;
 
+function modelDisplayName(model: string) {
+  if (model === "SignBridge-ML") return "Trained sign model";
+  if (model === "SignBridge Hand Landmark MLP") return "Local hand landmark model";
+  return model;
+}
+
 export function SignBridgeDemo() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const captureCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -55,7 +61,7 @@ export function SignBridgeDemo() {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ sessionId }),
     }).catch((cleanupError: unknown) => {
-      console.error("SignBridge camera session cleanup failed.", cleanupError);
+      console.error("ASL Assistant camera session cleanup failed.", cleanupError);
     });
   };
 
@@ -136,9 +142,9 @@ export function SignBridgeDemo() {
         signal: controller.signal,
       });
       const payload = await response.json().catch(() => null);
-      if (!response.ok) throw new Error(typeof payload?.error === "string" ? payload.error : "The SignBridge model request failed.");
+      if (!response.ok) throw new Error(typeof payload?.error === "string" ? payload.error : "The ASL Assistant model request failed.");
       const parsed = SignBridgePrediction.safeParse(payload);
-      if (!parsed.success) throw new Error("The SignBridge service returned an invalid prediction.");
+      if (!parsed.success) throw new Error("The ASL Assistant service returned an invalid prediction.");
       return parsed.data;
     } finally {
       if (predictionAbortRef.current === controller) predictionAbortRef.current = null;
@@ -302,7 +308,7 @@ export function SignBridgeDemo() {
     candidateRef.current = null;
     acceptedRef.current = null;
     releaseFramesRef.current = 0;
-    setStatus("Checking the local SignBridge service…");
+    setStatus("Checking the local ASL Assistant service…");
     let parsedHealth: ReturnType<typeof SignBridgeHealth.parse> | null = null;
     try {
       const response = await fetch("/api/signbridge/health", { cache: "no-store" });
@@ -311,12 +317,12 @@ export function SignBridgeDemo() {
       if (!response.ok || !parsed.success) {
         throw new Error(typeof payload === "object" && payload && "error" in payload && typeof payload.error === "string"
           ? payload.error
-          : "The local SignBridge model service is not ready.");
+          : "The local ASL Assistant model service is not ready.");
       }
       parsedHealth = parsed.data;
       setHealth(parsed.data);
     } catch (healthError) {
-      setError(healthError instanceof Error ? healthError.message : "The local SignBridge model service is not ready.");
+      setError(healthError instanceof Error ? healthError.message : "The local ASL Assistant model service is not ready.");
     }
 
     let stream: MediaStream | null = null;
@@ -394,7 +400,7 @@ export function SignBridgeDemo() {
       const payload = await response.json().catch(() => null);
       if (!response.ok) throw new Error(typeof payload?.error === "string" ? payload.error : "The motion model request failed.");
       const parsed = SignBridgePrediction.safeParse(payload);
-      if (!parsed.success) throw new Error("The SignBridge service returned an invalid motion prediction.");
+      if (!parsed.success) throw new Error("The ASL Assistant service returned an invalid motion prediction.");
       if (!mountedRef.current || !activeRef.current || sessionRef.current !== sessionId) return;
       setPrediction(parsed.data);
       if (parsed.data.source !== "motion" || parsed.data.label === "Uncertain") {
@@ -501,7 +507,7 @@ export function SignBridgeDemo() {
 
         <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-ink-muted">
           <span>Hold each fingerspelled letter steady; move your hand between repeated letters. Teal lines track facial landmarks.</span>
-          {health && <span>Model: <strong className="font-medium text-ink">{health.model}</strong></span>}
+          {health && <span>Model: <strong className="font-medium text-ink">{modelDisplayName(health.model)}</strong></span>}
         </div>
         {prediction?.faceDetected && prediction.facialCues && (
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-line bg-surface-subtle px-3 py-2 text-xs text-ink-muted" aria-live="polite">

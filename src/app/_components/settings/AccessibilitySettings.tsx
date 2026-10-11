@@ -88,8 +88,8 @@ export function AccessibilitySettings() {
       </SettingRow>
 
       <Heading>Voice</Heading>
-      <SettingRow title="Sign input" description="Adds a Sign button to the tutor and Test this concept. Spell a word with ASL letters on camera and it lands in the message box. Needs the SignBridge service running on this computer.">
-        <Switch label="Sign input" checked={s.signInput} onChange={(signInput) => update({ signInput })} />
+      <SettingRow title="ASL Assistant" description="Adds sign input to the tutor and Test this concept. Spell a word with ASL letters on camera and it lands in the message box. Needs the local ASL Assistant model service running on this computer.">
+        <Switch label="ASL Assistant" checked={s.signInput} onChange={(signInput) => update({ signInput })} />
       </SettingRow>
       <SettingRow title="Read questions aloud" description="The tutor speaks each question when a voice session starts. Turn this off to go straight to listening.">
         <Switch label="Read questions aloud" checked={s.speakQuestions} onChange={(speakQuestions) => update({ speakQuestions })} />

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check the SignBridge runtime, model files, and a no-hand inference round trip."""
+"""Check the ASL Assistant runtime, model files, and a no-hand inference round trip."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ sys.path.insert(0, str(REPO_ROOT))
 def main() -> int:
     if sys.version_info[:2] != (3, 12):
         raise RuntimeError(
-            f"SignBridge's tested local environment uses Python 3.12; found {platform.python_version()}."
+            f"The ASL Assistant's tested local environment uses Python 3.12; found {platform.python_version()}."
         )
 
     import cv2

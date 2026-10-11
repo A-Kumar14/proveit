@@ -718,8 +718,8 @@ class SignBridgeRequestHandler(BaseHTTPRequestHandler):
             if isinstance(error, MotionRecognitionFailed):
                 self._send_json(502, {"error": str(error)})
                 return
-            LOGGER.exception("SignBridge request failed.")
-            self._send_json(500, {"error": "SignBridge could not process this frame."})
+            LOGGER.exception("ASL Assistant request failed.")
+            self._send_json(500, {"error": "ASL Assistant could not process this frame."})
 
     def log_message(self, format: str, *args: Any) -> None:
         LOGGER.info("%s - %s", self.client_address[0], format % args)
@@ -759,11 +759,11 @@ def main() -> int:
         return 2
 
     server = SignBridgeHTTPServer((host, port), engine)
-    LOGGER.info("SignBridge model service listening at http://%s:%s", host, port)
+    LOGGER.info("ASL Assistant model service listening at http://%s:%s", host, port)
     try:
         server.serve_forever()
     except KeyboardInterrupt:
-        LOGGER.info("Shutting down SignBridge model service.")
+        LOGGER.info("Shutting down ASL Assistant model service.")
     finally:
         server.server_close()
         engine.close()
