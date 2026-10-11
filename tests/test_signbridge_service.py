@@ -2,10 +2,12 @@ import base64
 import json
 import unittest
 import uuid
+from types import SimpleNamespace
 
 from signbridge_service.server import (
     MAX_FRAME_BYTES,
     MAX_MOTION_FRAMES,
+    LandmarkASLClassifier,
     parse_motion_request,
     parse_prediction_request,
     parse_reset_request,
@@ -75,6 +77,34 @@ class SignBridgeProtocolTests(unittest.TestCase):
         for data in cases:
             with self.subTest(data=data), self.assertRaises(ValueError):
                 parse_motion_request(json.dumps(data).encode("utf-8"))
+
+    def test_extracts_local_facial_landmarks_and_measurements(self):
+        landmarks = [SimpleNamespace(x=0.5, y=0.5) for _ in range(468)]
+        for index, x, y in (
+            (10, 0.5, 0.2),
+            (234, 0.2, 0.5),
+            (152, 0.5, 0.9),
+            (454, 0.8, 0.5),
+            (105, 0.4, 0.3),
+            (159, 0.4, 0.4),
+            (334, 0.6, 0.3),
+            (386, 0.6, 0.4),
+            (13, 0.5, 0.5),
+            (14, 0.5, 0.52),
+            (61, 0.4, 0.5),
+            (291, 0.6, 0.5),
+            (78, 0.4, 0.5),
+            (308, 0.6, 0.5),
+            (145, 0.4, 0.5),
+            (374, 0.6, 0.5),
+        ):
+            landmarks[index] = SimpleNamespace(x=x, y=y)
+
+        points, cues = LandmarkASLClassifier._face_features(landmarks)
+
+        self.assertEqual(len(points), 12)
+        self.assertAlmostEqual(cues["mouthOpen"], 0.1)
+        self.assertAlmostEqual(cues["browEyeGap"], 1.0)
 
 
 if __name__ == "__main__":

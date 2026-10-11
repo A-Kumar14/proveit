@@ -103,6 +103,7 @@ class LandmarkASLClassifier:
 
     def __init__(self, model_path: Path, hand_model_path: Path):
         try:
+            import cv2
             import mediapipe as mp
             import numpy as np
             import torch
@@ -155,19 +156,70 @@ class LandmarkASLClassifier:
             min_hand_presence_confidence=0.3,
         )
         self.landmarker = vision.HandLandmarker.create_from_options(options)
+        from mediapipe.python.solutions.face_mesh import FaceMesh
+
+        self.face_mesh = FaceMesh(
+            static_image_mode=True,
+            max_num_faces=1,
+            refine_landmarks=False,
+            min_detection_confidence=0.5,
+        )
         self.mp = mp
+        self.cv2 = cv2
         self.np = np
         self.torch = torch
         self._lock = threading.Lock()
 
-    def predict(self, frame: Any) -> tuple[str, float | None, bool, list[list[float]] | None]:
+    @staticmethod
+    def _face_features(landmarks: Any) -> tuple[list[list[float]], dict[str, float]]:
+        indices = (10, 234, 152, 454, 105, 159, 334, 386, 13, 14, 61, 291)
+        points = [[float(landmarks[index].x), float(landmarks[index].y)] for index in indices]
+
+        mouth_width = max(abs(landmarks[78].x - landmarks[308].x), 1e-6)
+        mouth_open = abs(landmarks[13].y - landmarks[14].y) / mouth_width
+        left_eye_height = max(abs(landmarks[159].y - landmarks[145].y), 1e-6)
+        right_eye_height = max(abs(landmarks[386].y - landmarks[374].y), 1e-6)
+        brow_eye_gap = (
+            abs(landmarks[159].y - landmarks[105].y) / left_eye_height
+            + abs(landmarks[386].y - landmarks[334].y) / right_eye_height
+        ) / 2
+        return points, {
+            "mouthOpen": min(float(mouth_open), 1.0),
+            "browEyeGap": min(float(brow_eye_gap), 5.0),
+        }
+
+    def predict(self, frame: Any) -> tuple[
+        str,
+        float | None,
+        bool,
+        list[list[float]] | None,
+        bool,
+        list[list[float]] | None,
+        dict[str, float] | None,
+    ]:
         with self._lock:
             rgb = self.np.ascontiguousarray(frame)
+            height, width = rgb.shape[:2]
+            if max(height, width) > 480:
+                scale = 480 / max(height, width)
+                rgb = self.cv2.resize(
+                    rgb,
+                    (round(width * scale), round(height * scale)),
+                    interpolation=self.cv2.INTER_AREA,
+                )
+            face_result = self.face_mesh.process(rgb)
+            face_detected = bool(face_result.multi_face_landmarks)
+            face_points = None
+            facial_cues = None
+            if face_detected:
+                face_points, facial_cues = self._face_features(
+                    face_result.multi_face_landmarks[0].landmark
+                )
             result = self.landmarker.detect(
                 self.mp.Image(image_format=self.mp.ImageFormat.SRGB, data=rgb)
             )
             if not result.hand_landmarks:
-                return "No hand", None, False, None
+                return "No hand", None, False, None, face_detected, face_points, facial_cues
 
             coordinates = self.np.asarray(
                 [[point.x, point.y, point.z] for point in result.hand_landmarks[0]],
@@ -177,16 +229,17 @@ class LandmarkASLClassifier:
             coordinates -= coordinates[0]
             scale = float(self.np.linalg.norm(coordinates[9]))
             if scale <= 1e-6:
-                return "Uncertain", 0.0, True, points
+                return "Uncertain", 0.0, True, points, face_detected, face_points, facial_cues
             features = self.torch.from_numpy((coordinates / scale).reshape(1, -1))
             with self.torch.inference_mode():
                 probabilities = self.torch.softmax(self.classifier(features), dim=1)[0]
             index = int(self.torch.argmax(probabilities).item())
             confidence = float(probabilities[index].item())
-            return self.labels[index], confidence, True, points
+            return self.labels[index], confidence, True, points, face_detected, face_points, facial_cues
 
     def close(self) -> None:
         self.landmarker.close()
+        self.face_mesh.close()
 
 
 class CameraSession:
@@ -417,7 +470,15 @@ class SignBridgeEngine:
             if frame is None:
                 raise ValueError("Frame must be a decodable JPEG image.")
             if self.mode == "SignBridge Hand Landmark MLP":
-                label, confidence, found, landmarks = self.landmark_classifier.predict(
+                (
+                    label,
+                    confidence,
+                    found,
+                    landmarks,
+                    face_detected,
+                    face_landmarks,
+                    facial_cues,
+                ) = self.landmark_classifier.predict(
                     self._cv2.cvtColor(frame, self._cv2.COLOR_BGR2RGB)
                 )
                 return {
@@ -426,6 +487,9 @@ class SignBridgeEngine:
                     "source": "static" if found else "none",
                     "handDetected": found,
                     "landmarks": landmarks,
+                    "faceDetected": face_detected,
+                    "faceLandmarks": face_landmarks,
+                    "facialCues": facial_cues,
                 }
             frame = self._cv2.flip(frame, 1)
             if self.mode == "ASL Alphabet TinyCNN":
@@ -534,7 +598,7 @@ class SignBridgeEngine:
             if frame is None:
                 raise ValueError("Every motion frame must be a decodable JPEG image.")
             rgb = self._cv2.cvtColor(frame, self._cv2.COLOR_BGR2RGB)
-            _, _, found, _ = self.landmark_classifier.predict(rgb)
+            _, _, found, _, _, _, _ = self.landmark_classifier.predict(rgb)
             hands_detected += int(found)
             rgb_frames.append(rgb)
 
@@ -602,6 +666,7 @@ class SignBridgeRequestHandler(BaseHTTPRequestHandler):
             "ready": True,
             "model": self.server.engine.mode,
             "motionReady": self.server.engine.motion_ready,
+            "faceTrackingReady": self.server.engine.mode == "SignBridge Hand Landmark MLP",
         })
 
     def do_POST(self) -> None:

@@ -17,6 +17,14 @@ export const SignBridgePrediction = z.object({
   landmarks: z.array(
     z.tuple([z.number().min(0).max(1), z.number().min(0).max(1)]),
   ).length(21).nullable().optional(),
+  faceDetected: z.boolean().optional(),
+  faceLandmarks: z.array(
+    z.tuple([z.number().min(0).max(1), z.number().min(0).max(1)]),
+  ).length(12).nullable().optional(),
+  facialCues: z.object({
+    mouthOpen: z.number().min(0).max(1),
+    browEyeGap: z.number().min(0).max(5),
+  }).nullable().optional(),
 });
 
 export const SignBridgeHealth = z.object({
@@ -24,6 +32,7 @@ export const SignBridgeHealth = z.object({
   ready: z.literal(true),
   model: z.enum(["SignBridge-ML", "SignBridge Hand Landmark MLP"]),
   motionReady: z.boolean().optional(),
+  faceTrackingReady: z.boolean().optional(),
 });
 
 export const SignBridgeMotionRequest = z.object({
