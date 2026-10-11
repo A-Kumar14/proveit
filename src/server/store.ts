@@ -11,6 +11,7 @@ import type { CourseSpec } from "@proveit/lib/courseSpec";
 import type { CalEvent } from "./calendar";
 import { POINTS, STREAK_CAP, standing, TIERS, type Standing } from "@proveit/lib/rewards";
 import { aiEnabled } from "./ai";
+import { learningSourceViews, sourceIdUnion, type LearningSourceView } from "./sourceLineage";
 
 /**
  * The course catalog stays in code for the hackathon, while learner state is persisted through
@@ -220,6 +221,18 @@ const misconceptionForSpec = (spec: ConceptLearningSpec, misconceptionId: string
   misconceptionId ? spec.misconceptions.find((m) => m.id === misconceptionId) ?? null : null;
 const primaryMisconceptionFor = (courseId: string, conceptId: string) =>
   getLearningSpec(courseId, conceptId)?.misconceptions[0] ?? null;
+
+function sourceViewsForAttempt(a: Attempt): LearningSourceView[] {
+  // Legacy attempts without a pinned revision and low-stakes quiz signals cannot claim exact source lineage.
+  if (a.kind === "quiz" || a.learningSpecRevision === undefined) return [];
+  const spec = specFor(a.courseId, a.conceptId, a.learningSpecRevision);
+  const sectionIds =
+    a.kind === "transfer" ? spec.transfer.sourceIds :
+    a.kind === "review" ? spec.review.sourceIds :
+    spec.assessment.sourceIds;
+  const diagnosed = misconceptionForSpec(spec, a.evaluation?.misconceptionId ?? null);
+  return learningSourceViews(spec, sourceIdUnion(sectionIds, diagnosed?.sourceIds ?? []));
+}
 
 function clarificationPromptFor(a: Attempt): string {
   if (a.evaluation?.followUp) return a.evaluation.followUp;
@@ -562,7 +575,10 @@ export function getDashboard(): DashboardView {
   };
 }
 
-export type QuestionView = { courseName: string; conceptId: string; conceptName: string; state: MasteryState; prompt: string; why: string; probe: string; source: string };
+export type QuestionView = {
+  courseName: string; conceptId: string; conceptName: string; state: MasteryState;
+  prompt: string; why: string; probe: string; source: string; sources: LearningSourceView[];
+};
 export function getQuestion(courseId: string, conceptId: string): QuestionView {
   const course = courseFor(courseId);
   const c = conceptFor(courseId, conceptId);
@@ -584,6 +600,7 @@ export function getQuestion(courseId: string, conceptId: string): QuestionView {
     why,
     probe: spec.assessment.probe,
     source: firstSource?.title ?? "your course material",
+    sources: learningSourceViews(spec, spec.assessment.sourceIds),
   };
 }
 
@@ -695,7 +712,7 @@ export async function assess(input: AssessInput): Promise<AssessResult> {
 export type EvidenceAttemptView = {
   id: string; courseId: string; conceptId: string; kind: AttemptKind; outcome: AttemptOutcome;
   parentAttemptId: string | null; rootAttemptId: string; learningSpecRevision: number | null; answer: string; evaluation: Evaluation | null;
-  previousState: MasteryState; createdAt: number;
+  sources: LearningSourceView[]; previousState: MasteryState; createdAt: number;
 };
 /** Raw evidence view: unlike the diagnosis view, transfer passes and non-diagnostic misses are valid records. */
 export function getEvidenceAttempt(id: string): EvidenceAttemptView {
@@ -703,7 +720,7 @@ export function getEvidenceAttempt(id: string): EvidenceAttemptView {
   return {
     id: a.id, courseId: a.courseId, conceptId: a.conceptId, kind: a.kind, outcome: a.outcome,
     parentAttemptId: a.parentAttemptId, rootAttemptId: a.rootAttemptId, learningSpecRevision: a.learningSpecRevision ?? null, answer: a.answer, evaluation: a.evaluation,
-    previousState: a.previousState, createdAt: a.createdAt,
+    sources: sourceViewsForAttempt(a), previousState: a.previousState, createdAt: a.createdAt,
   };
 }
 
@@ -746,8 +763,8 @@ export function clarify(attemptId: string) {
 
 export type RemediationView = {
   attemptId: string; courseId: string; conceptId: string; conceptName: string; state: MasteryState;
-  lesson: { title: string; said: string; actuallyTrue: string; explanation: string; rule: string | null; aiWording: boolean; figure: "ci-intervals" | null };
-  transfer: { question: string; hint: string };
+  lesson: { title: string; said: string; actuallyTrue: string; explanation: string; rule: string | null; aiWording: boolean; figure: "ci-intervals" | null; sources: LearningSourceView[] };
+  transfer: { question: string; hint: string; sources: LearningSourceView[] };
 };
 export function getRemediation(attemptId: string): RemediationView {
   const a = attempt(attemptId);
@@ -768,14 +785,15 @@ export function getRemediation(attemptId: string): RemediationView {
       rule: remediation.sourceLabel,
       aiWording: spec.provenance.kind === "generated",
       figure: remediation.figure,
+      sources: learningSourceViews(spec, remediation.sourceIds),
     },
-    transfer: { question: spec.transfer.question, hint: spec.transfer.hint },
+    transfer: { question: spec.transfer.question, hint: spec.transfer.hint, sources: learningSourceViews(spec, spec.transfer.sourceIds) },
   };
 }
 
 export type TransferChallengeView = {
   attemptId: string; courseId: string; conceptId: string; conceptName: string; state: MasteryState;
-  transfer: { question: string; hint: string };
+  transfer: { question: string; hint: string; sources: LearningSourceView[] };
 };
 
 export function getTransferChallenge(attemptId: string): TransferChallengeView {
@@ -794,7 +812,7 @@ export function getTransferChallenge(attemptId: string): TransferChallengeView {
   }
   return {
     attemptId: source.id, courseId: source.courseId, conceptId: c.id, conceptName: c.name, state: c.state,
-    transfer: { question: spec.transfer.question, hint: spec.transfer.hint },
+    transfer: { question: spec.transfer.question, hint: spec.transfer.hint, sources: learningSourceViews(spec, spec.transfer.sourceIds) },
   };
 }
 
@@ -997,7 +1015,7 @@ export function getReviews(now = new Date()): { due: ReviewItem[]; upcoming: Rev
 export type ReviewChallengeView = {
   courseId: string; conceptId: string; conceptName: string; state: MasteryState; dueDay: string;
   learningSpecRevision?: number;
-  review: { question: string; hint: string };
+  review: { question: string; hint: string; sources: LearningSourceView[] };
 };
 
 const reviewIsDue = (c: Concept, now: Date) =>
@@ -1021,7 +1039,7 @@ export function getReviewChallenge(courseId: string, conceptId: string, now = ne
   return {
     courseId, conceptId: c.id, conceptName: c.name, state: c.state, dueDay: c.nextReview!,
     learningSpecRevision: spec.revision,
-    review: { question: spec.review.question, hint: spec.review.hint },
+    review: { question: spec.review.question, hint: spec.review.hint, sources: learningSourceViews(spec, spec.review.sourceIds) },
   };
 }
 
