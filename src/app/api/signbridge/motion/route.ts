@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { SignBridgeMotionRequest } from "@proveit/lib/signbridge";
 import { readSignBridgeJson, recognizeSignBridgeMotion } from "@proveit/server/signbridge";
+import { withUserRoute } from "@proveit/server/userBoundary";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function POST(request: Request) {
+async function POSTForUser(request: Request) {
   const body = await readSignBridgeJson(request, 4_000_000);
   if ("error" in body) return NextResponse.json({ error: body.error }, { status: body.status });
   const parsed = SignBridgeMotionRequest.safeParse(body.value);
@@ -19,3 +20,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: message }, { status: 503 });
   }
 }
+
+export const POST = withUserRoute(POSTForUser);
