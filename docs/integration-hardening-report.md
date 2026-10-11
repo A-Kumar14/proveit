@@ -56,3 +56,22 @@ Browser inspection was attempted, but the cloud browser could not reach the loca
 ## Review order
 
 Review the course-scoped upload patch first, then the account/evidence/revision/removal integration patch and incorporated teammate rank update, then the material-race guard and report. Keep PR #5/sample seed data out of main. No merge was performed.
+
+
+## Post-merge continuation
+
+PR #14 was merged into `main` at `b8ebb719e82a6c8e2990e603b02606fc1464c2ad`. The next three `main` commits added the live ElevenLabs agent speech path and adjusted the session UI, so the hardening pass was resumed from that exact delta rather than re-auditing already-merged subsystems.
+
+Focused review of the new voice path verified these preserved boundaries:
+
+- `/api/voice/session` is wrapped by the trusted user route boundary and resolves the current course/concept before issuing a short-lived ElevenLabs token;
+- the API key stays server-side;
+- the per-call prompt is built from the same user-scoped course/spec/material context as Tutor chat;
+- voice transcripts reuse the account/course/concept-scoped browser thread introduced by PR #14;
+- voice conversation remains explicitly non-grading and cannot directly change mastery, evidence, review scheduling or rank;
+- replaced/removed courses fail through current question resolution rather than reviving stale concepts;
+- prompt and first-message overrides are checked before the token request when the agent configuration can be read.
+
+This continuation also hardened the client start path for demo reliability: microphone permission is requested before spending a voice token, permission denial surfaces a direct recovery message, and SDK errors clear the local connecting lock so the student can retry instead of being stuck in "Connecting...". Regression tests cover blocked microphone access and retry after a reported SDK connection failure.
+
+The live provider/device checks below are still environment-dependent; passing mocked tests cannot prove microphone hardware, WebRTC network traversal, ElevenLabs account configuration or real model quality.

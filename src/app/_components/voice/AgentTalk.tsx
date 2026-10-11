@@ -46,7 +46,10 @@ function Call({ userId, courseId, conceptId, chatHref }: { userId: string; cours
         add("assistant", text);
       } else add("user", text);
     },
-    onError: (message) => setError(message || "The call dropped. Start it again."),
+    onError: (message) => {
+      setStarting(false);
+      setError(message || "The call dropped. Start it again.");
+    },
     onDisconnect: () => setStarting(false),
   });
 
@@ -58,18 +61,26 @@ function Call({ userId, courseId, conceptId, chatHref }: { userId: string; cours
     saved.current = read(storeKey) ?? { items: [] };
     const history = saved.current.items.flatMap((i) => (i.kind === "chat" && i.role && i.text?.trim() ? [{ role: i.role, text: i.text.slice(0, 2000) }] : [])).slice(-24);
     try {
+      if (!navigator.mediaDevices?.getUserMedia) throw new Error("Voice calls need microphone access in this browser.");
+      const permissionStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      permissionStream.getTracks().forEach((track) => track.stop());
+
       const res = await fetch("/api/voice/session", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ courseId, conceptId, history }) });
       const json = (await res.json().catch(() => null)) as { conversationToken?: string; prompt?: string; firstMessage?: string; error?: string } | null;
       if (!res.ok || !json?.conversationToken) throw new Error(json?.error ?? "Couldn't start the call. Try again.");
       opening.current = history.length === 0 ? json.firstMessage ?? null : null;
-      c.startSession({
+      await Promise.resolve(c.startSession({
         conversationToken: json.conversationToken,
         connectionType: "webrtc",
         overrides: { agent: { prompt: { prompt: json.prompt }, firstMessage: json.firstMessage } },
-      });
+      }));
     } catch (e) {
       setStarting(false);
-      setError(e instanceof Error ? e.message : "Couldn't start the call. Try again.");
+      if (e instanceof DOMException && (e.name === "NotAllowedError" || e.name === "SecurityError")) {
+        setError("Microphone access is blocked. Allow it in your browser and try again.");
+      } else {
+        setError(e instanceof Error ? e.message : "Couldn't start the call. Try again.");
+      }
     }
   }
 
