@@ -6,7 +6,7 @@ import { AUTHORED } from "./content";
 import { documentKind, documentText, isLegacyOffice, UnreadableDocumentError } from "./documentText";
 import { loadUserJson, saveUserJson } from "./persistence";
 import { pdfText } from "./pdfText";
-import { courseSpec, getCourse } from "./store";
+import { courseInstance, courseSpec, getCourse, NotFoundError } from "./store";
 
 export type Material = { id: string; courseId: string; name: string; mime: string; size: number; addedAt: number; text: string; words: number; readBy: "text" | "ai" };
 
@@ -102,8 +102,9 @@ export function saveMaterial(courseId: string, meta: { name: string; mime: strin
 
 /** Reads one uploaded file and adds it to the course. */
 export async function addMaterial(courseId: string, file: File): Promise<Material> {
-  getCourse(courseId);
+  const course = courseInstance(courseId);
   const { text, readBy } = await readMaterial(file);
+  if (courseInstance(courseId) !== course) throw new NotFoundError("course replaced while reading material");
   return saveMaterial(courseId, { name: file.name, mime: file.type, size: file.size }, text, readBy);
 }
 
@@ -167,4 +168,5 @@ export function courseMaterial(courseId: string, budget = 24_000): string {
   const share = Math.floor(budget / parts.length);
   return parts.map((p) => (p.length > share ? `${p.slice(0, share)}\n[...cut for length]` : p)).join("\n\n");
 }
+
 

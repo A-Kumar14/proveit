@@ -740,3 +740,4 @@ describe("rank points", () => {
     expect(getRewards().breakdown.find((b) => b.label === "Courses mastered end to end")?.count).toBe(0);
   });
 });
+

@@ -114,3 +114,4 @@ describe("RankCard", () => {
     expect(screen.getByText("Top tier reached")).toBeTruthy();
   });
 });
+

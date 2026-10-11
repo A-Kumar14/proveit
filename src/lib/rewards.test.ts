@@ -33,15 +33,16 @@ describe("tiers", () => {
 });
 
 describe("course tiers", () => {
-  it("scale to the course, and Legend is everything mastered and quizzed", () => {
+  it("scale to the course, and Legend is everything mastered", () => {
     const t = courseTiers(10);
-    expect(courseMaxPoints(10)).toBe(4250);
-    expect(t.map((x) => x.min)).toEqual([0, 425, 1065, 1915, 2975, 3825, 4250]);
-    expect(standing(4250, t).tier.name).toBe("Legend");
-    expect(standing(4249, t).tier.name).toBe("Master");
+    expect(courseMaxPoints(10)).toBe(4000);
+    expect(t.map((x) => x.min)).toEqual([0, 400, 1000, 1800, 2800, 3600, 4000]);
+    expect(standing(4000, t).tier.name).toBe("Legend");
+    expect(standing(3999, t).tier.name).toBe("Master");
   });
   it("keeps every tier above the last, even for a tiny course", () => {
     const mins = courseTiers(1).map((x) => x.min);
     expect(mins.every((m, i) => i === 0 || m > mins[i - 1]!)).toBe(true);
   });
 });
+

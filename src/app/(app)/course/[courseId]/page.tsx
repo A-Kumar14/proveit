@@ -43,3 +43,4 @@ async function CoursePage({ params, searchParams }: PageProps<"/course/[courseId
 }
 
 export default withUserPage(CoursePage);
+

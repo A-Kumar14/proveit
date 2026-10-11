@@ -38,8 +38,8 @@ type Attempt = {
   previousState: MasteryState; createdAt: number;
 };
 /** `completedOverride` is the student's own call. null means derive it from the concepts. */
-type Course = { id: string; name: string; deadline: string; concepts: Concept[]; edges: [string, string][]; files: CourseFile[]; completedOverride: boolean | null; /** ISO date of the next quiz, if any. */ examDate: string | null; /** True for courses added at runtime (uploads, imports, the curated catalog). They have a map, but no authored questions, so no diagnose loop yet. */ runtime?: boolean; /** The notes a curated course was built from. */ spec?: CourseSpec };
-/** `course` is the one being worked on. `samples` are every other course (added at runtime, plus placeholders in tests): viewable, not practicable yet. */
+type Course = { id: string; name: string; deadline: string; concepts: Concept[]; edges: [string, string][]; files: CourseFile[]; completedOverride: boolean | null; /** ISO date of the next quiz, if any. */ examDate: string | null; /** True for courses added at runtime (uploads, imports, the curated catalog). Their canonical learning content is generated on demand. */ runtime?: boolean; /** The notes a curated course was built from. */ spec?: CourseSpec };
+/** `course` is the one being worked on. `samples` are every other course (added at runtime, plus placeholders in tests): including runtime courses with generated practice content. */
 type Db = { course: Course; samples: Course[]; /** Every quiz taken, with what it changed. Absent in snapshots saved before quizzes were recorded. */ quizzes?: QuizRecord[]; attempts: Attempt[]; provenDays: Set<string>; /** Tasks the student ticked off by hand. */ taskDone: Set<string>; /** Highest point total ever shown. Rank never drops when a concept slips. */ peakPoints: number; /** Same rule per course, so a course's rank never drops either. */ peakByCourse: Record<string, number>; seq: number };
 
 const app = (answers: number, sound: number, transferPassed = false) => ({ answers, sound, transferPassed });
@@ -168,6 +168,7 @@ export function removeAddedCourse(id: string): boolean {
   if (i < 0) return false;
   const removed = data.samples[i]!;
   data.samples.splice(i, 1);
+  data.quizzes = (data.quizzes ?? []).filter((q) => q.courseId !== id);
   data.attempts = data.attempts.filter((attempt) => attempt.courseId !== id);
   for (const concept of removed.concepts) {
     data.taskDone.delete(concept.id);
@@ -207,6 +208,9 @@ const courseFor = (id: string): Course => {
   if (!found) throw new NotFoundError(`course ${id}`);
   return found;
 };
+/** In-flight operations must reject a deleted/replaced course, even if its slug is reused. */
+export const courseInstance = (courseId: string): object => courseFor(courseId);
+
 const conceptFor = (courseId: string, conceptId: string): Concept => {
   const c = courseFor(courseId).concepts.find((x) => x.id === conceptId);
   if (!c) throw new NotFoundError(`concept ${conceptId}`);
@@ -644,12 +648,12 @@ export function getDashboard(): DashboardView {
 
 export type QuestionView = {
   courseName: string; conceptId: string; conceptName: string; state: MasteryState;
-  prompt: string; why: string; probe: string; source: string; sources: LearningSourceView[];
+  prompt: string; why: string; probe: string; source: string; sources: LearningSourceView[]; learningSpecRevision?: number;
 };
-export function getQuestion(courseId: string, conceptId: string): QuestionView {
+export function getQuestion(courseId: string, conceptId: string, revision?: number): QuestionView {
   const course = courseFor(courseId);
   const c = conceptFor(courseId, conceptId);
-  const spec = specFor(courseId, conceptId);
+  const spec = specFor(courseId, conceptId, revision);
   const skills = c.skills ?? [];
   const weak = [...skills].filter((s) => s.label !== "New-question test").sort((x, y) => x.pct - y.pct)[0];
   const strong = [...skills].filter((s) => s.label !== "New-question test").sort((x, y) => y.pct - x.pct)[0];
@@ -663,6 +667,7 @@ export function getQuestion(courseId: string, conceptId: string): QuestionView {
     conceptId,
     conceptName: c.name,
     state: c.state,
+    learningSpecRevision: spec.revision,
     prompt: spec.assessment.question,
     why,
     probe: spec.assessment.probe,
@@ -704,6 +709,9 @@ export async function assess(input: AssessInput): Promise<AssessResult> {
     : course.runtime
       ? await ensureConceptLearningSpec(input.courseId, input.conceptId)
       : specFor(input.courseId, input.conceptId);
+  if (input.learningSpecRevision !== undefined && input.learningSpecRevision !== spec.revision) {
+    throw new InvalidAttemptLinkError("assessment content changed; refresh the question");
+  }
   const previousState = c.state;
   const judged = input.imageSummary ? `${input.answer}\n\n[Student's attached work, transcribed] ${input.imageSummary}` : input.answer;
   const j = await judgeAnswerForSpec(spec, judged, parent ? answerContext(parent) : undefined);
@@ -1492,7 +1500,6 @@ export function getRewards(courseId?: string): Rewards {
     { label: "Concepts proved with a new question", count: concepts.filter((c) => c.state === "provisional").length, each: POINTS.proved },
     { label: "Misconceptions repaired", count: repairedConcepts.size, each: POINTS.repaired },
     { label: "Passed a new question first try", count: firstTryConcepts.size, each: POINTS.firstTry },
-    { label: "Concepts answered right in a quiz", count: quizConceptsRight(courseId), each: POINTS.quiz },
     { label: "Courses mastered end to end", count: scope.filter((c) => c.completedOverride === null && c.concepts.length > 0 && c.concepts.every((x) => x.state === "mastered")).length, each: POINTS.course },
     ...(courseId ? [] : [{ label: "Streak days, up to 7", count: Math.min(streak(), STREAK_CAP), each: POINTS.streakDay }]),
   ].map((r) => ({ ...r, points: r.count * r.each }));
@@ -1528,22 +1535,14 @@ export function quizConceptsRight(courseId?: string): number {
   return found.size;
 }
 
-/**
- * What a quiz may do to a concept. A quiz is practice, so it can start a concept or flag one that is going badly,
- * and nothing more. Provisional and Mastered come only from a new-question test or a delayed review, and an open
- * misconception only clears through a lesson and a new question.
- */
-export function stateAfterQuiz(state: MasteryState, right: number, answered: number): MasteryState {
-  if (answered === 0 || state === "provisional" || state === "mastered" || state === "needs_work") return state;
-  if (right > 0) return state === "not_started" ? "developing" : state;
-  // Nothing right. One miss on a concept you were already working on isn't enough to call it a problem.
-  return state === "not_started" || answered >= 2 ? "needs_work" : state;
+/** Quiz answers may start an unseen concept; diagnosis, demotion, transfer and mastery require stronger evidence. */
+export function stateAfterQuiz(state: MasteryState, _right: number, answered: number): MasteryState {
+  return answered > 0 && state === "not_started" ? "developing" : state;
 }
 
 /** Saves a finished quiz and moves each concept it covered. Called once per quiz. */
 export function recordQuiz(input: { courseId: string; items: QuizItemRecord[] }): QuizRecord {
   const course = courseFor(input.courseId);
-  const before = quizConceptsRight(input.courseId);
   // Only questions that were answered count as evidence. A blank says nothing about the concept.
   const per = new Map<string, { right: number; answered: number }>();
   for (const it of input.items) {
@@ -1558,18 +1557,18 @@ export function recordQuiz(input: { courseId: string; items: QuizItemRecord[] })
     const c = course.concepts.find((x) => x.id === conceptId);
     if (!c) continue;
     const to = stateAfterQuiz(c.state, t.right, t.answered);
-    c.evidence.answers += t.answered;
-    c.evidence.sound += t.right;
     upsertSkill(c, { label: "Quiz", pct: Math.round((t.right / t.answered) * 100) });
-    if (to !== c.state) { changes.push({ conceptId, concept: c.name, from: c.state, to }); c.state = to; }
+    if (to !== c.state) changes.push({ conceptId, concept: c.name, from: c.state, to });
   }
   const score = input.items.filter((it) => it.picked === it.correct).length;
   const record: QuizRecord = {
     id: `q${++db().seq}`, courseId: course.id, courseName: course.name, at: Date.now(), score, total: input.items.length,
     pct: input.items.length ? Math.round((score / input.items.length) * 100) : 0, items: input.items, changes, pointsGained: 0,
   };
+  recordQuizEvidence(input.courseId, input.items.flatMap((it) => it.picked === null ? [] : [{
+    conceptId: it.conceptId, prompt: it.prompt, selected: it.options[it.picked] ?? "", correct: it.picked === it.correct,
+  }]), record.at);
   quizList().push(record);
-  record.pointsGained = (quizConceptsRight(input.courseId) - before) * POINTS.quiz;
   persistLearning();
   return record;
 }
@@ -1591,3 +1590,4 @@ export function getCourseRanks(): CourseRank[] {
     return { courseId: c.id, name: c.name, points, tierIndex, tier, next, toNext, pct };
   });
 }
+
