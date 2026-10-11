@@ -14,10 +14,11 @@ async function post<T>(url: string, body: unknown, schema: z.ZodType<T>): Promis
   return schema.parse(json);
 }
 
-async function checkUpload(file: File, conceptId: string) {
+async function checkUpload(file: File, courseId: string, conceptId: string) {
   const form = new FormData();
   form.set("file", file);
   form.set("conceptId", conceptId);
+  form.set("courseId", courseId);
   const res = await fetch("/api/upload/check", { method: "POST", body: form }).catch(() => null);
   if (!res) throw new Error("Can't reach the server. Check your connection and retry.");
   const json: unknown = await res.json().catch(() => null);
@@ -85,3 +86,4 @@ export const api = {
   review: (courseId: string, conceptId: string, answer: string, learningSpecRevision?: number) =>
     post("/api/review/submit", { courseId, conceptId, answer, learningSpecRevision }, ReviewSubmitResult),
 };
+

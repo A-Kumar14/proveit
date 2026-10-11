@@ -8,8 +8,8 @@ import { api } from "@proveit/lib/api";
 export type Checked = { name: string; check: UploadCheck };
 
 /** Opens the file picker and posts the image to the upload check. */
-export function AddFileMenu({ conceptId, disabled, onChecked, onError, buttonClassName, iconOnly }: {
-  conceptId: string; disabled?: boolean; onChecked: (c: Checked) => void; onError: (message: string) => void; buttonClassName?: string; /** Icon-only round button for the composer. */ iconOnly?: boolean;
+export function AddFileMenu({ courseId, conceptId, disabled, onChecked, onError, buttonClassName, iconOnly }: {
+  courseId: string; conceptId: string; disabled?: boolean; onChecked: (c: Checked) => void; onError: (message: string) => void; buttonClassName?: string; /** Icon-only round button for the composer. */ iconOnly?: boolean;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
@@ -18,7 +18,7 @@ export function AddFileMenu({ conceptId, disabled, onChecked, onError, buttonCla
     if (!file) return;
     setBusy(true);
     try {
-      onChecked({ name: file.name, check: await api.checkUpload(file, conceptId) });
+      onChecked({ name: file.name, check: await api.checkUpload(file, courseId, conceptId) });
     } catch (e) {
       onError(e instanceof Error ? e.message : "The upload check failed. Retry.");
     } finally {
@@ -42,3 +42,4 @@ export function AddFileMenu({ conceptId, disabled, onChecked, onError, buttonCla
     </div>
   );
 }
+

@@ -72,7 +72,7 @@ export function PracticeFlow({ courseId, question, resume, uploads, modeParam }:
   return (
     <>
       <Log>
-        <AssistantMessage><QuestionCard conceptName={question.conceptName} prompt={question.prompt} why={question.why} source={question.source} /></AssistantMessage>
+        <AssistantMessage><QuestionCard conceptName={question.conceptName} prompt={question.prompt} why={question.why} source={question.source} sources={question.sources} /></AssistantMessage>
         {turns.map((t, i) => (
           <div key={i} className="contents">
             <UserBubble>{t.answer}</UserBubble>
@@ -89,7 +89,7 @@ export function PracticeFlow({ courseId, question, resume, uploads, modeParam }:
         leading={(
           <>
             {uploads.enabled && <AddFileMenu
-              iconOnly conceptId={question.conceptId} disabled={status === "evaluating"}
+              iconOnly courseId={courseId} conceptId={question.conceptId} disabled={status === "evaluating"}
               onError={(m) => { setError(m); }}
               onChecked={({ name, check }) => { setError(null); setUpload({ name, ok: check.is_student_work && check.relevant, summary: check.summary, reason: check.reason || "That upload doesn't look like your own work on this question." }); }}
             />}
@@ -106,3 +106,4 @@ export function PracticeFlow({ courseId, question, resume, uploads, modeParam }:
     </>
   );
 }
+

@@ -114,7 +114,7 @@ export function VoiceSession({ courseId, question, typeHref, uploads }: { course
     setChecking(true);
     setError(null);
     try {
-      const c = await api.checkUpload(file, question.conceptId);
+      const c = await api.checkUpload(file, courseId, question.conceptId);
       setShown({ name: file.name, ok: c.is_student_work && c.relevant, summary: c.summary, reason: c.reason || "That doesn't look like your own work on this question." });
     } catch (e) {
       setError(e instanceof Error ? e.message : "The upload check failed. Retry.");
@@ -241,7 +241,7 @@ export function VoiceSession({ courseId, question, typeHref, uploads }: { course
               <button type="button" className={seg(tool === "sketch")} aria-pressed={tool === "sketch"} onClick={() => toggleTool("sketch")}><Pen size={14} strokeWidth={1.8} aria-hidden />Sketch</button>
               <button type="button" className={seg(tool === "camera")} aria-pressed={tool === "camera"} onClick={() => toggleTool("camera")}><Camera size={14} strokeWidth={1.8} aria-hidden />Camera</button>
               <AddFileMenu
-                conceptId={question.conceptId} onError={setError} buttonClassName={seg(false)}
+                courseId={courseId} conceptId={question.conceptId} onError={setError} buttonClassName={seg(false)}
                 onChecked={({ name, check }) => { setTool(null); setError(null); setShown({ name, ok: check.is_student_work && check.relevant, summary: check.summary, reason: check.reason || "That upload doesn't look like your own work." }); }}
               />
             </div>
@@ -255,3 +255,4 @@ export function VoiceSession({ courseId, question, typeHref, uploads }: { course
     </div>
   );
 }
+

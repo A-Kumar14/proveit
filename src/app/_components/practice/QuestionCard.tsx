@@ -1,7 +1,8 @@
+import { SourceLineage } from "./SourceLineage";
 import { Info } from "lucide-react";
 import { AssistantCard } from "../chat/AssistantCard";
 
-export function QuestionCard({ conceptName, prompt, why, source }: { conceptName: string; prompt: string; why: string; source: string }) {
+export function QuestionCard({ conceptName, prompt, why, source, sources = [] }: { conceptName: string; prompt: string; why: string; source: string; sources?: import("@proveit/server/sourceLineage").LearningSourceView[] }) {
   return (
     <AssistantCard ariaLabel="Question" label={`Question · ${conceptName}`} headline={<span className="text-base leading-normal">{prompt}</span>}>
       <p className="m-0 border-b border-line px-[18px] py-3 text-[0.8125rem] text-ink-muted">In your own words. Type it, talk it through, or add a photo of your work.</p>
@@ -10,6 +11,7 @@ export function QuestionCard({ conceptName, prompt, why, source }: { conceptName
         <div className="w-px bg-line" aria-hidden />
         <div className="flex-1"><div className="eyebrow mb-1">Graded against</div><div className="leading-normal text-ink-3">Your course material, {source}. Uploads only count if they show your own work.</div></div>
       </div>
+      <SourceLineage sources={sources} />
     </AssistantCard>
   );
 }
@@ -22,3 +24,4 @@ export function ClarificationCard({ text }: { text: string }) {
     </AssistantCard>
   );
 }
+
