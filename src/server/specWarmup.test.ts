@@ -1,17 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const gen = vi.hoisted(() => ({ ensure: vi.fn(async () => ({})), active: 0, peak: 0 }));
-const course = vi.hoisted(() => ({ runtime: true, concepts: Array.from({ length: 10 }, (_, i) => ({ id: `c${i}` })) }));
+const course = vi.hoisted(() => ({ runtime: true, canGenerate: true, concepts: Array.from({ length: 10 }, (_, i) => ({ id: `c${i}` })) }));
 
 vi.mock("./ai", () => ({ aiEnabled: () => true }));
 vi.mock("./learningSpecGenerator", () => ({ ensureConceptLearningSpec: gen.ensure }));
-vi.mock("./store", () => ({ getCourse: () => course, canGenerateFor: () => course.runtime }));
+vi.mock("./store", () => ({ getCourse: () => course, canGenerateFor: () => course.canGenerate }));
 vi.mock("./userScope", () => ({ scopedUserId: () => "u1" }));
 
 import { warmCourseSpecs } from "./specWarmup";
 
 beforeEach(() => {
   course.runtime = true;
+  course.canGenerate = true;
   gen.active = 0;
   gen.peak = 0;
   gen.ensure.mockReset();
@@ -31,8 +32,17 @@ describe("warmCourseSpecs", () => {
     expect(gen.peak).toBe(3);
   });
 
-  it("skips courses with built-in content", async () => {
+  it("also prepares built-in courses that can generate from shipped notes", async () => {
     course.runtime = false;
+    course.canGenerate = true;
+    await warmCourseSpecs("c", 2);
+    expect(gen.ensure).toHaveBeenCalledTimes(10);
+    expect(gen.peak).toBe(2);
+  });
+
+  it("skips a course that has no source material for generated learning content", async () => {
+    course.runtime = false;
+    course.canGenerate = false;
     await warmCourseSpecs("c");
     expect(gen.ensure).not.toHaveBeenCalled();
   });
