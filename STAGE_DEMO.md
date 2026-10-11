@@ -16,7 +16,7 @@ In **Settings, Data and privacy**, **Reset demo** puts everything back to the st
 - Overall rank Gold, 9,777 points, 223 under Platinum. Intro Statistics is Gold at 2,977, 263 under its Platinum. Passing the CI interpretation question earns about 320, which tips both.
 - Intro Statistics has an open misconception on **CI interpretation** ("Parameter probability trap") and one on Standard error.
 - A review is due today (Standard error). One quiz is saved in History (4 of 6) with its audit.
-- Linear Algebra is complete (Legend). Personal Finance is partly done.
+- Linear Algebra is complete (Legend). Personal Finance 101 is partly done (Gold). Discrete 2 and General Physics are early (a few concepts started, one Discrete 2 concept needs work). All three are built from real notes, so the tutor and Test this concept work on every concept. Open a course's map once before presenting, so its content is written in the background.
 - Calendar has classes, a shift and an Intro Statistics quiz on Thursday.
 
 ## Two-minute path

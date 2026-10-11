@@ -40,7 +40,8 @@ function demoCalendar(): Held {
       event("cafe", "Shift at the campus cafe", 2, 17, 0, 21, 0),
       event("finance", "Personal Finance seminar", 3, 14, 0, 15, 15, "class"),
       event("stats-lecture-2", "Intro Statistics lecture", 4, 10, 0, 10, 50, "class"),
-      event("study-group", "Study group", 4, 19, 0, 20, 0),
+      event("study-group", "Discrete 2 study group", 4, 19, 0, 20, 0, "class"),
+      event("physics-lab", "General Physics lab", 2, 13, 0, 15, 0, "class"),
     ],
   };
 }

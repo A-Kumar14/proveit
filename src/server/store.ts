@@ -15,6 +15,9 @@ import { awardAssessment, awardCourseBonus, emptyRewardLedger, makeCourseRewards
 import { aiEnabled } from "./ai";
 import { learningSourceViews, sourceIdUnion, type LearningSourceView } from "./sourceLineage";
 import { demoStateForTests } from "../test/demo-state";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { parseCourseMd } from "./catalog";
 
 /**
  * The course catalog stays in code for the hackathon, while learner state is persisted through
@@ -108,6 +111,34 @@ function demoRuntimeState(): Db {
     const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() + offset);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
   };
+
+  // Sample courses. Linear Algebra stays as the completed one. The others are built from real notes,
+  // so the tutor, Test this concept, quizzes and papers work on every concept.
+  const fromNotes = (file: string, id: string, source: CourseSpec["source"], states: MasteryState[]): Course => {
+    const spec = parseCourseMd(readFileSync(join(process.cwd(), file), "utf8"), id, source, id);
+    if (!spec) throw new Error(`demo course ${file} has no concepts`);
+    const course = courseFromSpec(spec);
+    course.concepts.forEach((c, i) => {
+      const state = states[i] ?? "not_started";
+      c.state = state;
+      c.evidence = state === "mastered" ? app(3, 3, true) : state === "provisional" ? app(2, 2, true) : state === "not_started" ? app(0, 0) : state === "needs_work" ? app(2, 0) : app(1, 1);
+      c.skills = state === "mastered" ? [{ label: "Application", pct: 90 }, { label: "New-question test", pct: 85 }]
+        : state === "not_started" ? null : [{ label: "Application", pct: state === "needs_work" ? 30 : 64 }, { label: "New-question test", pct: state === "provisional" ? 80 : 25 }];
+    });
+    return course;
+  };
+  const algebra = data.samples.find((c) => c.id === "linear-algebra")!;
+  const finance = fromNotes("content/courses/personal-finance-101.md", "personal-finance-101", "catalog",
+    ["mastered", "mastered", "mastered", "developing", "provisional", "developing", "not_started", "not_started"]);
+  finance.deadline = "Quiz Friday, Oct 23";
+  finance.examDate = "2026-10-23";
+  const discrete = fromNotes("content/demo-courses/discrete-2.md", "discrete-2", "upload",
+    ["developing", "developing", "needs_work", "developing", "developing", "not_started", "not_started", "not_started", "not_started", "not_started", "not_started"]);
+  discrete.deadline = "Midterm Wednesday, Oct 21";
+  discrete.examDate = "2026-10-21";
+  const physics = fromNotes("content/demo-courses/general-physics.md", "general-physics", "upload",
+    ["developing", "developing", "not_started", "developing", "not_started", "not_started", "not_started", "not_started", "not_started"]);
+  data.samples = [algebra, finance, discrete, physics];
   const pop = data.course.concepts.find((c) => c.id === "pop")!;
   const cii = data.course.concepts.find((c) => c.id === "cii")!;
   const se = data.course.concepts.find((c) => c.id === "se")!;
@@ -187,9 +218,8 @@ function demoRuntimeState(): Db {
   const introPlan = earn(data.course, named(data.course, ["pop", "par", "clt", "size", "moe", "se"]));
   const [variability] = named(data.course, ["var"]);
   awardAssessment(introPlan, variability!, "quiz", 100, [1, 2, 3, 4].map((n) => `seed-var-${n}`), "seed-q-var");
-  const [algebra, finance] = data.samples;
-  if (algebra) awardCourseBonus(earn(algebra, algebra.concepts.map((c) => c.name)), true, "seed-bonus-algebra");
-  if (finance) earn(finance, named(finance, ["pf-bud", "pf-emg", "pf-crs", "pf-cmp"]));
+  awardCourseBonus(earn(algebra, algebra.concepts.map((c) => c.name)), true, "seed-bonus-algebra");
+  earn(finance, finance.concepts.filter((c) => c.state === "mastered" || c.state === "provisional").map((c) => c.name));
   data.peakPoints = 0;
   data.peakByCourse = {};
   data.seq = 6;

@@ -41,7 +41,10 @@ afterEach(() => {
 describe("isolated demo-data branch", () => {
   it("seeds the SQLite database with coherent product-wide sample state", () => {
     const courses = listCourses();
-    expect(courses.map((c) => c.id)).toEqual(["intro-stats", "linear-algebra", "personal-finance"]);
+    expect(courses.map((c) => c.id)).toEqual(["intro-stats", "linear-algebra", "personal-finance-101", "discrete-2", "general-physics"]);
+    expect(courses.find((c) => c.id === "linear-algebra")!.completed).toBe(true);
+    expect(courses.filter((c) => c.id !== "linear-algebra").every((c) => !c.completed)).toBe(true);
+    expect(courses.find((c) => c.id === "discrete-2")!.total).toBe(11);
     expect(getRewards().points).toBeGreaterThanOrEqual(9000);
     expect(getHistory().length).toBeGreaterThanOrEqual(4);
     expect(getEvidenceTrail("a2").map((a) => a.id)).toEqual(["a2", "a3"]);
@@ -59,7 +62,7 @@ describe("isolated demo-data branch", () => {
     for (const state of ["mastered", "developing", "needs_work", "provisional", "not_started"] as const) expect(states.has(state)).toBe(true);
     expect(getDashboard().recentlyCaught.length).toBeGreaterThanOrEqual(2);
     expect(getDashboard().risk?.concept).toContain("CI interpretation");
-    expect(getTodos().some((g) => g.courseId === "personal-finance")).toBe(true);
+    expect(getTodos().some((g) => g.courseId === "intro-stats")).toBe(true);
     expect(getFiles("intro-stats").files.length).toBeGreaterThan(0);
     expect(getFiles("linear-algebra").files.length).toBeGreaterThan(0);
 
