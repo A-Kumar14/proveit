@@ -246,7 +246,7 @@ export function VoiceSession({ courseId, question, typeHref, uploads }: { course
               />
             </div>
           )}
-          <button type="button" onClick={toggleMute} aria-label={muted ? "Unmute microphone" : "Mute microphone"} aria-pressed={muted} className={cn("flex size-[60px] cursor-pointer items-center justify-center rounded-full border", muted ? "border-needswork bg-needswork text-white" : "border-line bg-[#F2F2F2] text-ink")}>
+          <button type="button" onClick={toggleMute} aria-label={muted ? "Unmute microphone" : "Mute microphone"} aria-pressed={muted} className={cn("flex size-[60px] cursor-pointer items-center justify-center rounded-full border", muted ? "border-needswork bg-needswork text-white" : "border-line bg-surface-hover text-ink")}>
             {muted ? <MicOff size={20} aria-hidden /> : <Mic size={20} aria-hidden />}
           </button>
           <Button onClick={review} className="h-12 px-5" disabled={!spoken && !interim}>End and review<ArrowRight size={16} strokeWidth={2} aria-hidden /></Button>

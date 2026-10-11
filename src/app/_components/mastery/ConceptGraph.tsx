@@ -10,10 +10,10 @@ const unitLabel = (u: string) => {
 
 /** Edge look from the two end states: green when both mastered, red dashed into a needs-work node, faint dashed when untouched. */
 function edgeLook(a: ConceptView, b: ConceptView) {
-  if (a.state === "mastered" && b.state === "mastered") return { stroke: "#2E9E5B", w: 2, dash: undefined };
-  if (b.state === "needs_work" || a.state === "needs_work") return { stroke: "#D14343", w: 2, dash: "6 4" };
-  if (a.state === "not_started" || b.state === "not_started") return { stroke: "#E6E6E6", w: 1.4, dash: "3 4" };
-  return { stroke: "#E6E6E6", w: 1.5, dash: undefined };
+  if (a.state === "mastered" && b.state === "mastered") return { stroke: "var(--color-mastered)", w: 2, dash: undefined };
+  if (b.state === "needs_work" || a.state === "needs_work") return { stroke: "var(--color-needswork)", w: 2, dash: "6 4" };
+  if (a.state === "not_started" || b.state === "not_started") return { stroke: "var(--color-line-button)", w: 1.4, dash: "3 4" };
+  return { stroke: "var(--color-line-button)", w: 1.5, dash: undefined };
 }
 
 function edgePath(a: ConceptView, b: ConceptView) {

@@ -64,3 +64,13 @@ describe("data settings", () => {
     expect(sessionStorage.getItem("unrelated")).toBe("keep");
   });
 });
+
+describe("appearance", () => {
+  it("switches the page to dark and remembers it", async () => {
+    mount();
+    await userEvent.click(screen.getByRole("button", { name: "Dark" }));
+    expect(JSON.parse(localStorage.getItem("proveit.settings")!).theme).toBe("dark");
+    expect(screen.getByRole("button", { name: "Dark" }).getAttribute("aria-pressed")).toBe("true");
+    localStorage.clear();
+  });
+});

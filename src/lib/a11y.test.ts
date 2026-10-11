@@ -48,3 +48,26 @@ describe("a11yBootScript", () => {
     expect(() => new Function(a11yBootScript(SETTINGS_KEY))()).not.toThrow();
   });
 });
+
+describe("theme", () => {
+  it("defaults to following the system and refuses unknown values", async () => {
+    const { sanitizeA11y } = await import("./a11y");
+    expect(sanitizeA11y({}).theme).toBe("system");
+    expect(sanitizeA11y({ theme: "dark" }).theme).toBe("dark");
+    expect(sanitizeA11y({ theme: "neon" }).theme).toBe("system");
+  });
+
+  it("writes light or dark onto the page, resolving system from the OS", async () => {
+    const { applyA11y } = await import("./a11y");
+    const root = document.createElement("html");
+    applyA11y(root, { theme: "dark" });
+    expect(root.getAttribute("data-theme")).toBe("dark");
+    applyA11y(root, { theme: "light" });
+    expect(root.getAttribute("data-theme")).toBe("light");
+    const mm = window.matchMedia;
+    window.matchMedia = ((q: string) => ({ matches: q.includes("dark") })) as unknown as typeof window.matchMedia;
+    applyA11y(root, { theme: "system" });
+    expect(root.getAttribute("data-theme")).toBe("dark");
+    window.matchMedia = mm;
+  });
+});

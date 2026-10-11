@@ -18,6 +18,13 @@ export function AccessibilityLayer() {
   // The hydration render sees default settings; applying those would undo the boot script for a frame.
   const hydrated = useSyncExternalStore(noop, () => true, () => false);
   useEffect(() => { if (hydrated) applyA11y(document.documentElement, s); }, [hydrated, s]);
+  useEffect(() => {
+    if (!hydrated || s.theme !== "system" || !window.matchMedia) return;
+    const mq = window.matchMedia("(prefers-color-scheme: dark)");
+    const onChange = () => applyA11y(document.documentElement, s);
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, [hydrated, s]);
   useEffect(() => { if (!s.readAloud) stopReading(); }, [s.readAloud]);
   if (!hydrated) return null;
   return (
