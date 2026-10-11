@@ -57,7 +57,7 @@ export function LessonFlow({ r }: { r: RemediationView }) {
           <>
             <UserBubble>Got it, give me a new question</UserBubble>
             <AssistantMessage>
-              <TransferQuestionCard question={r.transfer.question} hint={r.transfer.hint} showHint={hint} hintsEnabled={settings.showHints} onToggleHint={() => setHint((h) => !h)} />
+              <TransferQuestionCard sources={r.transfer.sources} question={r.transfer.question} hint={r.transfer.hint} showHint={hint} hintsEnabled={settings.showHints} onToggleHint={() => setHint((h) => !h)} />
             </AssistantMessage>
             {misses.map((m, i) => (
               <div key={i} className="contents">
@@ -78,3 +78,4 @@ export function LessonFlow({ r }: { r: RemediationView }) {
     </>
   );
 }
+

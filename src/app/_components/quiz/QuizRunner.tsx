@@ -50,7 +50,7 @@ export function QuizRunner({ courseId, courseName, conceptId, conceptName }: { c
           <li>{conceptName ? "4 multiple-choice questions on this one concept" : "8 multiple-choice questions"}, built from the course notes and your uploaded files.</li>
           {!conceptName && <li>Questions lean on the concepts you are weakest in.</li>}
           <li>You get a score and a review of every answer, saved to your History.</li>
-          <li>Each question counts toward its concept on the course map. A quiz can start a concept or flag one that is going badly, and it earns a few rank points. Proving a concept still takes a new-question test.</li>
+          <li>Answered questions can start a concept as Developing and help prioritize practice. Quizzes do not diagnose misconceptions, demote concepts or earn rank points. Transfer establishes Provisional; delayed review establishes Mastered.</li>
         </ul>
         {error && <p role="alert" className="m-0 text-xs text-needswork-text">{error}</p>}
         <div className="flex items-center gap-2">
@@ -111,3 +111,4 @@ export function QuizRunner({ courseId, courseName, conceptId, conceptName }: { c
 
   return <QuizResultView result={phase.result} onRetake={start} />;
 }
+

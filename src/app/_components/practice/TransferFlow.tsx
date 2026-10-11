@@ -43,7 +43,7 @@ export function TransferFlow({ r }: { r: TransferChallengeView }) {
       <Log>
         <AssistantMessage>
           <TransferQuestionCard
-            question={r.transfer.question}
+            sources={r.transfer.sources} question={r.transfer.question}
             hint={r.transfer.hint}
             showHint={hint}
             hintsEnabled={settings.showHints}
@@ -66,3 +66,4 @@ export function TransferFlow({ r }: { r: TransferChallengeView }) {
     </>
   );
 }
+

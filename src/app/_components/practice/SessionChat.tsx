@@ -1,10 +1,13 @@
 "use client";
 
+import { SourceLineage } from "./SourceLineage";
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "@proveit/lib/api";
 import { splitOptions } from "@proveit/lib/sessionText";
 import { streamTutor } from "@proveit/lib/tutorStream";
+import { sessionStorageKey } from "@proveit/lib/sessionStorageKey";
 import { cn } from "@proveit/lib/cn";
 import type { QuestionView } from "@proveit/server/store";
 import { AssistantCard } from "../chat/AssistantCard";
@@ -39,11 +42,11 @@ export function allowedOptions(options: string[], prevUser: string | undefined):
 const chip = "h-9 cursor-pointer rounded-full border px-3.5 text-xs transition-colors disabled:cursor-not-allowed disabled:opacity-50";
 
 /** Test this concept, as a conversation first. The student says what they think, the tutor agrees or corrects, and a graded check comes only when they ask for it. */
-export function SessionChat({ courseId, question, opening, resume }: {
-  courseId: string; question: QuestionView; opening: string; resume?: { attemptId: string; answer: string; followUp: string };
+export function SessionChat({ userId, courseId, question, opening, resume }: {
+  userId: string; courseId: string; question: QuestionView; opening: string; resume?: { attemptId: string; answer: string; followUp: string };
 }) {
   const router = useRouter();
-  const storeKey = `proveit.session.${courseId}.${question.conceptId}`;
+  const storeKey = sessionStorageKey(userId, courseId, question.conceptId);
   const nextId = useRef(resume ? 4 : 2);
   const [items, setItems] = useState<Item[]>(() => {
     const first: Item = { id: 1, kind: "chat", role: "assistant", text: opening };
@@ -127,7 +130,7 @@ export function SessionChat({ courseId, question, opening, resume }: {
     setGrading(true);
     setError(null);
     try {
-      const { attemptId, evaluation } = await api.assess({ courseId, conceptId: question.conceptId, answer, followUpTo });
+      const { attemptId, evaluation } = await api.assess({ courseId, conceptId: question.conceptId, learningSpecRevision: question.learningSpecRevision, answer, followUpTo });
       if (evaluation.verdict === "uncertain") {
         put([...itemsRef.current, { id: nextId.current++, kind: "answer", answer, followUp: evaluation.followUp ?? "Say a bit more." }]);
         setFollowUpTo(attemptId);
@@ -162,12 +165,19 @@ export function SessionChat({ courseId, question, opening, resume }: {
   return (
     <>
       <Log>
+        <div className={cn("mx-auto flex w-full max-w-[760px] flex-col gap-5", !talked && items.length === 1 && "my-auto")}>
+        <header className="flex flex-col gap-1.5 pb-1">
+          <span className="eyebrow">Talking it through</span>
+          <h1 className="m-0 text-[1.625rem] font-semibold leading-tight tracking-[-0.01em]">{question.conceptName}</h1>
+          <p className="m-0 text-[0.8125rem] text-ink-muted">A conversation, not a quiz. Nothing here is graded until you ask to be checked.</p>
+        </header>
         {items.map((it) => {
           if (it.kind === "check") {
             return (
               <AssistantMessage key={it.id}>
                 <AssistantCard ariaLabel="Check" label={`Check · ${question.conceptName}`} headline={<span className="text-base leading-normal">{it.text}</span>}>
                   <p className="m-0 px-[18px] py-3 text-[13px] text-ink-muted">Answer in your own words. This one is graded, and it moves your course map. You can keep talking first if you want.</p>
+                  <SourceLineage sources={question.sources} />
                 </AssistantCard>
               </AssistantMessage>
             );
@@ -189,7 +199,7 @@ export function SessionChat({ courseId, question, opening, resume }: {
           return (
             <AssistantMessage key={it.id}>
               {text
-                ? <div className="w-fit max-w-[640px] rounded-[14px_14px_14px_4px] border border-line bg-surface px-3.5 py-3"><Prose text={text} /></div>
+                ? <div className="max-w-[640px] pt-[3px]"><Prose text={text} className="text-[0.9375rem] leading-[1.65]" /></div>
                 : <Typing />}
               {showChips && (
                 <div role="group" aria-label="Quick replies" className="mt-2.5 flex flex-wrap gap-2">
@@ -200,7 +210,9 @@ export function SessionChat({ courseId, question, opening, resume }: {
           );
         })}
         <div ref={end} />
+        </div>
       </Log>
+      <div className="mx-auto w-full max-w-[822px]">
       <Composer
         value={draft} onChange={setDraft} onSubmit={submit} status={status} error={error}
         placeholder={mode === "check" ? "Explain it in your own words" : talked ? "Reply to your tutor" : "Tell me what you think"}
@@ -218,6 +230,8 @@ export function SessionChat({ courseId, question, opening, resume }: {
             </>
           )}
       />
+      </div>
     </>
   );
 }
+

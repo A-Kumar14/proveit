@@ -25,6 +25,7 @@ export const AssessInput = z.object({
   conceptId: z.string(),
   answer: z.string().trim().min(1, "Write an answer first.").max(4000),
   followUpTo: z.string().optional(),
+  learningSpecRevision: z.number().int().positive().optional(),
   /** Transcription of an uploaded photo that passed the upload check. Judged together with the typed answer. */
   imageSummary: z.string().max(2000).optional(),
   imageName: z.string().max(200).optional(),
@@ -257,3 +258,4 @@ export const CourseJobView = z.object({
   courseId: z.string().optional(), error: z.string().optional(), concepts: z.number().optional(), elapsedMs: z.number(),
 });
 export type CourseJobView = z.infer<typeof CourseJobView>;
+

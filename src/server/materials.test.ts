@@ -6,7 +6,7 @@ vi.mock("ai", () => ({ generateText: (...a: unknown[]) => generateText(...a), Ou
 vi.mock("./ai", () => ({ aiEnabled: () => ai, model: () => "mock-model" }));
 
 import { addMaterial, courseMaterial, listMaterials, MaterialError, materialKind, removeMaterial, saveUploadsAsMaterials } from "./materials";
-import { addCatalogCourse } from "./courses";
+import { addCatalogCourse, removeCatalogCourse } from "./courses";
 import { NotFoundError } from "./store";
 
 const file = (name: string, type: string, body = "x") => new File([body], name, { type });
@@ -117,4 +117,14 @@ describe("course files", () => {
   it("rejects an unknown course", async () => {
     await expect(addMaterial("nope", file("w.md", "", "Notes."))).rejects.toBeInstanceOf(NotFoundError);
   });
+});
+
+
+it("does not attach an in-flight file to a replacement course with the same slug", async () => {
+  addCatalogCourse("network-management");
+  const pending = addMaterial("network-management", file("private.txt", "text/plain", "Private notes about network protocols."));
+  removeCatalogCourse("network-management");
+  addCatalogCourse("network-management");
+  await expect(pending).rejects.toBeInstanceOf(NotFoundError);
+  expect(listMaterials("network-management")).toHaveLength(0);
 });

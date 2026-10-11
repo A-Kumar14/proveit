@@ -40,8 +40,8 @@ export function QuizResultView({ result, onRetake, saved = true }: { result: Qui
               </li>
             ))}
           </ul>
-        ) : <p className="m-0 text-[13px] text-ink-muted">No concept changed state. A quiz can start a concept or flag one that is going badly. Proving a concept takes a new-question test.</p>}
-        <p className="m-0 text-[13px]">{result.pointsGained > 0 ? <><span className="font-semibold text-mastered-text">+{result.pointsGained} rank points</span> for concepts you got right for the first time.</> : "No new rank points. Points go to each concept the first time you answer it right in a quiz."}</p>
+        ) : <p className="m-0 text-[13px] text-ink-muted">No concept changed state. Answered questions can start a concept as Developing. Proving transfer and retaining it later require separate checks.</p>}
+        <p className="m-0 text-[13px]">Quiz answers are practice signals. They do not earn rank points or prove mastery.</p>
         {saved && <p className="m-0 text-xs text-ink-faint">Saved to your <Link href="/history" className="text-ink-muted">History</Link>. You can open this review again from there.</p>}
       </section>
 
@@ -88,3 +88,4 @@ export function QuizResultView({ result, onRetake, saved = true }: { result: Qui
     </section>
   );
 }
+

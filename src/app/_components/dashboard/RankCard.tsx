@@ -75,3 +75,4 @@ export function RankCard({ r, courses, previewable, userId = "local" }: { r: Rew
     </div>
   );
 }
+

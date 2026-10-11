@@ -41,3 +41,4 @@ export function TickerCard({ c, rank }: { c: CourseRow; rank?: CourseRank }) {
     </li>
   );
 }
+
