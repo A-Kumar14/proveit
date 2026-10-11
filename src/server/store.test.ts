@@ -361,7 +361,10 @@ describe("delayed review and retained mastery", () => {
 
   it("promotes provisional to mastered only after a due delayed-retrieval pass", async () => {
     await provisionalDue();
-    const beforePoints = getRewards().points;
+    const evidencePoints = () => getRewards().breakdown
+      .filter((row) => row.label !== "Streak days, up to 7")
+      .reduce((sum, row) => sum + row.points, 0);
+    const beforePoints = evidencePoints();
     const challenge = getReviewChallenge("intro-stats", "cii", reviewNow);
     expect(challenge.review.question).toContain("A report says");
     expect(challenge.state).toBe("provisional");
@@ -376,7 +379,7 @@ describe("delayed review and retained mastery", () => {
     expect(getReviewResult(result.resultAttemptId)).toMatchObject({
       previous: "provisional", next: "mastered", nextReview: "Oct 17", pointsEarned: 100,
     });
-    expect(getRewards().points).toBe(beforePoints + 100);
+    expect(evidencePoints()).toBe(beforePoints + 100);
     expect(getHistory()[0]).toMatchObject({ title: "Passed delayed review on CI interpretation", detail: "Mastered with delayed retrieval", tone: "good" });
   });
 

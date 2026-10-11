@@ -2,17 +2,17 @@ import "server-only";
 import { generateText, Output } from "ai";
 import { z } from "zod";
 import { aiEnabled, model } from "./ai";
-import { AUTHORED } from "./content";
+import { getLearningSpec } from "./learningSpecStore";
 import { assess, NotFoundError } from "./store";
 import type { AuditResult, ConverseInput, ConverseResult, Turn } from "@proveit/lib/schemas";
 
 /** The AI asks at most this many follow-ups after the opening question. */
 export const MAX_FOLLOWUPS = 3;
 
-const authored = (conceptId: string) => {
-  const a = AUTHORED[conceptId];
-  if (!a) throw new NotFoundError(`no content for ${conceptId}`);
-  return a;
+const learning = (courseId: string, conceptId: string) => {
+  const spec = getLearningSpec(courseId, conceptId);
+  if (!spec) throw new NotFoundError(`no content for ${conceptId}`);
+  return spec;
 };
 const transcript = (turns: Turn[]) => turns.map((t) => `${t.role === "ai" ? "Tutor" : "Student"}: ${t.text}`).join("\n");
 const studentText = (turns: Turn[]) => turns.filter((t) => t.role === "student").map((t) => t.text).join("\n");
@@ -40,7 +40,7 @@ function offline(turns: Turn[], asked: number): ConverseResult {
 }
 
 export async function nextTurn(input: ConverseInput): Promise<ConverseResult> {
-  const a = authored(input.conceptId);
+  const spec = learning(input.courseId, input.conceptId);
   const asked = input.turns.filter((t) => t.role === "ai").length - 1;
   if (asked >= MAX_FOLLOWUPS) return { kind: "done" };
   if (!aiEnabled()) return offline(input.turns, asked);
@@ -48,7 +48,7 @@ export async function nextTurn(input: ConverseInput): Promise<ConverseResult> {
     model: model(),
     system: ASK,
     output: Output.object({ schema: Next }),
-    prompt: `Concept question: ${a.question}\nCourse material: ${a.correct}\nFollow-ups asked so far: ${asked} of ${MAX_FOLLOWUPS}\n\nConversation:\n${transcript(input.turns)}`,
+    prompt: `Concept question: ${spec.assessment.question}\nCourse material: ${spec.assessment.correctAnswer}\nFollow-ups asked so far: ${asked} of ${MAX_FOLLOWUPS}\n\nConversation:\n${transcript(input.turns)}`,
   });
   if (output.done && asked >= 1) return { kind: "done" };
   // Too early to stop and no question came back, so ask the offline one rather than end on nothing.
@@ -69,27 +69,41 @@ const AUDIT = `You audit what a student said out loud against course material.
 - Be specific and brief. No praise, no emoji. Leave a list empty rather than pad it.`;
 
 export async function audit(input: ConverseInput): Promise<AuditResult> {
-  const a = authored(input.conceptId);
+  const spec = learning(input.courseId, input.conceptId);
   const said = studentText(input.turns);
   const { attemptId, evaluation } = await assess({ courseId: input.courseId, conceptId: input.conceptId, answer: said.slice(0, 4000) });
   const base = { attemptId, verdict: evaluation.verdict };
 
   if (!aiEnabled()) {
     if (evaluation.verdict === "incorrect" && evaluation.evidenceQuote) {
-      return { ...base, right: [], off: [{ quote: evaluation.evidenceQuote, note: evaluation.gapSentence ?? a.misconceptions[0]?.gap ?? a.correct, fix: a.correct }], missing: [] };
+      const misconception = spec.misconceptions.find((m) => m.id === evaluation.misconceptionId);
+      const remediation = misconception ? spec.remediations.find((r) => r.misconceptionId === misconception.id) : null;
+      const fix = remediation
+        ? `${remediation.actuallyTrue} ${remediation.explanation}`
+        : spec.assessment.correctAnswer;
+      return {
+        ...base,
+        right: [],
+        off: [{
+          quote: evaluation.evidenceQuote,
+          note: evaluation.gapSentence ?? misconception?.description ?? spec.assessment.correctAnswer,
+          fix,
+        }],
+        missing: [],
+      };
     }
     if (evaluation.verdict === "correct") {
       const first = input.turns.find((t) => t.role === "student")!.text;
       return { ...base, right: [{ quote: first.slice(0, 120), note: "This matches the course material." }], off: [], missing: [] };
     }
-    return { ...base, right: [], off: [], missing: [a.correct] };
+    return { ...base, right: [], off: [], missing: [spec.assessment.correctAnswer] };
   }
 
   const { output } = await generateText({
     model: model(),
     system: AUDIT,
     output: Output.object({ schema: Audit }),
-    prompt: `Question: ${a.question}\nCourse material: ${a.correct}\nKnown misconceptions: ${a.misconceptions.map((m) => m.gap).join(" | ")}\n\nConversation:\n${transcript(input.turns)}`,
+    prompt: `Question: ${spec.assessment.question}\nCourse material: ${spec.assessment.correctAnswer}\nKnown misconceptions: ${spec.misconceptions.map((m) => m.description).join(" | ")}\n\nConversation:\n${transcript(input.turns)}`,
   });
   // A quote the student never said is dropped, so the audit can't invent evidence.
   const real = (q: string) => q.trim().length > 0 && said.includes(q);

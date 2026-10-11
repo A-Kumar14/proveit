@@ -9,8 +9,43 @@ vi.mock("./latex", async (orig) => ({ ...(await orig<typeof import("./latex")>()
 
 import { getWeakness, samplePaper, studyNotes } from "./practice";
 import { esc } from "./latex";
+import { createCourse, getCourse, recordQuizEvidence } from "./store";
+import { saveGeneratedLearningSpec } from "./learningSpecStore";
+import type { ConceptLearningSpec } from "@proveit/lib/conceptLearningSpec";
 
-beforeEach(() => { generateText.mockReset(); compile.mockReset(); ai = false; compile.mockResolvedValue(Buffer.from("%PDF")); });
+beforeEach(() => {
+  generateText.mockReset();
+  compile.mockReset();
+  ai = false;
+  compile.mockResolvedValue(Buffer.from("%PDF"));
+  (globalThis as { __proveit?: unknown; __proveitLearningSpecs?: unknown }).__proveit = undefined;
+  (globalThis as { __proveitLearningSpecs?: unknown }).__proveitLearningSpecs = undefined;
+});
+
+function generatedCourse() {
+  const courseId = createCourse({
+    name: "Runtime Biology",
+    outline: { units: [{ name: "Cells", concepts: [{ name: "Cell membrane", short: "Membrane", desc: "Controls entry and exit." }] }], prerequisites: [] },
+    files: [],
+  });
+  const conceptId = getCourse(courseId).concepts[0]!.id;
+  const spec: ConceptLearningSpec = {
+    schemaVersion: 1,
+    courseId,
+    conceptId,
+    revision: 1,
+    provenance: { kind: "generated", model: "test-model", generatedAt: "2026-10-10T00:00:00Z" },
+    sources: [{ id: "src", kind: "material_excerpt", materialId: "m1", title: "Biology notes", locator: "p1", excerpt: "The cell membrane controls what enters and leaves the cell." }],
+    assessment: { question: "What does the cell membrane control?", correctAnswer: "It controls what enters and leaves the cell.", rubric: "States the entry/exit role.", probe: "Think about the cell boundary.", sourceIds: ["src"] },
+    misconceptions: [{ id: "stores_dna", name: "Membrane stores DNA", description: "The membrane controls transport, not DNA storage.", clarificationQuestion: "Which role belongs to the membrane?", sourceIds: ["src"] }],
+    remediations: [{ misconceptionId: "stores_dna", title: "Separate transport from storage.", actuallyTrue: "The membrane controls entry and exit.", explanation: "Use the boundary role from the notes.", sourceLabel: "Biology notes", figure: null, sourceIds: ["src"] }],
+    transfer: { question: "How does the membrane matter when a molecule reaches the cell boundary?", correctAnswer: "It controls whether material enters or leaves.", rubric: "Applies the transport role.", hint: "Think boundary.", sourceIds: ["src"] },
+    review: { question: "Correct someone who says the membrane stores DNA.", correctAnswer: "It controls entry and exit instead.", rubric: "Rejects DNA storage and states transport.", hint: "Recall the boundary.", sourceIds: ["src"] },
+    skills: { onWrong: { label: "Application", pct: 30 }, onRight: { label: "Application", pct: 85 } },
+  };
+  saveGeneratedLearningSpec(spec, "fixture-fingerprint");
+  return { courseId, conceptId };
+}
 
 describe("getWeakness", () => {
   it("flags needs-work concepts and attaches the open mistake with its fix", () => {
@@ -19,6 +54,18 @@ describe("getWeakness", () => {
     expect(cii.weak).toBe(true);
     expect(cii.mistakes[0]).toMatchObject({ name: expect.any(String), gap: expect.any(String) });
     expect(w.concepts.some((c) => !c.weak)).toBe(true);
+  });
+
+  it("uses generated specs as course truth and a low quiz score only as a weakness signal", () => {
+    const { courseId, conceptId } = generatedCourse();
+    let concept = getWeakness(courseId).concepts[0]!;
+    expect(concept.material).toBe("It controls what enters and leaves the cell.");
+    expect(concept.weak).toBe(false);
+
+    recordQuizEvidence(courseId, [{ conceptId, prompt: "Boundary?", selected: "Stores DNA", correct: false }]);
+    concept = getWeakness(courseId).concepts[0]!;
+    expect(concept.state).toBe("developing");
+    expect(concept.weak).toBe(true);
   });
 });
 
@@ -37,6 +84,13 @@ describe("samplePaper", () => {
   it("puts the weak concept first and asks it twice", async () => {
     const tex = (await samplePaper("intro-stats")).docs[0]!.tex;
     expect((tex.match(/95\\% confidence interval/g) ?? []).length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("uses a generated learning spec for offline paper questions and keys", async () => {
+    const { courseId } = generatedCourse();
+    const r = await samplePaper(courseId);
+    expect(r.docs[0]!.tex).toContain("What does the cell membrane control?");
+    expect(r.docs[1]!.tex).toContain("It controls what enters and leaves the cell.");
   });
 
   it("returns the .tex and an error when the compile fails", async () => {

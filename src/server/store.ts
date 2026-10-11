@@ -252,6 +252,70 @@ function recordAttempt(data: NewAttempt): Attempt {
   return rec;
 }
 
+export type QuizEvidenceObservation = {
+  conceptId: string;
+  prompt: string;
+  selected: string;
+  correct: boolean;
+};
+
+/**
+ * Multiple-choice quiz answers are supporting evidence only.
+ * They can establish that a concept has been seen, but never diagnose a misconception,
+ * prove transfer, schedule review, award rank points, or demote stronger mastery states.
+ */
+export function recordQuizEvidence(courseId: string, observations: QuizEvidenceObservation[], at = Date.now()): string[] {
+  const course = courseFor(courseId);
+  const ids: string[] = [];
+  for (const observation of observations) {
+    const c = course.concepts.find((concept) => concept.id === observation.conceptId);
+    if (!c) throw new NotFoundError(`concept ${observation.conceptId}`);
+
+    const previousState = c.state;
+    c.evidence.answers++;
+    if (observation.correct) c.evidence.sound++;
+    if (c.state === "not_started") c.state = "developing";
+
+    const id = newId();
+    const rec: Attempt = {
+      id,
+      courseId,
+      conceptId: c.id,
+      kind: "quiz",
+      outcome: observation.correct ? "correct" : "incorrect",
+      parentAttemptId: null,
+      rootAttemptId: id,
+      answer: `Question: ${observation.prompt}\nSelected: ${observation.selected}`,
+      evaluation: null,
+      previousState,
+      createdAt: at,
+    };
+    db().attempts.push(rec);
+    ids.push(id);
+  }
+  if (observations.length) persistLearning();
+  return ids;
+}
+
+export type QuizSignal = { right: number; total: number; pct: number; lastAt: number };
+
+/** Recent quiz performance is a prioritization hint, never a mastery verdict. */
+export function getQuizSignal(courseId: string, conceptId: string, limit = 5): QuizSignal | null {
+  courseFor(courseId);
+  const rows = [...db().attempts]
+    .reverse()
+    .filter((a) => a.courseId === courseId && a.conceptId === conceptId && a.kind === "quiz")
+    .slice(0, Math.max(1, limit));
+  if (!rows.length) return null;
+  const right = rows.filter((a) => a.outcome === "correct").length;
+  return {
+    right,
+    total: rows.length,
+    pct: Math.round((right / rows.length) * 100),
+    lastAt: Math.max(...rows.map((a) => a.createdAt)),
+  };
+}
+
 const transferMissesFor = (rootAttemptId: string, beforeOrAt = Number.POSITIVE_INFINITY) =>
   db().attempts.filter((a) => a.rootAttemptId === rootAttemptId && a.kind === "transfer" && a.outcome === "fail" && a.createdAt <= beforeOrAt).length;
 
@@ -317,8 +381,13 @@ const latestConfirmedIncorrect = (conceptId: string, courseId?: string) =>
 const latestEvaluatedInRoot = (rootAttemptId: string) =>
   [...db().attempts].reverse().find((a) => a.rootAttemptId === rootAttemptId && a.evaluation) ?? null;
 
+/** Low-stakes quiz signals never supersede an in-flight assess/clarify/transfer/review episode. */
 const latestAttemptForConcept = (conceptId: string, courseId?: string) =>
-  [...db().attempts].reverse().find((a) => a.conceptId === conceptId && (!courseId || a.courseId === courseId)) ?? null;
+  [...db().attempts].reverse().find((a) =>
+    a.kind !== "quiz" &&
+    a.conceptId === conceptId &&
+    (!courseId || a.courseId === courseId)
+  ) ?? null;
 
 const rootIsCurrentForConcept = (conceptId: string, rootAttemptId: string, courseId?: string) =>
   latestAttemptForConcept(conceptId, courseId)?.rootAttemptId === rootAttemptId;
@@ -1058,6 +1127,8 @@ export function getHistory(): HistoryEvent[] {
   return [...attempts].reverse().map((a) => {
     const c = conceptFor(a.courseId, a.conceptId);
     const base = `/course/${a.courseId}`;
+    if (a.kind === "quiz" && a.outcome === "correct") return { id: a.id, at: a.createdAt, title: `Quiz check on ${c.name}`, detail: "Correct multiple-choice signal · mastery not proved", tone: "good" as const, href: `${base}/practice/${c.id}` };
+    if (a.kind === "quiz" && a.outcome === "incorrect") return { id: a.id, at: a.createdAt, title: `Quiz check on ${c.name}`, detail: "Missed multiple-choice signal · no misconception inferred", tone: "warn" as const, href: `${base}/practice/${c.id}` };
     if (a.kind === "review" && a.outcome === "pass") return { id: a.id, at: a.createdAt, title: `Passed delayed review on ${c.name}`, detail: "Mastered with delayed retrieval", tone: "good" as const, href: `${base}/review-result/${a.id}` };
     if (a.kind === "review" && a.outcome === "fail" && a.evaluation?.verdict === "incorrect") return { id: a.id, at: a.createdAt, title: `Review exposed a gap in ${c.name}`, detail: `Caught: ${a.evaluation.misconceptionName}`, tone: "bad" as const, href: `${base}/diagnosis/${a.id}` };
     if (a.kind === "review" && a.outcome === "uncertain") return { id: a.id, at: a.createdAt, title: `Reviewed ${c.name}`, detail: "Needs more evidence", tone: "warn" as const, href: "/review" };
@@ -1228,7 +1299,7 @@ export class TaskLockedError extends Error {}
 
 export const taskRank = (t: Task) => (t.kind === "review" ? 1 : t.state === "needs_work" ? 0 : t.state === "developing" ? 2 : 3);
 
-function tasksFor(c: Course, _active: boolean): Task[] {
+function tasksFor(c: Course): Task[] {
   const today = isoDay(new Date());
   return c.concepts.flatMap((x): Task[] => {
     const provedByWork = x.state === "provisional" || x.state === "mastered";
@@ -1250,7 +1321,7 @@ export function getTodos(): TodoGroup[] {
   return [course, ...samples]
     .filter((c) => !isCompleted(c) && (!c.runtime || c.concepts.some((concept) => canPractice(c, concept))))
     .map((c) => {
-    const all = tasksFor(c, c === course);
+    const all = tasksFor(c);
     const open = all.filter((t) => !t.done).sort((a, b) => taskRank(a) - taskRank(b));
     return { courseId: c.id, courseName: c.name, open, done: all.filter((t) => t.done), total: all.length, doneCount: all.filter((t) => t.done).length };
   });
@@ -1259,7 +1330,7 @@ export function getTodos(): TodoGroup[] {
 /** Ticks or unticks a task by hand. Progress-based completion can't be undone, and a hand tick never changes mastery. */
 export function setTaskDone(id: string, done: boolean): void {
   const { course, samples } = db();
-  const task = [course, ...samples].flatMap((c) => tasksFor(c, c === course)).find((t) => t.id === id);
+  const task = [course, ...samples].flatMap((c) => tasksFor(c)).find((t) => t.id === id);
   if (!task) throw new NotFoundError(`task ${id}`);
   if (task.doneBy === "progress") throw new TaskLockedError("Your answers already completed this task.");
   if (done) db().taskDone.add(id);
