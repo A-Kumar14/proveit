@@ -26,6 +26,12 @@ describe("tiers", () => {
     expect(standing(999999)).toMatchObject({ tier: { name: "Legend" }, next: null, toNext: 0, pct: 100 });
   });
 
+  it("keeps Legend a long-term multi-course target", () => {
+    const standardCourseMax = courseMaxPoints(20);
+    expect(standardCourseMax).toBe(12000);
+    expect(Math.ceil(TIERS.at(-1)!.min / standardCourseMax)).toBe(42);
+  });
+
   it("ignores negative and fractional totals", () => {
     expect(standing(-50).points).toBe(0);
     expect(standing(1999.9).points).toBe(1999);
