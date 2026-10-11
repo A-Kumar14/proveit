@@ -125,7 +125,7 @@ async function buildCourse(id: string, inputs: JobInput[]): Promise<void> {
 
     at("building");
     const record: CourseFile[] = read.map((r) => ({ name: r.name, kind: `${r.mime === "application/pdf" ? "PDF" : r.mime.startsWith("image/") ? "Image" : "Notes"}, uploaded`, detail: r.readBy === "ai" ? "Read by the AI to build the concept map." : "Read to build the concept map." }));
-    const courseId = createCourse({ name: job.name, outline, files: record });
+    const courseId = createCourse({ name: job.name, outline, files: record, rewardSource: read.map(r => r.text).sort().join("\n\n") });
 
     at("saving");
     for (const r of read) saveMaterial(courseId, { name: r.name, mime: r.mime, size: r.size }, r.text, r.readBy);
@@ -143,3 +143,4 @@ async function buildCourse(id: string, inputs: JobInput[]): Promise<void> {
     save({ ...j, stoppedAt: j.stage as StageId, stage: "failed", error, endedAt: Date.now() });
   }
 }
+

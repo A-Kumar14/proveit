@@ -50,7 +50,7 @@ export async function createCourseFromSources(name: string, sources: Source[], k
   const record: CourseFile[] = sources.map((s) => ({ name: s.name, kind: `${kindLabel}, imported`, detail: "Notes pulled in from a connected app." }));
   let id: string;
   try {
-    id = createCourse({ name: title, outline, files: record });
+    id = createCourse({ name: title, outline, files: record, rewardSource: sources.map(s => s.text).sort().join("\n\n") });
   } catch (e) {
     if (e instanceof EmptyOutlineError) throw new MaterialError("I couldn't find separate topics in those notes. Try adding more detail.");
     throw e;
@@ -59,4 +59,5 @@ export async function createCourseFromSources(name: string, sources: Source[], k
   const concepts = outline.units.slice(0, 4).reduce((n, u) => n + Math.min(u.concepts.length, 3), 0);
   return { id, concepts };
 }
+
 

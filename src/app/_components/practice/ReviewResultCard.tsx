@@ -1,3 +1,4 @@
+import { AssessmentScore } from "./AssessmentScore";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { buttonStyles } from "../Button";
@@ -28,6 +29,7 @@ export function ReviewResultCard({ r }: { r: ReviewResultView }) {
         <Row><Cell className="text-ink-3">{r.courseName}</Cell><Cell className="font-semibold">{r.provenLabel} · {r.coursePct}%</Cell></Row>
       </CardTable>
 
+      <AssessmentScore reward={r.assessmentReward} />
       <CalloutRow>
         <Callout kind="plain" title="Next spaced review"><div className="text-[0.9375rem] font-semibold text-ink">{r.nextReview}</div><div className="text-xs text-ink-muted">The interval expands after successful delayed checks.</div></Callout>
         <Callout kind="advice" title="Why this matters">You proved the idea after time passed, not while the explanation was still fresh.</Callout>
@@ -44,3 +46,4 @@ export function ReviewResultCard({ r }: { r: ReviewResultView }) {
     </AssistantCard>
   );
 }
+

@@ -7,13 +7,18 @@ import { aiEnabled, model } from "./ai";
 import { courseMaterial } from "./materials";
 import { splitByConcept } from "./parallel";
 import { getWeakness, type Weak } from "./practice";
-import { courseInstance, getQuizRecord, NotFoundError, recordQuiz, type QuizRecord } from "./store";
+import { courseInstance, getCourse, getQuizRecord, NotFoundError, recordQuiz, type QuizRecord } from "./store";
+import { ensureConceptLearningSpec } from "./learningSpecGenerator";
+import { UpstreamError } from "./modelError";
+import { learningSourceViews } from "./sourceLineage";
+import { judgeAnswerForSpec } from "./evaluator";
+import type { ConceptLearningSpec } from "@proveit/lib/conceptLearningSpec";
 import type { QuizQuestion, QuizResult, QuizStartResult } from "@proveit/lib/schemas";
 
 export const DEFAULT_QUESTIONS = 8;
 
-type Keyed = QuizQuestion & { conceptId: string; correct: number; explanation: string };
-type Held = { course: object; id: string; courseId: string; courseName: string; questions: Keyed[]; at: number; result: QuizResult | null };
+type Keyed = QuizQuestion & { conceptId: string; correct: number; explanation: string; spec?: ConceptLearningSpec };
+type Held = { course: object; id: string; courseId: string; courseName: string; questions: Keyed[]; at: number; result: QuizResult | null; pending?: Promise<QuizResult> };
 
 const g = globalThis as unknown as { __proveitQuizzes?: Map<string, Held> };
 const quizzes = (): Map<string, Held> => userCache("quizzes", () => (g.__proveitQuizzes ??= new Map<string, Held>()), () => new Map<string, Held>());
@@ -116,10 +121,10 @@ async function written(courseId: string, courseName: string, concepts: Weak[], c
   return out.slice(0, count);
 }
 
-const strip = ({ id, concept, prompt, options }: Keyed): QuizQuestion => ({ id, concept, prompt, options });
+const strip = ({ id, concept, prompt, options, format, marks }: Keyed): QuizQuestion => ({ id, concept, prompt, options, format, marks });
 const FOCUSED_QUESTIONS = 4;
 
-export async function startQuiz(courseId: string, count?: number, conceptId?: string): Promise<QuizStartResult> {
+export async function startQuiz(courseId: string, count?: number, conceptId?: string, format: "quiz" | "explanation" | "mixed" = "quiz"): Promise<QuizStartResult> {
   const course = courseInstance(courseId);
   const w = getWeakness(courseId);
   if (w.concepts.length === 0) throw new NotFoundError(`course ${courseId} has no concepts`);
@@ -129,7 +134,19 @@ export async function startQuiz(courseId: string, count?: number, conceptId?: st
   const n = count ?? (focus ? FOCUSED_QUESTIONS : DEFAULT_QUESTIONS);
   const useAi = aiEnabled();
   // Without a model, a one-concept quiz can only ask about the concept once, since the questions come from the other concepts' descriptions.
-  const questions = useAi ? await written(courseId, w.courseName, concepts, n) : offline(concepts, n, w.concepts);
+  let questions = format === "explanation" ? [] : useAi ? await written(courseId, w.courseName, concepts, n) : offline(concepts, n, w.concepts);
+  if (format !== "quiz") {
+    if (!useAi) throw new UpstreamError("Explanation quizzes need an AI key for percentage scoring. Choose multiple choice or configure the AI provider.");
+    const available = new Set(getCourse(courseId).concepts.filter(c => c.cta.href !== null).map(c => c.id));
+    const eligible = concepts.filter(c => available.has(c.id));
+    if (!eligible.length) throw new NotFoundError("No explanation questions are available for these topics yet.");
+    const chosen = pick(eligible, Math.min(format === "mixed" ? 2 : n, eligible.length));
+    const explanations = await Promise.all(chosen.map(async (c, i): Promise<Keyed> => {
+      const spec = await ensureConceptLearningSpec(courseId, c.id);
+      return { id: `frq${i + 1}`, conceptId: c.id, concept: c.name, prompt: spec.assessment.question, options: [], correct: -1, explanation: "", format: "explanation", marks: 4, spec };
+    }));
+    questions = [...questions, ...explanations];
+  }
   if (questions.length === 0) throw new NotFoundError(`course ${courseId} is too small for a quiz`);
   if (courseInstance(courseId) !== course) throw new NotFoundError("course replaced while generating quiz");
   const id = randomUUID();
@@ -155,7 +172,7 @@ export function auditOf(r: QuizRecord): QuizResult {
 
 export const getQuizAudit = (quizId: string): QuizResult => auditOf(getQuizRecord(quizId));
 
-/** Grades a quiz and saves it. Submitting twice returns the first result. Answered questions are weak evidence; they never demote mastery or award rank. */
+/** Grades a quiz and saves it. Submitting twice returns the first result. Answered questions are weak evidence; they never demote durable mastery. Scores of 90% can earn quiz allocations once. */
 export function submitQuiz(quizId: string, answers: (number | null)[]): QuizResult {
   const quiz = quizzes().get(quizId);
   if (!quiz || courseInstance(quiz.courseId) !== quiz.course) throw new NotFoundError(`quiz ${quizId}`);
@@ -168,3 +185,28 @@ export function submitQuiz(quizId: string, answers: (number | null)[]): QuizResu
   return quiz.result;
 }
 
+
+/** FRQs use the same pinned source/rubric as standalone explanations; client text never supplies a score. */
+export async function submitAssessmentQuiz(quizId: string, answers: (number | string | null)[]): Promise<QuizResult> {
+  const quiz = quizzes().get(quizId);
+  if (!quiz || courseInstance(quiz.courseId) !== quiz.course) throw new NotFoundError(`quiz ${quizId}`);
+  if (quiz.result) return quiz.result;
+  if (!quiz.questions.some(q => q.format === "explanation")) return submitQuiz(quizId, answers.map(a => typeof a === "number" ? a : null));
+  if (quiz.pending) return quiz.pending;
+  const run = async () => {
+    const items = await Promise.all(quiz.questions.map(async (q, i) => {
+      const raw = answers[i];
+      if (q.format !== "explanation") return { conceptId: q.conceptId, concept: q.concept, prompt: q.prompt, options: q.options, picked: typeof raw === "number" ? raw : null, correct: q.correct, explanation: q.explanation };
+      const response = typeof raw === "string" ? raw.trim() : "";
+      const judged = response ? await judgeAnswerForSpec(q.spec!, response) : null;
+      if (judged && (judged.score === null || judged.score === undefined)) throw new UpstreamError("The AI did not return a complete rubric score. Retry grading.");
+      const score = judged?.score ?? 0;
+      return { conceptId: q.conceptId, concept: q.concept, prompt: q.prompt, options: [], picked: response ? 0 : null, correct: score >= 90 ? 0 : -1, explanation: "Scored against the course rubric: correctness 50%, reasoning 30%, coverage 20%.", format: "explanation" as const, marks: 4, learningSpecRevision: q.spec!.revision, sources: learningSourceViews(q.spec!, q.spec!.assessment.sourceIds), response, earnedMarks: score / 100 * 4, explanationScore: score };
+    }));
+    if (courseInstance(quiz.courseId) !== quiz.course) throw new NotFoundError("course replaced while grading quiz");
+    quiz.result = auditOf(recordQuiz({ courseId: quiz.courseId, items }));
+    return quiz.result;
+  };
+  quiz.pending = run();
+  try { return await quiz.pending; } finally { delete quiz.pending; }
+}

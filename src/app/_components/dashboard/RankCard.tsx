@@ -1,6 +1,5 @@
 import Link from "next/link";
 import type { CourseRank, Rewards } from "@proveit/server/store";
-import { POINTS } from "@proveit/lib/rewards";
 import { cn } from "@proveit/lib/cn";
 import { TierBadge } from "./TierBadge";
 import { TierCelebration } from "./TierCelebration";
@@ -39,7 +38,7 @@ export function RankCard({ r, courses, previewable, userId = "local" }: { r: Rew
 
           <section aria-label="Rank by course" className="flex flex-col gap-1.5">
             <h3 className="m-0 text-[0.6875rem] font-medium tracking-[0.06em] text-ink-faint uppercase">By course</h3>
-            <p className="m-0 text-xs text-ink-muted">Your overall rank adds up everything across every course, plus your streak. Each course also has its own rank, with a ladder scaled to that course so one topic can reach the top.</p>
+            <p className="m-0 text-xs text-ink-muted">Your overall rank adds up everything across every course. Each course also has its own rank, with a ladder scaled to that course so one topic can reach the top.</p>
             <ul className="m-0 grid list-none grid-cols-1 gap-x-6 gap-y-1 p-0 sm:grid-cols-2">
               {courses.map((c) => (
                 <li key={c.courseId} className="flex items-center gap-2 border-t border-line py-1.5 text-xs">
@@ -60,14 +59,14 @@ export function RankCard({ r, courses, previewable, userId = "local" }: { r: Rew
                 {r.breakdown.map((b) => (
                   <tr key={b.label} className="border-t border-line first:border-t-0">
                     <th scope="row" className="py-1.5 text-left font-normal text-ink-muted">{b.label}</th>
-                    <td className="py-1.5 text-right tabular-nums text-ink-faint">{b.count} × {b.each}</td>
+                    <td className="py-1.5 text-right tabular-nums text-ink-faint">{b.each ? `${b.count} × ${b.each}` : `${b.count} awards`}</td>
                     <td className="w-20 py-1.5 text-right font-semibold tabular-nums">{fmt(b.points)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
             <p className="m-0 mt-2 max-w-xl text-[0.6875rem] leading-normal text-ink-faint">
-              The overall rank counts every course. Points come from evidence: passing a new question ({POINTS.proved}), mastering a concept ({POINTS.mastered}), and the extras above. Ticking tasks or marking a course done earns nothing. Rank never drops, even if a concept slips. <Link href="/courses" className="text-ink-muted">Manage courses</Link>
+              Earn points at 90% assessment mastery; 70% proficiency is a milestone with no points. Topic importance sets each allocation: a standard topic offers 150 quiz points and 350 explanation points. Four distinct questions in one mastered quiz cover its full quiz allocation. Repeats earn only any remaining allocation. Standard courses offer up to 12,000 points, including a 2,000-point bonus after all allocations and delayed reviews are complete; smaller courses scale down. Transfer and review establish durable mastery. Previously earned totals are retained as a floor. <Link href="/courses" className="text-ink-muted">Manage courses</Link>
             </p>
           </details>
         </div>

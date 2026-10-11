@@ -1,6 +1,6 @@
 import { userCache } from "./userScope";
 import "server-only";
-import { cardStatus, type AssessInput, type AssessResult, type AttemptKind, type AttemptOutcome, type CourseOutline, type Evaluation, type MasteryState, type ReviewSubmitResult, type ReviewText, type TransferResult } from "@proveit/lib/schemas";
+import { cardStatus, type AssessInput, type AssessResult, type AttemptKind, type AttemptOutcome, type CourseOutline, type Evaluation, type MasteryState, type ReviewSubmitResult, type AssessmentReward, type ReviewText, type TransferResult } from "@proveit/lib/schemas";
 import { toneForPct, type Tone } from "@proveit/lib/mastery";
 import { judgeAnswerForSpec, judgeReviewForSpec, judgeTransferForSpec, type AnswerContext } from "./evaluator";
 import { ensureConceptLearningSpec } from "./learningSpecGenerator";
@@ -10,7 +10,8 @@ import { followUpFor, GENERIC_FOLLOWUP } from "./followup";
 import { loadUserJson, saveUserJson } from "./persistence";
 import type { CourseSpec } from "@proveit/lib/courseSpec";
 import type { CalEvent } from "./calendar";
-import { courseTiers, POINTS, STREAK_CAP, standing, TIERS, type Standing } from "@proveit/lib/rewards";
+import { courseTiers, standing, TIERS, type Standing } from "@proveit/lib/rewards";
+import { awardAssessment, awardCourseBonus, emptyRewardLedger, makeCourseRewards, rewardFingerprint, rewardName, type RewardLedger, type RewardTopic } from "./rewardLedger";
 import { aiEnabled } from "./ai";
 import { learningSourceViews, sourceIdUnion, type LearningSourceView } from "./sourceLineage";
 
@@ -23,12 +24,14 @@ import { learningSourceViews, sourceIdUnion, type LearningSourceView } from "./s
 type Skill = { label: string; pct: number };
 type Concept = {
   id: string; name: string; short: string; unit: string; desc: string; x: number; y: number;
+  importance?: number;
   state: MasteryState;
   skills: Skill[] | null;
   evidence: { answers: number; sound: number; transferPassed: boolean };
   nextReview: string | null;
 };
 type Attempt = {
+  assessmentReward?: AssessmentReward;
   id: string; courseId: string; conceptId: string; kind: AttemptKind; outcome: AttemptOutcome;
   /** Immediate predecessor and stable episode root let the DB preserve the complete evidence chain. */
   parentAttemptId: string | null; rootAttemptId: string;
@@ -38,9 +41,9 @@ type Attempt = {
   previousState: MasteryState; createdAt: number;
 };
 /** `completedOverride` is the student's own call. null means derive it from the concepts. */
-type Course = { id: string; name: string; deadline: string; concepts: Concept[]; edges: [string, string][]; files: CourseFile[]; completedOverride: boolean | null; /** ISO date of the next quiz, if any. */ examDate: string | null; /** True for courses added at runtime (uploads, imports, the curated catalog). Their canonical learning content is generated on demand. */ runtime?: boolean; /** The notes a curated course was built from. */ spec?: CourseSpec };
+type Course = { rewardIdentity?: string; id: string; name: string; deadline: string; concepts: Concept[]; edges: [string, string][]; files: CourseFile[]; completedOverride: boolean | null; /** ISO date of the next quiz, if any. */ examDate: string | null; /** True for courses added at runtime (uploads, imports, the curated catalog). Their canonical learning content is generated on demand. */ runtime?: boolean; /** The notes a curated course was built from. */ spec?: CourseSpec };
 /** `course` is the one being worked on. `samples` are every other course (added at runtime, plus placeholders in tests): including runtime courses with generated practice content. */
-type Db = { course: Course; samples: Course[]; /** Every quiz taken, with what it changed. Absent in snapshots saved before quizzes were recorded. */ quizzes?: QuizRecord[]; attempts: Attempt[]; provenDays: Set<string>; /** Tasks the student ticked off by hand. */ taskDone: Set<string>; /** Highest point total ever shown. Rank never drops when a concept slips. */ peakPoints: number; /** Same rule per course, so a course's rank never drops either. */ peakByCourse: Record<string, number>; seq: number };
+type Db = { rewardLedger?: RewardLedger; course: Course; samples: Course[]; /** Every quiz taken, with what it changed. Absent in snapshots saved before quizzes were recorded. */ quizzes?: QuizRecord[]; attempts: Attempt[]; provenDays: Set<string>; /** Tasks the student ticked off by hand. */ taskDone: Set<string>; /** Highest point total ever shown. Rank never drops when a concept slips. */ peakPoints: number; /** Same rule per course, so a course's rank never drops either. */ peakByCourse: Record<string, number>; seq: number };
 
 const app = (answers: number, sound: number, transferPassed = false) => ({ answers, sound, transferPassed });
 
@@ -81,6 +84,7 @@ function initialState(): Db {
 }
 
 type StoredLearning = {
+  rewardLedger?: RewardLedger;
   concepts: Record<string, Pick<Concept, "state" | "skills" | "evidence" | "nextReview">>;
   attempts: Attempt[];
   quizzes?: QuizRecord[];
@@ -103,6 +107,7 @@ function restoreLearning(): Db {
     const saved = stored.concepts?.[concept.id];
     if (saved) Object.assign(concept, saved);
   }
+  if (stored.rewardLedger?.version === 2) data.rewardLedger = stored.rewardLedger;
   if (Array.isArray(stored.attempts)) data.attempts = stored.attempts;
   if (Array.isArray(stored.quizzes)) data.quizzes = stored.quizzes;
   if (Array.isArray(stored.provenDays)) data.provenDays = new Set(stored.provenDays);
@@ -123,6 +128,7 @@ function persistLearning(): void {
   const current = db();
   const snapshot: StoredLearning = {
     concepts: Object.fromEntries(current.course.concepts.map((c) => [c.id, { state: c.state, skills: c.skills, evidence: c.evidence, nextReview: c.nextReview }])),
+    rewardLedger: current.rewardLedger,
     attempts: current.attempts,
     quizzes: current.quizzes ?? [],
     provenDays: [...current.provenDays],
@@ -144,9 +150,10 @@ function courseFromSpec(spec: CourseSpec): Course {
   let n = 0;
   const concepts = spec.units.flatMap((u, ui): Concept[] => u.concepts.map((c) => {
     n++;
-    return { id: `${spec.id}-${n}`, name: c.name, short: c.name.length > 14 ? `${c.name.slice(0, 13).trimEnd()}.` : c.name, unit: unitLabel(u.name, ui), desc: c.desc, x: 0, y: 0, state: "not_started", skills: null, evidence: { answers: 0, sound: 0, transferPassed: false }, nextReview: null };
+    return { id: `${spec.id}-${n}`, name: c.name, importance: c.importance, short: c.name.length > 14 ? `${c.name.slice(0, 13).trimEnd()}.` : c.name, unit: unitLabel(u.name, ui), desc: c.desc, x: 0, y: 0, state: "not_started", skills: null, evidence: { answers: 0, sound: 0, transferPassed: false }, nextReview: null };
   }));
   return {
+    rewardIdentity: rewardFingerprint(spec.material || spec.units.flatMap(u => u.concepts.map(c => c.name)).sort().join("|")),
     id: spec.id, name: spec.name, deadline: "No quiz scheduled", concepts, edges: [], completedOverride: null, examDate: null, runtime: true, spec,
     files: [{ name: `${spec.name} course notes`, kind: spec.source === "catalog" ? "Curated course" : "Your course", detail: spec.summary }],
   };
@@ -156,7 +163,9 @@ function courseFromSpec(spec: CourseSpec): Course {
 export function addCourseSpec(spec: CourseSpec): { id: string; added: boolean } {
   const data = db();
   if (data.course.id === spec.id || data.samples.some((c) => c.id === spec.id)) return { id: spec.id, added: false };
-  data.samples.push(courseFromSpec(spec));
+  const added = courseFromSpec(spec);
+  data.samples.push(added);
+  rewardsForCourse(added);
   persistLearning();
   return { id: spec.id, added: true };
 }
@@ -268,7 +277,13 @@ function recordAttempt(data: NewAttempt): Attempt {
     parentAttemptId: parent?.id ?? null,
     rootAttemptId: parent?.rootAttemptId ?? id,
   };
+  if (rec.assessmentReward) {
+    const course = courseFor(rec.courseId);
+    rec.assessmentReward = awardAssessment(rewardsForCourse(course), conceptFor(rec.courseId, rec.conceptId).name, "explanation", rec.assessmentReward.score, 1, rec.id);
+    if (rec.evaluation) rec.evaluation.assessmentReward = rec.assessmentReward;
+  }
   db().attempts.push(rec);
+  if (rec.kind === "review" && rec.outcome === "pass") checkCourseBonus(courseFor(rec.courseId), rec.id);
   persistLearning();
   return rec;
 }
@@ -283,7 +298,7 @@ export type QuizEvidenceObservation = {
 /**
  * Multiple-choice quiz answers are supporting evidence only.
  * They can establish that a concept has been seen, but never diagnose a misconception,
- * prove transfer, schedule review, award rank points, or demote stronger mastery states.
+ * prove transfer, schedule review, directly award rank points, or demote stronger mastery states.
  */
 export function recordQuizEvidence(courseId: string, observations: QuizEvidenceObservation[], at = Date.now()): string[] {
   const course = courseFor(courseId);
@@ -483,6 +498,7 @@ const practiceHrefFor = (courseId: string, c: Concept) => `/course/${courseId}/p
 
 export type DimView = { label: string; level: string; pct: number; tone: Tone };
 export type ConceptView = {
+  rewards?: RewardTopic;
   id: string; name: string; short: string; unit: string; desc: string; x: number; y: number;
   state: MasteryState; dims: DimView[]; evidence: string;
   cta: { label: string; href: string | null };
@@ -534,6 +550,7 @@ export function getCourse(courseId: string): CourseView {
     needsWork: course.concepts.filter((c) => c.state === "needs_work").length,
     concepts: course.concepts.map((c) => ({
       id: c.id, name: c.name, short: c.short, unit: c.unit, desc: c.desc, x: c.x, y: c.y,
+      rewards: rewardsForCourse(course).topics[rewardName(c.name)],
       state: c.state, dims: dimsFor(c), evidence: evidenceText(c), cta: ctaFor(course, c),
     })),
     edges: course.edges,
@@ -772,6 +789,9 @@ export async function assess(input: AssessInput): Promise<AssessResult> {
     };
   }
 
+  const evidenceId = `a${db().seq + 1}`;
+  evaluation.assessmentReward = awardAssessment(rewardsForCourse(course), c.name, "explanation", j.score ?? null, 1, evidenceId);
+  if (j.score !== null && j.score !== undefined) upsertSkill(c, { label: "Explanation assessment", pct: j.score });
   const rec = recordAttempt({
     courseId: input.courseId,
     conceptId: c.id,
@@ -785,10 +805,15 @@ export async function assess(input: AssessInput): Promise<AssessResult> {
     previousState,
     createdAt: Date.now(),
   });
+  const plan = rewardsForCourse(course);
+  for (const award of plan.awards) if (award.evidenceId === evidenceId) award.evidenceId = rec.id;
+  checkCourseBonus(course, rec.id);
+  persistLearning();
   return { attemptId: rec.id, evaluation };
 }
 
 export type EvidenceAttemptView = {
+  assessmentReward?: AssessmentReward;
   id: string; courseId: string; conceptId: string; kind: AttemptKind; outcome: AttemptOutcome;
   parentAttemptId: string | null; rootAttemptId: string; learningSpecRevision: number | null; answer: string; evaluation: Evaluation | null;
   sources: LearningSourceView[]; previousState: MasteryState; createdAt: number;
@@ -799,6 +824,7 @@ export function getEvidenceAttempt(id: string): EvidenceAttemptView {
   return {
     id: a.id, courseId: a.courseId, conceptId: a.conceptId, kind: a.kind, outcome: a.outcome,
     parentAttemptId: a.parentAttemptId, rootAttemptId: a.rootAttemptId, learningSpecRevision: a.learningSpecRevision ?? null, answer: a.answer, evaluation: a.evaluation,
+    assessmentReward: a.assessmentReward ?? a.evaluation?.assessmentReward,
     sources: sourceViewsForAttempt(a), previousState: a.previousState, createdAt: a.createdAt,
   };
 }
@@ -933,6 +959,7 @@ export async function submitTransfer(attemptId: string, answer: string): Promise
     const rec = recordAttempt({
       courseId: parent.courseId, conceptId: c.id, kind: "transfer", outcome: "pass", parentAttemptId: parent.id,
       learningSpecRevision: spec.revision,
+      assessmentReward: { score: judged.score ?? null, level: null, pointsGained: 0 },
       answer, evaluation: null, previousState: before, createdAt: Date.now(),
     });
     return { result: "pass", resultAttemptId: rec.id };
@@ -965,12 +992,14 @@ export async function submitTransfer(attemptId: string, answer: string): Promise
   const rec = recordAttempt({
     courseId: parent.courseId, conceptId: c.id, kind: "transfer", outcome: "fail", parentAttemptId: parent.id,
     learningSpecRevision: spec.revision,
+    assessmentReward: { score: judged.score ?? null, level: null, pointsGained: 0 },
     answer, evaluation, previousState: before, createdAt: Date.now(),
   });
   return { result: "fail", failedAttemptId: rec.id, nextAttemptId: evaluation.verdict === "incorrect" ? rec.id : null, followUp };
 }
 
 export type ResultView = {
+  assessmentReward?: AssessmentReward;
   courseId: string; courseName: string; conceptName: string; previous: MasteryState; next: MasteryState;
   diagnosisLabel: string; misconception: string; intervention: string; transferText: string;
   nextReview: string; recommendation: string;
@@ -995,6 +1024,7 @@ export function getResult(attemptId: string): ResultView {
   const proven = course.concepts.filter((x) => x.state === "mastered").length;
   const prov = course.concepts.filter((x) => x.state === "provisional").length;
   return {
+    assessmentReward: a.assessmentReward,
     courseId: a.courseId, courseName: course.name, conceptName: c.name, previous: a.previousState, next: "provisional",
     diagnosisLabel: diagnosed ? "Misconception found" : "Diagnosis",
     misconception: diagnosed ?? (hadOverturnedDiagnosis ? "Not confirmed after clarification" : "None detected"),
@@ -1006,11 +1036,7 @@ export function getResult(attemptId: string): ResultView {
     segments: [...course.concepts].map((x) => x.state).sort((p, q) => RANK.indexOf(p) - RANK.indexOf(q)),
     coursePct: coursePct(course.concepts),
     provenLabel: `${proven} proven + ${prov} provisional`,
-    points: [
-      { label: "Proved the concept", points: POINTS.proved },
-      ...(confirmed ? [{ label: "Repaired a misconception", points: POINTS.repaired }] : []),
-      ...(earlierMisses === 0 ? [{ label: "Passed on the first try", points: POINTS.firstTry }] : []),
-    ],
+    points: rewardsForCourse(course).awards.filter(x => x.evidenceId === a.id).map(x => ({ label: x.category === "bonus" ? "Course mastery bonus" : "Explanation assessment mastery", points: x.points })),
   };
 }
 
@@ -1157,6 +1183,7 @@ export async function submitReview(
     const rec = recordAttempt({
       courseId, conceptId: c.id, kind: "review", outcome: "pass",
       learningSpecRevision: spec.revision,
+      assessmentReward: { score: judged.score ?? null, level: null, pointsGained: 0 },
       answer, evaluation: null, previousState, createdAt: now.getTime(),
     });
     return { result: "pass", resultAttemptId: rec.id };
@@ -1178,7 +1205,8 @@ export async function submitReview(
     const rec = recordAttempt({
       courseId, conceptId: c.id, kind: "review", outcome: "fail",
       learningSpecRevision: spec.revision,
-      answer, evaluation, previousState, createdAt: now.getTime(),
+      assessmentReward: { score: judged.score ?? null, level: null, pointsGained: 0 },
+    answer, evaluation, previousState, createdAt: now.getTime(),
     });
     return { result: "fail", failedAttemptId: rec.id, nextAttemptId: rec.id };
   }
@@ -1192,12 +1220,14 @@ export async function submitReview(
   const rec = recordAttempt({
     courseId, conceptId: c.id, kind: "review", outcome: "uncertain",
     learningSpecRevision: spec.revision,
+    assessmentReward: { score: judged.score ?? null, level: null, pointsGained: 0 },
     answer, evaluation, previousState, createdAt: now.getTime(),
   });
   return { result: "uncertain", attemptId: rec.id, followUp };
 }
 
 export type ReviewResultView = {
+  assessmentReward?: AssessmentReward;
   courseId: string; courseName: string; conceptName: string; previous: MasteryState; next: "mastered";
   nextReview: string; pointsEarned: number; coursePct: number; provenLabel: string;
 };
@@ -1210,9 +1240,10 @@ export function getReviewResult(attemptId: string): ReviewResultView {
   const proven = course.concepts.filter((x) => x.state === "mastered").length;
   const provisional = course.concepts.filter((x) => x.state === "provisional").length;
   return {
+    assessmentReward: a.assessmentReward,
     courseId: a.courseId, courseName: course.name, conceptName: c.name, previous: a.previousState, next: "mastered",
     nextReview: c.nextReview ? shortDate(new Date(`${c.nextReview}T00:00:00`)) : "Not scheduled",
-    pointsEarned: a.previousState === "provisional" ? POINTS.mastered - POINTS.proved : 0,
+    pointsEarned: rewardsForCourse(course).awards.filter(x => x.evidenceId === a.id).reduce((n, x) => n + x.points, 0),
     coursePct: coursePct(course.concepts),
     provenLabel: `${proven} mastered${provisional ? ` + ${provisional} provisional` : ""}`,
   };
@@ -1319,7 +1350,7 @@ const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1).trim
  * Turns an extracted outline into a viewable course. Every concept starts not_started, so a new course adds no rank points.
  * Prerequisites are kept only when both ends exist and `from` sits in the same or an earlier unit, which is also what the graph can draw.
  */
-export function createCourse(input: { name: string; outline: CourseOutline; files: CourseFile[] }): string {
+export function createCourse(input: { name: string; outline: CourseOutline; files: CourseFile[]; rewardSource?: string }): string {
   const units = input.outline.units
     .map((u) => ({ name: u.name.trim(), concepts: u.concepts.filter((c) => c.name.trim()).slice(0, MAX_PER_UNIT) }))
     .filter((u) => u.name && u.concepts.length > 0)
@@ -1341,7 +1372,7 @@ export function createCourse(input: { name: string; outline: CourseOutline; file
       const cid = `${id}-${concepts.length + 1}`;
       const name = clip(c.name.trim(), 48);
       concepts.push({
-        id: cid, name, short: clip(c.short.trim() || name.split(/\s+/).slice(0, 2).join(" "), 16), unit, desc: clip(c.desc.trim(), 160),
+        id: cid, name, importance: c.importance, short: clip(c.short.trim() || name.split(/\s+/).slice(0, 2).join(" "), 16), unit, desc: clip(c.desc.trim(), 160),
         x: Math.round((480 / units.length) * (ui + 0.5)), y: ROWS[row]!,
         state: "not_started", skills: null, evidence: app(0, 0), nextReview: null,
       });
@@ -1357,7 +1388,8 @@ export function createCourse(input: { name: string; outline: CourseOutline; file
     if (!edges.some(([a, b]) => a === from && b === to)) edges.push([from, to]);
   }
 
-  samples.push({ id, name: clip(input.name.trim(), 60), deadline: "No quiz date set", examDate: null, concepts, edges, files: input.files, completedOverride: null, runtime: true });
+  samples.push({ rewardIdentity: input.rewardSource ? rewardFingerprint(input.rewardSource) : undefined, id, name: clip(input.name.trim(), 60), deadline: "No quiz date set", examDate: null, concepts, edges, files: input.files, completedOverride: null, runtime: true });
+  rewardsForCourse(courseFor(id));
   persistLearning();
   return id;
 }
@@ -1484,41 +1516,48 @@ export type Rewards = Standing & {
  * Points for one course, or for every course when `courseId` is left out. The overall rank is not the sum of
  * the course ranks, because the streak counts once, for the student, and not per course.
  */
+/** Plans and awards survive course deletion and are shared by duplicate imports of the same source. */
+function rewardsForCourse(course: Course) {
+  const ledger = db().rewardLedger ??= emptyRewardLedger();
+  const identity = course.rewardIdentity ??= rewardFingerprint(course.concepts.map(c => rewardName(c.name)).sort().join("|"));
+  return ledger.courses[identity] ??= makeCourseRewards(course.concepts.map(c => ({
+    name: c.name,
+    importance: c.importance ?? (course.edges.filter(([from]) => from === c.id).length >= 2 ? 3 : 2),
+  })));
+}
+
+function checkCourseBonus(course: Course, evidenceId: string): number {
+  return awardCourseBonus(rewardsForCourse(course), course.concepts.length > 0 && course.concepts.every(c => c.state === "mastered"), evidenceId);
+}
+
 export function getRewards(courseId?: string): Rewards {
-  const { course, samples, attempts } = db();
-  const scope = courseId ? [courseFor(courseId)] : [course, ...samples];
-  const concepts = scope.flatMap((c) => c.concepts);
-  const passed = attempts.filter((a) => a.kind === "transfer" && a.outcome === "pass" && (!courseId || a.courseId === courseId));
-  const repairedConcepts = new Set(
-    passed.filter((a) => confirmedIncorrectForRoot(a.rootAttemptId)).map((a) => a.conceptId),
-  );
-  const firstTryConcepts = new Set(
-    passed.filter((a) => transferMissesFor(a.rootAttemptId, a.createdAt) === 0).map((a) => a.conceptId),
-  );
-  const rows = [
-    { label: "Concepts mastered", count: concepts.filter((c) => c.state === "mastered").length, each: POINTS.mastered },
-    { label: "Concepts proved with a new question", count: concepts.filter((c) => c.state === "provisional").length, each: POINTS.proved },
-    { label: "Misconceptions repaired", count: repairedConcepts.size, each: POINTS.repaired },
-    { label: "Passed a new question first try", count: firstTryConcepts.size, each: POINTS.firstTry },
-    { label: "Courses mastered end to end", count: scope.filter((c) => c.completedOverride === null && c.concepts.length > 0 && c.concepts.every((x) => x.state === "mastered")).length, each: POINTS.course },
-    ...(courseId ? [] : [{ label: "Streak days, up to 7", count: Math.min(streak(), STREAK_CAP), each: POINTS.streakDay }]),
-  ].map((r) => ({ ...r, points: r.count * r.each }));
+  const data = db();
+  data.peakByCourse ??= {};
+  const course = courseId ? courseFor(courseId) : null;
+  const plan = course ? rewardsForCourse(course) : null;
+  if (!course) for (const c of [data.course, ...data.samples]) rewardsForCourse(c);
+  const plans = plan ? [plan] : Object.values(data.rewardLedger!.courses);
+  const awards = plans.flatMap(p => p.awards);
+  const rows = (["quiz", "explanation", "bonus"] as const).map(category => ({
+    label: category === "quiz" ? "Quiz assessment mastery" : category === "explanation" ? "Explanation assessment mastery" : "Course mastery bonuses",
+    count: awards.filter(a => a.category === category).length, each: 0,
+    points: awards.filter(a => a.category === category).reduce((n, a) => n + a.points, 0),
+  }));
   const earned = rows.reduce((n, r) => n + r.points, 0);
-  const peaks = (db().peakByCourse ??= {});
-  const previousPeak = courseId ? peaks[courseId] ?? 0 : db().peakPoints;
-  const peak = Math.max(previousPeak, earned);
-  if (peak !== previousPeak) {
-    if (courseId) peaks[courseId] = peak; else db().peakPoints = peak;
-    persistLearning();
-  }
-  const tiers = courseId ? courseTiers(concepts.length) : TIERS;
-  const s = standing(peak, tiers);
-  return { ...s, breakdown: rows, ladder: tiers.map((t, i) => ({ id: t.id, name: t.name, min: t.min, reached: i <= s.tierIndex, current: i === s.tierIndex })) };
+  // Preserve the previous displayed total as a floor, not a new source of recurring points.
+  const previous = courseId ? data.peakByCourse[courseId] ?? 0 : data.peakPoints;
+  const points = Math.max(previous, earned);
+  if (previous > earned) rows.push({ label: "Previously earned points retained", count: 1, each: previous - earned, points: previous - earned });
+  if (courseId) data.peakByCourse[courseId] = points; else data.peakPoints = points;
+  persistLearning();
+  const tiers = plan ? courseTiers(Object.keys(plan.topics).length) : TIERS;
+  const standingNow = standing(points, tiers);
+  return { ...standingNow, breakdown: rows, ladder: tiers.map((t, i) => ({ ...t, reached: i <= standingNow.tierIndex, current: i === standingNow.tierIndex })) };
 }
 
 // ---- quiz evidence ----
 
-export type QuizItemRecord = { conceptId: string; concept: string; prompt: string; options: string[]; picked: number | null; correct: number; explanation: string };
+export type QuizItemRecord = { learningSpecRevision?: number; sources?: LearningSourceView[]; format?: "quiz" | "explanation"; marks?: number; earnedMarks?: number; explanationScore?: number | null; response?: string; conceptId: string; concept: string; prompt: string; options: string[]; picked: number | null; correct: number; explanation: string };
 export type QuizChange = { conceptId: string; concept: string; from: MasteryState; to: MasteryState };
 export type QuizRecord = { id: string; courseId: string; courseName: string; at: number; score: number; total: number; pct: number; items: QuizItemRecord[]; changes: QuizChange[]; pointsGained: number };
 
@@ -1560,14 +1599,32 @@ export function recordQuiz(input: { courseId: string; items: QuizItemRecord[] })
     upsertSkill(c, { label: "Quiz", pct: Math.round((t.right / t.answered) * 100) });
     if (to !== c.state) changes.push({ conceptId, concept: c.name, from: c.state, to });
   }
-  const score = input.items.filter((it) => it.picked === it.correct).length;
+  const score = input.items.reduce((n, it) => n + (it.earnedMarks ?? (it.picked === it.correct ? 1 : 0)), 0);
+  const total = input.items.reduce((n, it) => n + (it.marks ?? 1), 0);
   const record: QuizRecord = {
-    id: `q${++db().seq}`, courseId: course.id, courseName: course.name, at: Date.now(), score, total: input.items.length,
-    pct: input.items.length ? Math.round((score / input.items.length) * 100) : 0, items: input.items, changes, pointsGained: 0,
+    id: `q${++db().seq}`, courseId: course.id, courseName: course.name, at: Date.now(), score, total,
+    pct: total ? Math.floor((score / total) * 1000) / 10 : 0, items: input.items, changes, pointsGained: 0,
   };
   recordQuizEvidence(input.courseId, input.items.flatMap((it) => it.picked === null ? [] : [{
-    conceptId: it.conceptId, prompt: it.prompt, selected: it.options[it.picked] ?? "", correct: it.picked === it.correct,
+    conceptId: it.conceptId, prompt: it.prompt, selected: it.response ?? it.options[it.picked] ?? "", correct: it.picked === it.correct,
   }]), record.at);
+  const plan = rewardsForCourse(course);
+  const percentage = record.total ? 100 * record.score / record.total : 0;
+  for (const c of course.concepts) {
+    const items = input.items.filter(it => it.conceptId === c.id);
+    const choices = items.filter(it => it.format !== "explanation");
+    if (choices.length) {
+      const coverage = new Set(choices.filter(it => it.picked === it.correct).map(it => rewardName(it.prompt))).size;
+      record.pointsGained += awardAssessment(plan, c.name, "quiz", percentage, coverage, record.id).pointsGained;
+    }
+    const explanations = items.filter(it => it.format === "explanation");
+    if (explanations.length) {
+      // An overall pass cannot launder an unsupported or incorrect explanation into full topic credit.
+      const supportedScore = Math.min(percentage, Math.max(...explanations.map(it => it.explanationScore ?? 0)));
+      record.pointsGained += awardAssessment(plan, c.name, "explanation", supportedScore, 1, record.id).pointsGained;
+    }
+  }
+  record.pointsGained += checkCourseBonus(course, record.id);
   quizList().push(record);
   persistLearning();
   return record;
