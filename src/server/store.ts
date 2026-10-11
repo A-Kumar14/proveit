@@ -17,8 +17,6 @@ import { awardAssessment, awardCourseBonus, emptyRewardLedger, makeCourseRewards
 import { aiEnabled } from "./ai";
 import { learningSourceViews, sourceIdUnion, type LearningSourceView } from "./sourceLineage";
 import { demoStateForTests } from "../test/demo-state";
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
 import { parseCourseMd } from "./catalog";
 
 /**
