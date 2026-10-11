@@ -75,3 +75,21 @@ Focused review of the new voice path verified these preserved boundaries:
 This continuation also hardened the client start path for demo reliability: microphone permission is requested before spending a voice token, permission denial surfaces a direct recovery message, and SDK errors clear the local connecting lock so the student can retry instead of being stuck in "Connecting...". Regression tests cover blocked microphone access and retry after a reported SDK connection failure.
 
 The live provider/device checks below are still environment-dependent; passing mocked tests cannot prove microphone hardware, WebRTC network traversal, ElevenLabs account configuration or real model quality.
+
+
+## Weighted points finalization
+
+PR #16 superseded the earlier point-policy notes in this report. The final reward system keeps quiz evidence weak for mastery while separately rewarding high-scoring assessments:
+
+- course budgets are derived from the class/concept map and normalized to 3,000 quiz + 7,000 explanation + 2,000 completion points for a standard 20-topic course;
+- topic allocations use 1/2/3 importance weights, with uploaded AI-built maps deriving importance from source emphasis and prerequisite structure;
+- 70% is Proficient with zero points; 90% is Assessment mastered and can earn the relevant allocation;
+- non-FRQ quiz questions and explanation/FRQ/student-explanation assessments are the earning evidence, plus the explicit one-time fully-mastered-course bonus;
+- four distinct mastered quiz questions fill a topic's quiz allocation cumulatively across assessments; repeats are fingerprinted and do not pay twice;
+- explanation allocation is one-time per topic;
+- course bonus requires every reward allocation plus durable Mastered state for every concept;
+- pre-redesign mastery/streak/repair rank peaks are not imported into the assessment ledger;
+- reward state is user-scoped and persisted with the existing learning state;
+- mastery remains independent: quiz evidence cannot diagnose/demote/prove mastery, transfer alone establishes Provisional, and delayed retrieval alone establishes Mastered.
+
+The hardening audit added direct reward-ledger, class-map wiring, migration, account-isolation, anti-farming and UI/course-rank regressions. The exact PR #16 head passed route type generation, TypeScript, ESLint, 524 tests across 74 files, and the production build before merge.
