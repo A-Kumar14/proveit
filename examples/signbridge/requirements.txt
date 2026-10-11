@@ -1,6 +1,4 @@
-ai-edge-litert>=2.3,<3
 certifi>=2024.2.2
 mediapipe==0.10.21
 numpy>=1.26,<2
-openai>=1.54,<2
-torch>=2.4
+torch>=2.4,<3

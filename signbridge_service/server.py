@@ -262,7 +262,7 @@ class TinyASLClassifier:
         except ImportError as error:
             raise ImportError(
                 "The ASL demo model needs ai-edge-litert, opencv-python-headless, and numpy. "
-                "Install examples/signbridge/requirements.txt."
+                "Install examples/signbridge/requirements-tinycnn.txt."
             ) from error
 
         labels_path = Path(os.getenv("SIGNBRIDGE_ASL_LABELS_PATH", str(model_path.with_name("labels.txt"))))
