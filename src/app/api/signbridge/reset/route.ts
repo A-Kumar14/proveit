@@ -1,11 +1,12 @@
 import { NextResponse } from "next/server";
 import { SignBridgeResetRequest } from "@proveit/lib/signbridge";
 import { readSignBridgeJson, resetSignBridgeSession, SIGNBRIDGE_MAX_BODY_BYTES } from "@proveit/server/signbridge";
+import { withUserRoute } from "@proveit/server/userBoundary";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-export async function POST(request: Request) {
+async function POSTForUser(request: Request) {
   const body = await readSignBridgeJson(request, SIGNBRIDGE_MAX_BODY_BYTES);
   if ("error" in body) return NextResponse.json({ error: body.error }, { status: body.status });
   const parsed = SignBridgeResetRequest.safeParse(body.value);
@@ -18,3 +19,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: message }, { status: 503 });
   }
 }
+
+export const POST = withUserRoute(POSTForUser);
