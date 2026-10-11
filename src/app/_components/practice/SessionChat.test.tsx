@@ -211,12 +211,12 @@ describe("answer by talk", () => {
 });
 
 describe("sign input", () => {
-  it("opens the sign panel from the composer and drops the spelled word into the box", async () => {
+  it("opens the ASL Assistant panel from the composer and closes it", async () => {
     mount();
     await userEvent.click(screen.getByRole("button", { name: "Sign your message" }));
-    expect(screen.getByRole("region", { name: "Sign your message" })).toBeTruthy();
-    await userEvent.click(screen.getByRole("button", { name: "Close sign input" }));
-    expect(screen.queryByRole("region", { name: "Sign your message" })).toBeNull();
+    expect(screen.getByLabelText("ASL Assistant panel")).toBeTruthy();
+    await userEvent.click(screen.getByRole("button", { name: "Close ASL Assistant" }));
+    expect(screen.queryByLabelText("ASL Assistant panel")).toBeNull();
   });
 
   it("hides the Sign button when it is switched off in Settings", async () => {
