@@ -6,7 +6,7 @@ export type Crumb = { label: string; href?: string };
 
 export function HeaderBar({ crumbs, state, right }: { crumbs: Crumb[]; state?: MasteryState; right?: React.ReactNode }) {
   return (
-    <header className="flex min-h-[60px] shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 py-2 border-b border-line bg-surface pl-16 pr-4 lg:px-7">
+    <header className="flex min-h-[60px] shrink-0 flex-wrap items-center justify-between gap-x-4 gap-y-2 py-2 glass border-b pl-16 pr-4 lg:px-7">
       <nav aria-label="Breadcrumb" className="flex min-w-0 items-center gap-2 text-[0.8125rem]">
         {crumbs.map((c, i) => (
           <span key={c.label} className="flex items-center gap-2">

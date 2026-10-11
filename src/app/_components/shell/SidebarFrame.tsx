@@ -16,7 +16,7 @@ export function SidebarFrame({ children }: { children: React.ReactNode }) {
   return (
     <>
       <button type="button" aria-label={open ? "Close menu" : "Open menu"} aria-expanded={open} aria-controls="app-sidebar" onClick={() => setOpen((o) => !o)}
-        className="fixed left-3 top-[13px] z-50 flex size-9 cursor-pointer items-center justify-center rounded-md border border-line bg-surface text-ink lg:hidden">
+        className="glass fixed left-3 top-[13px] z-50 flex size-9 cursor-pointer items-center justify-center rounded-md border text-ink lg:hidden">
         {open ? <X size={17} aria-hidden /> : <Menu size={17} aria-hidden />}
       </button>
       {open && <div aria-hidden onClick={() => setOpen(false)} className="fixed inset-0 z-30 bg-black/30 lg:hidden" />}

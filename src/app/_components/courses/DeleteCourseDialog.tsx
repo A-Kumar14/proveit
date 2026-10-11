@@ -34,7 +34,7 @@ export function DeleteCourseDialog({ course, onClose, onDeleted }: { course: { i
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/30 px-4" onClick={() => { if (!busy) onClose(); }}>
       <div role="alertdialog" aria-modal="true" aria-labelledby="delete-title" aria-describedby="delete-body" onClick={(e) => e.stopPropagation()}
-        className="flex w-full max-w-md flex-col gap-3 rounded-md border border-line bg-surface p-5 shadow-[0_12px_32px_rgba(0,0,0,0.14)]">
+        className="glass flex w-full max-w-md flex-col gap-3 rounded-md border p-5">
         <h2 id="delete-title" className="m-0 text-base font-semibold">Delete {course.name}?</h2>
         <p id="delete-body" className="m-0 text-[0.8125rem] leading-normal text-ink-muted">
           This removes the course map, your uploaded files, its quizzes and your answers for it. It can&apos;t be undone. Rank points you already earned stay.

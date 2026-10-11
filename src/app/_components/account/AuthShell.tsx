@@ -8,7 +8,7 @@ export function AuthShell({ enabled, mode, children }: { enabled: boolean; mode:
     <main className="flex h-screen flex-col items-center justify-center gap-6 overflow-y-auto bg-surface-sidebar px-4 py-10">
       <Link href="/" className="flex items-center gap-2.5 text-ink no-underline">
         <span className="flex size-8 items-center justify-center rounded-md bg-ink"><BarChart3 size={18} strokeWidth={2.2} className="text-white" aria-hidden /></span>
-        <span className="text-lg font-semibold tracking-tight">Mastery</span>
+        <span className="text-lg font-semibold tracking-tight">ProveIt</span>
       </Link>
       {enabled ? children : (
         <section className="flex max-w-sm flex-col gap-3 rounded-md border border-line bg-surface p-6">
