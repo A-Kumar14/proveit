@@ -26,6 +26,25 @@ describe("materialKind", () => {
     expect(materialKind({ name: "a.png", type: "image/png" })).toBe("image");
     expect(materialKind({ name: "a.exe", type: "application/x-msdownload" })).toBeNull();
   });
+
+  it("treats Word, PowerPoint, Excel, HTML and CSV as documents, but not the old binary Office formats", () => {
+    for (const name of ["a.docx", "a.pptx", "a.xlsx", "a.html", "a.htm", "a.csv"]) expect(materialKind({ name, type: "" })).toBe("document");
+    expect(materialKind({ name: "a.doc", type: "application/msword" })).toBeNull();
+  });
+});
+
+describe("document files", () => {
+  it("reads an HTML page without the model and keeps it as a course file", async () => {
+    const m = await addMaterial("intro-stats", file("lecture.html", "text/html", "<h2>Sampling</h2><ul><li>Standard error shrinks with n</li></ul><script>x()</script>"));
+    expect(m.readBy).toBe("text");
+    expect(generateText).not.toHaveBeenCalled();
+    expect(courseMaterial("intro-stats")).toMatch(/Uploaded file: lecture\.html\n## Sampling\n+- Standard error shrinks with n/);
+  });
+
+  it("says how to fix an old Office file and a damaged one", async () => {
+    await expect(addMaterial("intro-stats", file("old.ppt", "application/vnd.ms-powerpoint"))).rejects.toThrow(/Save it as \.docx, \.pptx or \.xlsx/);
+    await expect(addMaterial("intro-stats", file("fake.docx", ""))).rejects.toBeInstanceOf(MaterialError);
+  });
 });
 
 describe("course files", () => {

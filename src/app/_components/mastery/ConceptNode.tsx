@@ -26,7 +26,7 @@ export function ConceptNode({ id, name, short, x, y, state, selected, onSelect }
       >
         <NodeIcon state={state} />
       </button>
-      <span style={{ left: `${(x / 480) * 100}%`, top: `${(y / 336) * 100}%` }} className={cn("pointer-events-none absolute w-[110px] -translate-x-1/2 translate-y-6 text-center text-[11px]", selected ? "font-semibold text-ink" : "text-ink-muted")}>
+      <span style={{ left: `${(x / 480) * 100}%`, top: `${(y / 336) * 100}%` }} className={cn("pointer-events-none absolute w-[110px] -translate-x-1/2 translate-y-6 text-center text-[0.6875rem]", selected ? "font-semibold text-ink" : "text-ink-muted")}>
         {short}
       </span>
     </>

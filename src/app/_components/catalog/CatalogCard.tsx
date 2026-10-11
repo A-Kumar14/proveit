@@ -46,21 +46,21 @@ export function CatalogCard({ item }: { item: CatalogItem }) {
     <li className="flex flex-col gap-3 rounded-md border border-line bg-surface p-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="m-0 text-[15px] font-semibold">{item.name}</h2>
-          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px]">
+          <h2 className="m-0 text-[0.9375rem] font-semibold">{item.name}</h2>
+          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[0.6875rem]">
             <span className="rounded-full bg-surface-hover px-2 py-0.5 text-ink-3">{item.topic}</span>
             <span className="rounded-full bg-surface-hover px-2 py-0.5 text-ink-3">{item.level}</span>
           </div>
         </div>
         {item.added ? (
-          <span className="flex shrink-0 items-center gap-1 rounded-full bg-mastered-bg px-2.5 py-1 text-[11px] font-semibold text-mastered-text"><Check size={12} strokeWidth={2.4} aria-hidden />Added</span>
+          <span className="flex shrink-0 items-center gap-1 rounded-full bg-mastered-bg px-2.5 py-1 text-[0.6875rem] font-semibold text-mastered-text"><Check size={12} strokeWidth={2.4} aria-hidden />Added</span>
         ) : (
           <button type="button" onClick={add} disabled={busy} aria-label={`Add ${item.name}`} title="Add to In progress" className="flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full border border-line-button bg-surface text-ink hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-60">
             {busy ? <LoaderCircle size={15} className="animate-spin" aria-hidden /> : <Plus size={16} strokeWidth={2.2} aria-hidden />}
           </button>
         )}
       </div>
-      <p className="m-0 flex-1 text-[13px] leading-normal text-ink-muted">{item.summary}</p>
+      <p className="m-0 flex-1 text-[0.8125rem] leading-normal text-ink-muted">{item.summary}</p>
       <div className="flex items-center justify-between gap-3 text-xs text-ink-faint">
         <span>{item.concepts} concepts · {item.units} units</span>
         {item.added && (

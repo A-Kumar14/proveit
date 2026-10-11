@@ -3,9 +3,11 @@ import { generateText, Output } from "ai";
 import { z } from "zod";
 import { CourseOutline } from "@proveit/lib/schemas";
 import { model } from "./ai";
+import { documentKind } from "./documentText";
 import { MAX_PER_UNIT, MAX_UNITS } from "./store";
 
-export type UploadKind = "pdf" | "text" | "image";
+/** "document" is Word, PowerPoint, Excel, HTML or CSV. The route turns it into text before anything reads it. */
+export type UploadKind = "pdf" | "text" | "image" | "document";
 
 export const MAX_FILES = 5;
 export const MAX_FILE_BYTES = 10 * 1024 * 1024;
@@ -20,6 +22,7 @@ export function kindOf(file: File): UploadKind | null {
   if (file.type === "application/pdf" || (!file.type && ext === "pdf")) return "pdf";
   if (IMAGE_TYPES.includes(file.type)) return "image";
   if (file.type === "text/plain" || file.type === "text/markdown" || ((!file.type || file.type === "application/octet-stream") && (ext === "md" || ext === "txt"))) return "text";
+  if (documentKind(file)) return "document";
   return null;
 }
 
@@ -73,7 +76,8 @@ const Extraction = CourseOutline.extend({
   reason: z.string().describe("One short sentence. Why the files are or are not course material."),
 });
 
-export type UploadFile = { name: string; kind: UploadKind; mediaType: string; data: Uint8Array };
+/** By the time a file reaches the model, documents are already text. */
+export type UploadFile = { name: string; kind: Exclude<UploadKind, "document">; mediaType: string; data: Uint8Array };
 
 const instructions = (courseName: string) => `A student uploaded these files to build a study course called "${courseName}".
 Build the concept map a tutor would test them on.

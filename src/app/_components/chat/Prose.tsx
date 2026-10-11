@@ -6,7 +6,7 @@ function Inline({ text }: { text: string }) {
     <>
       {text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g).map((part, i) =>
         part.startsWith("**") && part.endsWith("**") && part.length > 4 ? <strong key={i}>{part.slice(2, -2)}</strong>
-          : part.startsWith("`") && part.endsWith("`") && part.length > 2 ? <code key={i} className="rounded-xs bg-surface-active px-1 py-px text-[12.5px]">{part.slice(1, -1)}</code>
+          : part.startsWith("`") && part.endsWith("`") && part.length > 2 ? <code key={i} className="rounded-xs bg-surface-active px-1 py-px text-[0.78125rem]">{part.slice(1, -1)}</code>
           : <span key={i}>{part}</span>)}
     </>
   );

@@ -60,7 +60,7 @@ export function MasteryReviewCard({ courseId, courseName, base, aiWritten }: { c
                   <span className="w-8 text-right text-xs">{c.mastery}%</span>
                 </div>
               </Cell>
-              <Cell><span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", TONE[st.tone].pill)}>{st.label}</span></Cell>
+              <Cell><span className={cn("rounded-full px-2 py-0.5 text-[0.6875rem] font-semibold", TONE[st.tone].pill)}>{st.label}</span></Cell>
               <Cell className="w-44 text-ink-3">{c.status === "mastered" ? <span className="text-ink-faint">None</span> : m === undefined ? text(undefined) : m ?? <span className="text-ink-faint">None</span>}</Cell>
             </Row>
           );
@@ -68,9 +68,9 @@ export function MasteryReviewCard({ courseId, courseName, base, aiWritten }: { c
       </CardTable>
 
       {error ? (
-        <div role="alert" className="mx-[18px] my-3 rounded-sm border border-needswork-line bg-needswork-bg px-3 py-2 text-[13px] text-needswork-text">
+        <div role="alert" className="mx-[18px] my-3 rounded-sm border border-needswork-line bg-needswork-bg px-3 py-2 text-[0.8125rem] text-needswork-text">
           The review text failed to load. The numbers above are still correct.{" "}
-          <button type="button" onClick={run} className="cursor-pointer border-0 bg-transparent p-0 text-[13px] underline">Retry</button>
+          <button type="button" onClick={run} className="cursor-pointer border-0 bg-transparent p-0 text-[0.8125rem] underline">Retry</button>
         </div>
       ) : (
         <CalloutRow>
@@ -80,8 +80,8 @@ export function MasteryReviewCard({ courseId, courseName, base, aiWritten }: { c
       )}
 
       <Section title="Next actions">
-        <ul className="m-0 flex list-none flex-col gap-1.5 p-0 text-[13px]">
-          {(object?.nextActions ?? []).map((a, i) => <li key={i} className="rounded-sm border border-line bg-surface-subtle px-2.5 py-2"><span className="mr-2 text-[11px] text-ink-muted">{i + 1}</span>{a}</li>)}
+        <ul className="m-0 flex list-none flex-col gap-1.5 p-0 text-[0.8125rem]">
+          {(object?.nextActions ?? []).map((a, i) => <li key={i} className="rounded-sm border border-line bg-surface-subtle px-2.5 py-2"><span className="mr-2 text-[0.6875rem] text-ink-muted">{i + 1}</span>{a}</li>)}
           {!object?.nextActions?.length && isLoading && <li><Skeleton className="h-8" /></li>}
         </ul>
         {base.nextHref && <Link href={base.nextHref} className={cn(buttonStyles(), "mt-1 self-start")}>Start now</Link>}

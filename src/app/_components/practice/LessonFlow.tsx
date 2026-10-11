@@ -64,7 +64,7 @@ export function LessonFlow({ r }: { r: RemediationView }) {
                 <UserBubble>{m.answer}</UserBubble>
                 <AssistantMessage>
                   <AssistantCard ariaLabel="Not yet" label="Not yet" headline="That doesn't show the idea yet.">
-                    <div className="px-[18px] py-3 text-[13px] leading-normal text-ink-2">{m.followUp}</div>
+                    <div className="px-[18px] py-3 text-[0.8125rem] leading-normal text-ink-2">{m.followUp}</div>
                   </AssistantCard>
                 </AssistantMessage>
               </div>

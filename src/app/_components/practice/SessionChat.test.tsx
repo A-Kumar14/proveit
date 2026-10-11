@@ -14,7 +14,7 @@ Element.prototype.scrollIntoView = vi.fn();
 import { SessionChat } from "./SessionChat";
 import type { QuestionView } from "@proveit/server/store";
 
-const question: QuestionView = { courseName: "Intro Statistics", conceptId: "cii", conceptName: "CI interpretation", state: "needs_work", prompt: "Explain what a 95% confidence interval means.", why: "Why", probe: "Probe?", source: "Unit 03" };
+const question: QuestionView = { courseName: "Intro Statistics", conceptId: "cii", conceptName: "CI interpretation", state: "needs_work", prompt: "Explain what a 95% confidence interval means.", why: "Why", probe: "Probe?", source: "Unit 03", sources: [] };
 const OPENING = "Let's talk about CI interpretation. What do you think it means?";
 const mount = (resume?: { attemptId: string; answer: string; followUp: string }) => render(<SessionChat courseId="intro-stats" question={question} opening={OPENING} resume={resume} />);
 /** A tutor that replies with the given texts, one per call, streaming each in two pieces. */
@@ -58,6 +58,15 @@ describe("Test this concept, as a conversation", () => {
     expect(screen.queryByText(/OPTIONS/)).toBeNull();
     const chips = within(screen.getByRole("group", { name: "Quick replies" }));
     expect(chips.getAllByRole("button").map((b) => b.textContent)).toEqual(["The 95% part", "What an interval is", "Teach me from scratch"]);
+  });
+
+  it("never shows quick replies that could be answers to the tutor's question", async () => {
+    tutor("What does 95% refer to?\nOPTIONS: The method's long-run hit rate | The chance this interval is right");
+    mount();
+    await type("Tell me what you think", "an interval");
+    await userEvent.click(screen.getByRole("button", { name: "Send" }));
+    expect(await screen.findByText("What does 95% refer to?")).toBeTruthy();
+    expect(screen.queryByRole("group", { name: "Quick replies" })).toBeNull();
   });
 
   it("sends a quick reply as the student's message, and it carries on from there", async () => {

@@ -32,7 +32,7 @@ export function ConceptGraph({ concepts, edges, selectedId, onSelect }: {
   const units = [...new Set(concepts.map((c) => c.unit))];
   return (
     <div className="flex flex-col gap-3">
-      <div className="grid text-center text-[11px] text-ink-faint" style={{ gridTemplateColumns: `repeat(${units.length}, minmax(0, 1fr))` }}>
+      <div className="grid text-center text-[0.6875rem] text-ink-faint" style={{ gridTemplateColumns: `repeat(${units.length}, minmax(0, 1fr))` }}>
         {units.map((u) => <span key={u}>{unitLabel(u)}</span>)}
       </div>
       <div className="relative aspect-[480/336] w-full">

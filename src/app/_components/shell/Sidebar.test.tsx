@@ -31,6 +31,8 @@ describe("Sidebar course groups", () => {
 
   it("keeps tutor, practice, the misconception log and files off the sidebar", () => {
     const out = html([stats, algebra], "stats");
+    expect(out).toContain('href="/signbridge"');
+    expect(out).toContain("SignBridge");
     expect(out).not.toContain("Tutor");
     expect(out).not.toContain("Misconception log");
     expect(out).not.toContain("Course files");

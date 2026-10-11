@@ -22,7 +22,7 @@ async function DiagnosisPage({ params }: PageProps<"/course/[courseId]/diagnosis
         <div className="flex max-w-[72%] flex-col items-end gap-1.5 self-end">
           <UserBubble className="max-w-none">{a.answer}</UserBubble>
           {a.attachment && (
-            <span className="flex items-center gap-1.5 rounded-full border border-mastered-line bg-mastered-bg px-2.5 py-0.5 text-[11px] text-mastered-text"><Paperclip size={11} strokeWidth={2.2} aria-hidden />{a.attachment} · read as your work</span>
+            <span className="flex items-center gap-1.5 rounded-full border border-mastered-line bg-mastered-bg px-2.5 py-0.5 text-[0.6875rem] text-mastered-text"><Paperclip size={11} strokeWidth={2.2} aria-hidden />{a.attachment} · read as your work</span>
           )}
         </div>
         <AssistantMessage><DiagnosisCard a={a} trail={trail} /></AssistantMessage>

@@ -2,7 +2,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@proveit/lib/cn";
 
 export const buttonStyles = cva(
-  "inline-flex items-center justify-center gap-2 rounded-sm text-[13px] no-underline transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+  "inline-flex items-center justify-center gap-2 rounded-sm text-[0.8125rem] no-underline transition-colors disabled:cursor-not-allowed disabled:opacity-50",
   {
     variants: {
       variant: {

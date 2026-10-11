@@ -12,7 +12,7 @@ beforeEach(() => { ai = true; generateText.mockReset(); });
 describe("followUpFor", () => {
   it("builds on what the student wrote, and shows the model the question and their words", async () => {
     generateText.mockResolvedValueOnce({ text: "  You said it tells you how sure you are. Sure about what, exactly?  " });
-    const r = await followUpFor("cii", "It tells you how sure you are.");
+    const r = await followUpFor("Explain what a 95% confidence interval means.", "It tells you how sure you are.");
     expect(r).toBe("You said it tells you how sure you are. Sure about what, exactly?");
     const arg = generateText.mock.calls[0]![0];
     expect(arg.prompt).toContain("Explain what a 95% confidence interval means.");
@@ -20,17 +20,17 @@ describe("followUpFor", () => {
     expect(arg.system).toMatch(/Never state the correct answer/);
   });
 
-  it("falls back to the fixed prompt with no model, an unknown concept, a failed call or a useless reply", async () => {
+  it("falls back to the fixed prompt with no model, no question, a failed call or a useless reply", async () => {
     ai = false;
-    expect(await followUpFor("cii", "x")).toBe(GENERIC_FOLLOWUP);
+    expect(await followUpFor("Explain it.", "x")).toBe(GENERIC_FOLLOWUP);
     ai = true;
-    expect(await followUpFor("nope", "x")).toBe(GENERIC_FOLLOWUP);
+    expect(await followUpFor("", "x")).toBe(GENERIC_FOLLOWUP);
     generateText.mockRejectedValueOnce(new Error("429"));
     vi.spyOn(console, "error").mockImplementation(() => {});
-    expect(await followUpFor("cii", "x")).toBe(GENERIC_FOLLOWUP);
+    expect(await followUpFor("Explain it.", "x")).toBe(GENERIC_FOLLOWUP);
     generateText.mockResolvedValueOnce({ text: "ok" });
-    expect(await followUpFor("cii", "x")).toBe(GENERIC_FOLLOWUP);
+    expect(await followUpFor("Explain it.", "x")).toBe(GENERIC_FOLLOWUP);
     generateText.mockResolvedValueOnce({ text: "q ".repeat(300) });
-    expect(await followUpFor("cii", "x")).toBe(GENERIC_FOLLOWUP);
+    expect(await followUpFor("Explain it.", "x")).toBe(GENERIC_FOLLOWUP);
   });
 });

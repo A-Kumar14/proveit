@@ -3,6 +3,7 @@ import "server-only";
 import { generateText } from "ai";
 import { aiEnabled, model } from "./ai";
 import { AUTHORED } from "./content";
+import { documentKind, documentText, isLegacyOffice, UnreadableDocumentError } from "./documentText";
 import { loadUserJson, saveUserJson } from "./persistence";
 import { pdfText } from "./pdfText";
 import { courseSpec, getCourse } from "./store";
@@ -11,7 +12,12 @@ export type Material = { id: string; courseId: string; name: string; mime: strin
 
 export class MaterialError extends Error {}
 
-export const MATERIAL_TYPES = ["text/markdown", "text/plain", "application/pdf", "image/png", "image/jpeg", "image/webp"];
+export const MATERIAL_TYPES = [
+  "text/markdown", "text/plain", "application/pdf", "image/png", "image/jpeg", "image/webp", "text/html", "text/csv",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+];
 export const MAX_MATERIAL_BYTES = 10 * 1024 * 1024;
 export const MAX_MATERIAL_FILES = 5;
 const MAX_TEXT = 60_000;
@@ -29,8 +35,9 @@ const words = (s: string) => s.trim().split(/\s+/).filter(Boolean).length;
 const isText = (f: { name: string; type: string }) => f.type === "text/markdown" || f.type === "text/plain" || /\.(md|markdown|txt)$/i.test(f.name);
 
 /** Browsers often send an empty or generic type for .md files, so the extension decides for text. */
-export function materialKind(f: { name: string; type: string }): "text" | "pdf" | "image" | null {
+export function materialKind(f: { name: string; type: string }): "text" | "document" | "pdf" | "image" | null {
   if (isText(f)) return "text";
+  if (documentKind(f)) return "document";
   if (f.type === "application/pdf") return "pdf";
   if (["image/png", "image/jpeg", "image/webp"].includes(f.type)) return "image";
   return null;
@@ -56,14 +63,22 @@ export function listMaterials(courseId: string): Material[] {
   return held().items.filter((m) => m.courseId === courseId).sort((a, b) => b.addedAt - a.addedAt);
 }
 
-/** Turns one uploaded file into text. Text files are read as is, PDFs and images by the model. */
+async function readDocument(file: File): Promise<string> {
+  try { return await documentText(file); }
+  catch (e) { throw e instanceof UnreadableDocumentError ? new MaterialError(e.message) : e; }
+}
+
+/** Turns one uploaded file into text. Text files and Office, HTML and CSV documents are read here, PDFs and images by the model. */
 export async function readMaterial(file: File): Promise<{ text: string; readBy: Material["readBy"] }> {
   const kind = materialKind(file);
-  if (!kind) throw new MaterialError(`${file.name} isn't supported. Use markdown, text, PDF or an image.`);
+  if (!kind) throw new MaterialError(isLegacyOffice(file.name)
+    ? `${file.name} is an old Office format. Save it as .docx, .pptx or .xlsx and add it again.`
+    : `${file.name} isn't supported. Use markdown, text, PDF, Word, PowerPoint, Excel, HTML, CSV or an image.`);
   if (file.size > MAX_MATERIAL_BYTES) throw new MaterialError(`${file.name} is over 10 MB.`);
   let raw: string;
   let readBy: Material["readBy"] = "text";
   if (kind === "text") raw = await file.text();
+  else if (kind === "document") raw = await readDocument(file);
   else {
     // Typeset PDFs have a text layer we can read here in milliseconds. Only scans and images need the model.
     const local = kind === "pdf" ? await pdfText(new Uint8Array(await file.arrayBuffer())).catch(() => null) : null;

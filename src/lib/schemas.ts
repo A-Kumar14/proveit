@@ -4,7 +4,7 @@ export const MasteryState = z.enum(["not_started", "developing", "needs_work", "
 export type MasteryState = z.infer<typeof MasteryState>;
 
 /** Every learner response is stored as evidence. The kind records where it occurred in the learning loop. */
-export const AttemptKind = z.enum(["initial", "clarification", "transfer", "review"]);
+export const AttemptKind = z.enum(["initial", "clarification", "transfer", "review", "quiz"]);
 export type AttemptKind = z.infer<typeof AttemptKind>;
 
 /** Outcome is separate from kind so failed transfer/review evidence is never lost. */
@@ -69,6 +69,8 @@ export const ReviewSubmitInput = z.object({
   courseId: z.string(),
   conceptId: z.string(),
   answer: z.string().trim().min(1, "Write an answer first.").max(4000),
+  /** Optional pin to the exact challenge revision shown to the learner. */
+  learningSpecRevision: z.number().int().positive().optional(),
 });
 export type ReviewSubmitInput = z.infer<typeof ReviewSubmitInput>;
 

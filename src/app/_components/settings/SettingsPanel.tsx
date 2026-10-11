@@ -4,11 +4,12 @@ import { useState } from "react";
 import { cn } from "@proveit/lib/cn";
 import { useSettings } from "@proveit/lib/settings";
 import { useVoiceSupport } from "../voice/speech";
+import { AccessibilitySettings } from "./AccessibilitySettings";
 import { Segmented } from "./Segmented";
 import { SettingRow } from "./SettingRow";
 import { Switch } from "./Switch";
 
-const TABS = [{ id: "learning", label: "Learning" }, { id: "voice", label: "Voice" }] as const;
+const TABS = [{ id: "learning", label: "Learning" }, { id: "accessibility", label: "Accessibility Features" }] as const;
 
 /** Only settings that change behavior are listed. Each is stored in this browser. */
 export function SettingsPanel() {
@@ -37,14 +38,7 @@ export function SettingsPanel() {
             </SettingRow>
           </>
         )}
-        {tab === "voice" && (
-          <>
-            <h2 className="m-0 mb-1 text-lg font-semibold">Voice</h2>
-            <SettingRow title="Read questions aloud" description="The tutor speaks each question when a voice session starts. Turn this off to go straight to listening.">
-              <Switch label="Read questions aloud" checked={s.speakQuestions} onChange={(speakQuestions) => update({ speakQuestions })} />
-            </SettingRow>
-          </>
-        )}
+        {tab === "accessibility" && <AccessibilitySettings />}
       </section>
     </div>
   );

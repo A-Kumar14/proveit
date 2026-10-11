@@ -17,12 +17,12 @@ export function MicroLessonCard({ lesson, conceptName, open, toggleable, onToggl
           <div className="flex gap-3 px-[18px] py-3">
             <div className="flex flex-1 flex-col gap-2.5">
               <div className="rounded-sm border border-needswork-line bg-needswork-bg px-3 py-2.5">
-                <div className="text-[11px] font-semibold text-needswork-text">What you said</div>
-                <div className="mt-[3px] text-[13px] leading-normal text-ink-2">&ldquo;{lesson.said}&rdquo;</div>
+                <div className="text-[0.6875rem] font-semibold text-needswork-text">What you said</div>
+                <div className="mt-[3px] text-[0.8125rem] leading-normal text-ink-2">&ldquo;{lesson.said}&rdquo;</div>
               </div>
               <div className="rounded-sm border border-mastered-line bg-mastered-bg px-3 py-2.5">
-                <div className="text-[11px] font-semibold text-mastered-text">What&apos;s actually true</div>
-                <div className="mt-[3px] text-[13px] leading-normal text-ink-2">{lesson.actuallyTrue}</div>
+                <div className="text-[0.6875rem] font-semibold text-mastered-text">What&apos;s actually true</div>
+                <div className="mt-[3px] text-[0.8125rem] leading-normal text-ink-2">{lesson.actuallyTrue}</div>
               </div>
               <div className="text-xs leading-[1.55] text-ink-3">{lesson.explanation}</div>
             </div>
@@ -30,8 +30,8 @@ export function MicroLessonCard({ lesson, conceptName, open, toggleable, onToggl
           </div>
           <div className="flex items-center justify-between gap-2.5 px-[18px] pb-3">
             <div className="flex gap-1.5">
-              {lesson.rule && <span className="rounded-full bg-surface-active px-[9px] py-0.5 text-[11px] text-ink-3">{lesson.rule}</span>}
-              {lesson.aiWording && <span className="rounded-full bg-developing-bg px-[9px] py-0.5 text-[11px] text-developing-text">Wording by AI</span>}
+              {lesson.rule && <span className="rounded-full bg-surface-active px-[9px] py-0.5 text-[0.6875rem] text-ink-3">{lesson.rule}</span>}
+              {lesson.aiWording && <span className="rounded-full bg-developing-bg px-[9px] py-0.5 text-[0.6875rem] text-developing-text">Wording by AI</span>}
             </div>
             {onGotIt && (
               <div className="flex gap-2">

@@ -6,7 +6,7 @@ export function EmptyState({ title, body, action }: { title: string; body: strin
   return (
     <div className="flex flex-col items-start gap-2 rounded-md border border-line bg-surface-subtle px-5 py-5">
       <div className="text-sm font-semibold">{title}</div>
-      <p className="m-0 max-w-md text-[13px] text-ink-muted">{body}</p>
+      <p className="m-0 max-w-md text-[0.8125rem] text-ink-muted">{body}</p>
       {action && <Link href={action.href} className={buttonStyles({ size: "sm" })}>{action.label}</Link>}
     </div>
   );

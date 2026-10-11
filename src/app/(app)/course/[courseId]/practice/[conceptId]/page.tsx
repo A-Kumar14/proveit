@@ -5,9 +5,9 @@ import { AppShell } from "@proveit/app/_components/shell/AppShell";
 import { PracticeFlow } from "@proveit/app/_components/practice/PracticeFlow";
 import { SessionChat } from "@proveit/app/_components/practice/SessionChat";
 import { aiEnabled } from "@proveit/server/ai";
-import { orNotFound } from "@proveit/server/page";
+import { orNotFoundAsync } from "@proveit/server/page";
 import { sessionOpening } from "@proveit/server/session";
-import { clarify, getAttempt, getQuestion } from "@proveit/server/store";
+import { clarify, ensureQuestion, getAttempt } from "@proveit/server/store";
 
 export const dynamic = "force-dynamic";
 
@@ -15,8 +15,8 @@ async function PracticePage({ params, searchParams }: PageProps<"/course/[course
   const { courseId, conceptId } = await params;
   const { clarify: clarifyId, mode } = await searchParams;
   const modeParam = typeof mode === "string" ? mode : undefined;
-  const { q, resume } = orNotFound(() => {
-    const q = getQuestion(courseId, conceptId);
+  const { q, resume } = await orNotFoundAsync(async () => {
+    const q = await ensureQuestion(courseId, conceptId);
     const prior = typeof clarifyId === "string" ? getAttempt(clarifyId) : null;
     const resume = prior && prior.conceptId === conceptId ? { attemptId: prior.id, answer: prior.answer, followUp: clarify(prior.id).followUp } : undefined;
     return { q, resume };

@@ -50,7 +50,7 @@ export function TierCelebration({ tierIndex, tierId, tierName, points, previewab
             </div>
             <div className="eyebrow">New rank</div>
             <div className="text-2xl font-semibold tracking-tight">You reached {tierName}</div>
-            <div className="text-[13px] text-ink-muted">{points.toLocaleString("en-US")} points of proven understanding.</div>
+            <div className="text-[0.8125rem] text-ink-muted">{points.toLocaleString("en-US")} points of proven understanding.</div>
             <Button size="sm" variant="secondary" onClick={() => setOpen(false)}>Keep going</Button>
           </div>
         </div>

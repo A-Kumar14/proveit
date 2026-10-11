@@ -26,7 +26,9 @@ export function ReviewFlow({ r }: { r: ReviewChallengeView }) {
     setStatus("evaluating");
     setError(null);
     try {
-      const res = await api.review(r.courseId, r.conceptId, answer);
+      const res = r.learningSpecRevision === undefined
+        ? await api.review(r.courseId, r.conceptId, answer)
+        : await api.review(r.courseId, r.conceptId, answer, r.learningSpecRevision);
       if (res.result === "pass") return router.push(`/course/${r.courseId}/review-result/${res.resultAttemptId}`);
       if (res.result === "fail") return router.push(`/course/${r.courseId}/diagnosis/${res.nextAttemptId}`);
       setUncertain((rows) => [...rows, { answer, followUp: res.followUp }]);
@@ -58,7 +60,7 @@ export function ReviewFlow({ r }: { r: ReviewChallengeView }) {
             <UserBubble>{row.answer}</UserBubble>
             <AssistantMessage>
               <AssistantCard ariaLabel="Need more evidence" label="Need more evidence" headline="Your mastery state stays unchanged.">
-                <div className="px-[18px] py-3 text-[13px] leading-normal text-ink-2">{row.followUp}</div>
+                <div className="px-[18px] py-3 text-[0.8125rem] leading-normal text-ink-2">{row.followUp}</div>
               </AssistantCard>
             </AssistantMessage>
           </div>

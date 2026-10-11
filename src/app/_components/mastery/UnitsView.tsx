@@ -12,7 +12,7 @@ export function UnitsView({ concepts, selectedId, onSelect, source }: { concepts
         const list = concepts.filter((c) => c.unit === u);
         return (
           <div key={u} className="flex flex-col gap-0.5 rounded-sm border border-line bg-surface-subtle p-2">
-            <div className="flex items-center justify-between px-1 pb-1 text-[10px] tracking-[0.06em]">
+            <div className="flex items-center justify-between px-1 pb-1 text-[0.625rem] tracking-[0.06em]">
               <span>{u.replace("CONFIDENCE INTERVALS", "CONF. INTERVALS")}</span>
               <span className="text-ink-faint">{list.filter((c) => c.state === "mastered").length}/{list.length}</span>
             </div>
@@ -23,13 +23,13 @@ export function UnitsView({ concepts, selectedId, onSelect, source }: { concepts
                   c.id === selectedId ? "border-ink bg-surface-hover" : "border-transparent bg-transparent")}
               >
                 <span>{c.name}</span>
-                <span className={cn("whitespace-nowrap rounded-full px-[7px] py-0.5 text-[10px] font-semibold", LOOK[c.state].chip)}>{LOOK[c.state].label}</span>
+                <span className={cn("whitespace-nowrap rounded-full px-[7px] py-0.5 text-[0.625rem] font-semibold", LOOK[c.state].chip)}>{LOOK[c.state].label}</span>
               </button>
             ))}
           </div>
         );
       })}
-      {source && <div className="col-span-2 p-1 text-[11px] text-ink-faint">{source}</div>}
+      {source && <div className="col-span-2 p-1 text-[0.6875rem] text-ink-faint">{source}</div>}
     </div>
   );
 }
