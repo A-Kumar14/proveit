@@ -1,7 +1,7 @@
 import Link from "next/link";
 import type { CourseRank, Rewards } from "@proveit/server/store";
 import { cn } from "@proveit/lib/cn";
-import { TierBadge } from "./TierBadge";
+import { TierBadge, tierColor } from "./TierBadge";
 import { TierCelebration } from "./TierCelebration";
 import { Widget } from "./Widget";
 
@@ -18,7 +18,7 @@ export function RankCard({ r, courses, previewable, userId = "local" }: { r: Rew
               <div className="flex flex-wrap items-baseline gap-x-3"><span className="text-[1.375rem] font-semibold leading-tight">{r.tier.name}</span><span className="text-sm tabular-nums text-ink-muted">{fmt(r.points)} points</span></div>
               <div className="mt-2 flex items-center gap-3">
                 <div role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={r.pct} aria-label={r.next ? `Progress to ${r.next.name}` : "Top tier reached"} className="h-2 flex-1 rounded-full bg-surface-active">
-                  <div className="h-full rounded-full bg-ink" style={{ width: `${r.pct}%` }} />
+                  <div className="h-full rounded-full" style={{ width: `${r.pct}%`, background: `linear-gradient(90deg, ${tierColor(r.tier.id).from}, ${tierColor(r.tier.id).to})` }} />
                 </div>
                 <span className="w-44 text-right text-xs text-ink-muted">{r.next ? `${fmt(r.toNext)} to ${r.next.name}` : "Top tier reached"}</span>
               </div>
@@ -29,8 +29,8 @@ export function RankCard({ r, courses, previewable, userId = "local" }: { r: Rew
           <ol className="m-0 grid list-none grid-cols-7 gap-2 p-0" aria-label="Tiers">
             {r.ladder.map((t) => (
               <li key={t.id} aria-current={t.current ? "step" : undefined} className="flex flex-col items-center gap-1.5 text-center">
-                <TierBadge id={t.id} size={t.current ? 38 : 30} filled={t.reached} className={cn(t.current && "outline outline-2 outline-offset-2 outline-ink")} />
-                <span className={cn("text-[0.6875rem]", t.current ? "font-semibold text-ink" : t.reached ? "text-ink-3" : "text-ink-faint")}>{t.name}</span>
+                <TierBadge id={t.id} size={t.current ? 38 : 30} filled={t.reached} className={cn(t.current && "outline outline-2 outline-offset-2")} style={t.current ? { outlineColor: tierColor(t.id).to } : undefined} />
+                <span className={cn("text-[0.6875rem]", t.current ? "font-semibold" : t.reached ? "text-ink-3" : "text-ink-faint")} style={t.current ? { color: tierColor(t.id).text } : undefined}>{t.name}</span>
                 <span className="text-[0.625rem] tabular-nums text-ink-faint">{fmt(t.min)}</span>
               </li>
             ))}

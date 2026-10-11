@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Sparkles } from "lucide-react";
 import { Button } from "../Button";
-import { TierBadge } from "./TierBadge";
+import { TierBadge, tierColor } from "./TierBadge";
 import { useConfetti } from "./useConfetti";
 
 const KEY = "proveit.tier.celebrated";
@@ -45,7 +45,7 @@ export function TierCelebration({ tierIndex, tierId, tierName, points, previewab
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/25" onClick={() => setOpen(false)}>
           <div role="status" className="relative flex w-[320px] flex-col items-center gap-3 rounded-lg border border-line bg-surface px-8 py-8 text-center shadow-[0_12px_32px_rgba(0,0,0,0.12)]" onClick={(e) => e.stopPropagation()}>
             <div className="relative">
-              <span aria-hidden className="tier-ring absolute inset-0 rounded-full border-2 border-ink" />
+              <span aria-hidden className="tier-ring absolute inset-0 rounded-full border-2" style={{ borderColor: tierColor(tierId).to }} />
               <TierBadge id={tierId} size={84} className="tier-pop" />
             </div>
             <div className="eyebrow">New rank</div>
