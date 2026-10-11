@@ -97,7 +97,7 @@ export function PracticeFlow({ courseId, question, resume, uploads, modeParam }:
           </>
         )}
         chip={upload?.ok && (
-          <span className="flex w-fit items-center gap-1.5 rounded-full border border-mastered-line bg-mastered-bg px-2.5 py-0.5 text-[11px] text-mastered-text">
+          <span className="flex w-fit items-center gap-1.5 rounded-full border border-mastered-line bg-mastered-bg px-2.5 py-0.5 text-[0.6875rem] text-mastered-text">
             <Paperclip size={11} strokeWidth={2.2} aria-hidden />{upload.name} · read as your work
             <button type="button" aria-label="Remove file" onClick={() => setUpload(null)} className="flex cursor-pointer border-0 bg-transparent p-0 text-mastered-text"><X size={11} aria-hidden /></button>
           </span>

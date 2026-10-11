@@ -10,8 +10,9 @@ import { Pause, Play } from "lucide-react";
  */
 export function CourseTicker({ children, count }: { children: React.ReactNode; count: number }) {
   const [paused, setPaused] = useState(false);
-  // A few cards don't fill the row, so looping would show the same card twice. Lay them out still.
-  if (count < 4) return <ul aria-label="Your courses" className="m-0 flex list-none p-0">{children}</ul>;
+  // A few cards don't fill the row, so looping would show the same card twice. Lay them out still,
+  // wrapping onto a second line when the window is narrow or zoomed rather than spilling sideways.
+  if (count < 4) return <ul aria-label="Your courses" className="m-0 flex list-none flex-wrap gap-y-3 p-0">{children}</ul>;
   return (
     <div className="flex flex-col gap-2">
       <div className="ticker overflow-hidden" data-paused={paused} role="region" aria-label="Your courses">

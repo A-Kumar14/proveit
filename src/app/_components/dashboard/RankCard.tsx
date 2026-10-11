@@ -16,7 +16,7 @@ export function RankCard({ r, courses, previewable, userId = "local" }: { r: Rew
           <div className="flex items-center gap-4">
             <TierBadge id={r.tier.id} size={56} />
             <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-baseline gap-x-3"><span className="text-[22px] font-semibold leading-tight">{r.tier.name}</span><span className="text-sm tabular-nums text-ink-muted">{fmt(r.points)} points</span></div>
+              <div className="flex flex-wrap items-baseline gap-x-3"><span className="text-[1.375rem] font-semibold leading-tight">{r.tier.name}</span><span className="text-sm tabular-nums text-ink-muted">{fmt(r.points)} points</span></div>
               <div className="mt-2 flex items-center gap-3">
                 <div role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={r.pct} aria-label={r.next ? `Progress to ${r.next.name}` : "Top tier reached"} className="h-2 flex-1 rounded-full bg-surface-active">
                   <div className="h-full rounded-full bg-ink" style={{ width: `${r.pct}%` }} />
@@ -31,14 +31,14 @@ export function RankCard({ r, courses, previewable, userId = "local" }: { r: Rew
             {r.ladder.map((t) => (
               <li key={t.id} aria-current={t.current ? "step" : undefined} className="flex flex-col items-center gap-1.5 text-center">
                 <TierBadge id={t.id} size={t.current ? 38 : 30} filled={t.reached} className={cn(t.current && "outline outline-2 outline-offset-2 outline-ink")} />
-                <span className={cn("text-[11px]", t.current ? "font-semibold text-ink" : t.reached ? "text-ink-3" : "text-ink-faint")}>{t.name}</span>
-                <span className="text-[10px] tabular-nums text-ink-faint">{fmt(t.min)}</span>
+                <span className={cn("text-[0.6875rem]", t.current ? "font-semibold text-ink" : t.reached ? "text-ink-3" : "text-ink-faint")}>{t.name}</span>
+                <span className="text-[0.625rem] tabular-nums text-ink-faint">{fmt(t.min)}</span>
               </li>
             ))}
           </ol>
 
           <section aria-label="Rank by course" className="flex flex-col gap-1.5">
-            <h3 className="m-0 text-[11px] font-medium tracking-[0.06em] text-ink-faint uppercase">By course</h3>
+            <h3 className="m-0 text-[0.6875rem] font-medium tracking-[0.06em] text-ink-faint uppercase">By course</h3>
             <p className="m-0 text-xs text-ink-muted">Your overall rank adds up everything across every course, plus your streak. Each course also has its own rank on the same ladder.</p>
             <ul className="m-0 grid list-none grid-cols-1 gap-x-6 gap-y-1 p-0 sm:grid-cols-2">
               {courses.map((c) => (
@@ -66,7 +66,7 @@ export function RankCard({ r, courses, previewable, userId = "local" }: { r: Rew
                 ))}
               </tbody>
             </table>
-            <p className="m-0 mt-2 max-w-xl text-[11px] leading-normal text-ink-faint">
+            <p className="m-0 mt-2 max-w-xl text-[0.6875rem] leading-normal text-ink-faint">
               The overall rank counts every course. Points come from evidence: passing a new question ({POINTS.proved}), mastering a concept ({POINTS.mastered}), and the extras above. Ticking tasks or marking a course done earns nothing. Rank never drops, even if a concept slips. <Link href="/courses" className="text-ink-muted">Manage courses</Link>
             </p>
           </details>

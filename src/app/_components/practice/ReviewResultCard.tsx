@@ -29,7 +29,7 @@ export function ReviewResultCard({ r }: { r: ReviewResultView }) {
       </CardTable>
 
       <CalloutRow>
-        <Callout kind="plain" title="Next spaced review"><div className="text-[15px] font-semibold text-ink">{r.nextReview}</div><div className="text-xs text-ink-muted">The interval expands after successful delayed checks.</div></Callout>
+        <Callout kind="plain" title="Next spaced review"><div className="text-[0.9375rem] font-semibold text-ink">{r.nextReview}</div><div className="text-xs text-ink-muted">The interval expands after successful delayed checks.</div></Callout>
         <Callout kind="advice" title="Why this matters">You proved the idea after time passed, not while the explanation was still fresh.</Callout>
       </CalloutRow>
 

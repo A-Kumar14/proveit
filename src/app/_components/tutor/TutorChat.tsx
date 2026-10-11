@@ -185,7 +185,7 @@ export function TutorChat({ courseId, courseName, base, aiWritten, enabled }: { 
         {messages.map((m) => m.role === "user"
           ? (
             <UserBubble key={m.id}>
-              {m.files && m.files.length > 0 && <div className="mb-1.5 flex flex-wrap gap-1.5">{m.files.map((f) => <span key={f} className="flex items-center gap-1 rounded-full bg-surface px-2 py-0.5 text-[11px] text-ink-3"><Paperclip size={10} aria-hidden />{f}</span>)}</div>}
+              {m.files && m.files.length > 0 && <div className="mb-1.5 flex flex-wrap gap-1.5">{m.files.map((f) => <span key={f} className="flex items-center gap-1 rounded-full bg-surface px-2 py-0.5 text-[0.6875rem] text-ink-3"><Paperclip size={10} aria-hidden />{f}</span>)}</div>}
               <span className="whitespace-pre-wrap">{m.text}</span>
             </UserBubble>
           )
@@ -225,7 +225,7 @@ export function TutorChat({ courseId, courseName, base, aiWritten, enabled }: { 
           chip={files.length > 0 && (
             <div className="flex flex-wrap gap-1.5">
               {files.map((f, i) => (
-                <span key={`${f.name}-${i}`} className="flex w-fit items-center gap-1.5 rounded-full border border-line bg-surface-hover px-2.5 py-0.5 text-[11px] text-ink-3">
+                <span key={`${f.name}-${i}`} className="flex w-fit items-center gap-1.5 rounded-full border border-line bg-surface-hover px-2.5 py-0.5 text-[0.6875rem] text-ink-3">
                   <Paperclip size={11} aria-hidden />{f.name}
                   <button type="button" aria-label={`Remove ${f.name}`} onClick={() => setFiles((all) => all.filter((_, j) => j !== i))} className="flex cursor-pointer border-0 bg-transparent p-0 text-ink-3"><X size={11} aria-hidden /></button>
                 </span>

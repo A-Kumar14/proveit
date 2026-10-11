@@ -37,7 +37,7 @@ async function Dashboard({ searchParams }: PageProps<"/">) {
 
           <section aria-labelledby="courses-heading" className="flex flex-col gap-3">
             <div className="flex items-baseline justify-between">
-              <h1 id="courses-heading" className="m-0 text-[22px] font-semibold">Courses</h1>
+              <h1 id="courses-heading" className="m-0 text-[1.375rem] font-semibold">Courses</h1>
               <Link href="/courses" className="text-xs text-ink-muted no-underline hover:text-ink">View all and manage</Link>
             </div>
             <CourseTicker count={courses.length}>{courses.map((c) => <TickerCard key={c.id} c={c} rank={ranks.find((r) => r.courseId === c.id)} />)}</CourseTicker>

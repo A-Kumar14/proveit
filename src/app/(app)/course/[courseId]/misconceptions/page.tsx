@@ -21,8 +21,8 @@ async function MisconceptionLogPage({ params }: PageProps<"/course/[courseId]/mi
               <RowItem key={m.key}>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2"><span className="text-sm font-semibold">{m.name}</span><span className="text-xs text-ink-muted">· {m.concept}</span></div>
-                  {m.quote && <div className="mt-1 text-[13px] text-ink-3">You said &ldquo;{m.quote}&rdquo;</div>}
-                  <div className="mt-1 text-[13px] leading-normal text-ink-muted">{m.gap}</div>
+                  {m.quote && <div className="mt-1 text-[0.8125rem] text-ink-3">You said &ldquo;{m.quote}&rdquo;</div>}
+                  <div className="mt-1 text-[0.8125rem] leading-normal text-ink-muted">{m.gap}</div>
                 </div>
               </RowItem>
             ))}

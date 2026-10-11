@@ -38,7 +38,7 @@ export function DiagnosisCard({ a, trail = [] }: { a: AttemptView; trail?: Evide
                   <span className="w-8 text-right text-xs">{s.pct}%</span>
                 </div>
               </Cell>
-              <Cell><span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${TONE[tone].pill}`}>{STATUS[tone]}</span></Cell>
+              <Cell><span className={`rounded-full px-2 py-0.5 text-[0.6875rem] font-semibold ${TONE[tone].pill}`}>{STATUS[tone]}</span></Cell>
               <Cell className={tone === "bad" && e.misconceptionName ? "text-ink-3" : "text-ink-faint"}>{tone === "bad" && e.misconceptionName ? e.misconceptionName : "None"}</Cell>
             </Row>
           );
@@ -66,7 +66,7 @@ export function DiagnosisCard({ a, trail = [] }: { a: AttemptView; trail?: Evide
       <EvidenceTrail rows={trail} />
       <CardFooter left="Levels come from your attempts. The trail above shows the evidence behind this diagnosis." />
       {wrong && !e.evidenceQuote && (
-        <div className="flex items-center gap-1.5 px-[18px] pb-3.5 text-[11px] text-ink-faint"><AlertTriangle size={12} aria-hidden />No single phrase stood out, so nothing is highlighted.</div>
+        <div className="flex items-center gap-1.5 px-[18px] pb-3.5 text-[0.6875rem] text-ink-faint"><AlertTriangle size={12} aria-hidden />No single phrase stood out, so nothing is highlighted.</div>
       )}
     </AssistantCard>
   );

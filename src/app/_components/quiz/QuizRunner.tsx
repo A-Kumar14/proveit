@@ -46,7 +46,7 @@ export function QuizRunner({ courseId, courseName, conceptId, conceptName }: { c
     return (
       <section aria-label="Quiz" className="flex max-w-xl flex-col gap-4 rounded-md border border-line bg-surface p-6">
         <h2 className="m-0 text-lg font-semibold">{conceptName ? `Quiz on ${conceptName}` : `Quiz on ${courseName}`}</h2>
-        <ul className="m-0 flex list-disc flex-col gap-1 pl-5 text-[13px] leading-normal text-ink-muted">
+        <ul className="m-0 flex list-disc flex-col gap-1 pl-5 text-[0.8125rem] leading-normal text-ink-muted">
           <li>{conceptName ? "4 multiple-choice questions on this one concept" : "8 multiple-choice questions"}, built from the course notes and your uploaded files.</li>
           {!conceptName && <li>Questions lean on the concepts you are weakest in.</li>}
           <li>You get a score and a review of every answer, saved to your History.</li>

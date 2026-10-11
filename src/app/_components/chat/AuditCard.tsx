@@ -19,14 +19,14 @@ export function AuditCard({ conceptName, audit, nextHref, onAgain }: { conceptNa
         {audit.right.length > 0 && (
           <Section title="What you got right">
             {audit.right.map((r, i) => (
-              <div key={i} className="flex gap-2 text-[13px] leading-normal text-ink-2"><CheckCircle2 size={15} className="mt-0.5 shrink-0 text-mastered-text" aria-hidden /><span><Quote>{r.quote}</Quote>. {r.note}</span></div>
+              <div key={i} className="flex gap-2 text-[0.8125rem] leading-normal text-ink-2"><CheckCircle2 size={15} className="mt-0.5 shrink-0 text-mastered-text" aria-hidden /><span><Quote>{r.quote}</Quote>. {r.note}</span></div>
             ))}
           </Section>
         )}
         {audit.off.length > 0 && (
           <Section title="Where it's off">
             {audit.off.map((o, i) => (
-              <div key={i} className="flex gap-2 rounded-sm border border-needswork-line bg-needswork-bg px-3 py-2.5 text-[13px] leading-normal text-ink-2">
+              <div key={i} className="flex gap-2 rounded-sm border border-needswork-line bg-needswork-bg px-3 py-2.5 text-[0.8125rem] leading-normal text-ink-2">
                 <XCircle size={15} className="mt-0.5 shrink-0 text-needswork-text" aria-hidden />
                 <span><Quote>{o.quote}</Quote>. {o.note}<br /><span className="font-semibold">Instead:</span> {o.fix}</span>
               </div>
@@ -36,7 +36,7 @@ export function AuditCard({ conceptName, audit, nextHref, onAgain }: { conceptNa
         {audit.missing.length > 0 && (
           <Section title="Not covered">
             {audit.missing.map((m, i) => (
-              <div key={i} className="flex gap-2 text-[13px] leading-normal text-ink-3"><CircleDashed size={15} className="mt-0.5 shrink-0 text-ink-faint" aria-hidden />{m}</div>
+              <div key={i} className="flex gap-2 text-[0.8125rem] leading-normal text-ink-3"><CircleDashed size={15} className="mt-0.5 shrink-0 text-ink-faint" aria-hidden />{m}</div>
             ))}
           </Section>
         )}

@@ -20,7 +20,7 @@ export function MonthGrid({ month, selected, today, events }: { month: string; s
   return (
     <table className="w-full table-fixed border-collapse text-xs" aria-label={first.toLocaleDateString("en-US", { month: "long", year: "numeric" })}>
       <thead>
-        <tr>{WEEKDAYS.map((d) => <th key={d} scope="col" className="border-b border-line pb-2 text-left text-[11px] font-medium text-ink-faint">{d}</th>)}</tr>
+        <tr>{WEEKDAYS.map((d) => <th key={d} scope="col" className="border-b border-line pb-2 text-left text-[0.6875rem] font-medium text-ink-faint">{d}</th>)}</tr>
       </thead>
       <tbody>
         {weeks.map((week, i) => (
@@ -34,11 +34,11 @@ export function MonthGrid({ month, selected, today, events }: { month: string; s
                   <Link href={`/calendar?m=${month}&d=${key}`} aria-current={key === selected ? "date" : undefined}
                     aria-label={`${day.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}, ${list.length} ${list.length === 1 ? "event" : "events"}`}
                     className={cn("flex h-full flex-col gap-0.5 p-1.5 text-ink no-underline hover:bg-surface-hover", key === selected && "bg-surface-active")}>
-                    <span className={cn("flex size-5 items-center justify-center rounded-full text-[11px]", key === today ? "bg-ink font-semibold text-white" : inMonth ? "text-ink" : "text-ink-faint")}>{day.getDate()}</span>
+                    <span className={cn("flex size-5 items-center justify-center rounded-full text-[0.6875rem]", key === today ? "bg-ink font-semibold text-white" : inMonth ? "text-ink" : "text-ink-faint")}>{day.getDate()}</span>
                     {list.slice(0, SHOWN).map((e) => (
-                      <span key={e.id} className={cn("truncate rounded-[3px] border-l-[3px] px-1 py-px text-[10px]", KIND[e.kind].chip)}>{e.title}</span>
+                      <span key={e.id} className={cn("truncate rounded-[3px] border-l-[3px] px-1 py-px text-[0.625rem]", KIND[e.kind].chip)}>{e.title}</span>
                     ))}
-                    {list.length > SHOWN && <span className="text-[10px] text-ink-faint">+{list.length - SHOWN} more</span>}
+                    {list.length > SHOWN && <span className="text-[0.625rem] text-ink-faint">+{list.length - SHOWN} more</span>}
                   </Link>
                 </td>
               );

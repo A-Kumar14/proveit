@@ -56,7 +56,7 @@ export function TransferFlow({ r }: { r: TransferChallengeView }) {
             <UserBubble>{m.answer}</UserBubble>
             <AssistantMessage>
               <AssistantCard ariaLabel="Need more evidence" label="Need more evidence" headline="Not enough to prove transfer yet.">
-                <div className="px-[18px] py-3 text-[13px] leading-normal text-ink-2">{m.followUp}</div>
+                <div className="px-[18px] py-3 text-[0.8125rem] leading-normal text-ink-2">{m.followUp}</div>
               </AssistantCard>
             </AssistantMessage>
           </div>

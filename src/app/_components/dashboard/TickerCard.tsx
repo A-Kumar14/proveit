@@ -16,10 +16,10 @@ export function TickerCard({ c, rank }: { c: CourseRow; rank?: CourseRank }) {
   return (
     <li className="relative mr-3 flex w-[264px] shrink-0 flex-col gap-3 rounded-md border border-line bg-surface p-4 hover:bg-surface-subtle">
       <div className="flex items-start justify-between gap-2">
-        <Link href={`/course/${c.id}`} className="text-[15px] font-semibold text-ink no-underline after:absolute after:inset-0 after:content-['']">{c.name}</Link>
+        <Link href={`/course/${c.id}`} className="text-[0.9375rem] font-semibold text-ink no-underline after:absolute after:inset-0 after:content-['']">{c.name}</Link>
         {c.completed
-          ? <span className="flex shrink-0 items-center gap-1 rounded-full bg-mastered-bg px-2 py-0.5 text-[11px] font-semibold text-mastered-text"><CircleCheck size={11} strokeWidth={2.2} aria-hidden />Done</span>
-          : <span className="shrink-0 rounded-full bg-developing-bg px-2 py-0.5 text-[11px] font-semibold text-developing-text">Active</span>}
+          ? <span className="flex shrink-0 items-center gap-1 rounded-full bg-mastered-bg px-2 py-0.5 text-[0.6875rem] font-semibold text-mastered-text"><CircleCheck size={11} strokeWidth={2.2} aria-hidden />Done</span>
+          : <span className="shrink-0 rounded-full bg-developing-bg px-2 py-0.5 text-[0.6875rem] font-semibold text-developing-text">Active</span>}
       </div>
       <div className="flex items-center gap-2">
         <MasteryBar pct={c.pct} barClass={c.pct >= 40 ? "bg-mastered" : "bg-developing"} label={`${c.name} mastery ${c.pct}%`} />
@@ -44,7 +44,7 @@ export function TickerCard({ c, rank }: { c: CourseRow; rank?: CourseRank }) {
           ))}
         </tbody>
       </table>
-      <div className="truncate text-[11px] text-ink-faint">{c.completed ? (c.manual ? "Marked completed by you" : "Every concept mastered") : c.next ? `Next: ${c.next}` : "Nothing left to start"}</div>
+      <div className="truncate text-[0.6875rem] text-ink-faint">{c.completed ? (c.manual ? "Marked completed by you" : "Every concept mastered") : c.next ? `Next: ${c.next}` : "Nothing left to start"}</div>
     </li>
   );
 }
