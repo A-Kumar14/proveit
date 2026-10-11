@@ -66,7 +66,7 @@ export function RankCard({ r, courses, previewable, userId = "local" }: { r: Rew
               </tbody>
             </table>
             <p className="m-0 mt-2 max-w-xl text-[0.6875rem] leading-normal text-ink-faint">
-              Earn points at 90% assessment mastery; 70% proficiency is a milestone with no points. Topic importance sets each allocation: a standard topic offers 150 quiz points and 350 explanation points. Four distinct questions in one mastered quiz cover its full quiz allocation. Repeats earn only any remaining allocation. Standard courses offer up to 12,000 points, including a 2,000-point bonus after all allocations and delayed reviews are complete; smaller courses scale down. Transfer and review establish durable mastery. Previously earned totals are retained as a floor. <Link href="/courses" className="text-ink-muted">Manage courses</Link>
+              Earn points at 90% assessment mastery; 70% proficiency is a milestone with no points. Topic importance sets each allocation: a standard topic offers about 150 quiz points and 350 explanation points before weighting. Four distinct mastered quiz questions can accumulate across assessments to cover the full quiz allocation; repeating the same question never pays twice. Standard 20-topic courses offer up to 12,000 points, including a 2,000-point bonus after all allocations and delayed reviews are complete; smaller courses scale down. Transfer and review establish durable mastery. <Link href="/courses" className="text-ink-muted">Manage courses</Link>
             </p>
           </details>
         </div>
