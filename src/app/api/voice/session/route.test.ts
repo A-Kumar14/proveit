@@ -20,7 +20,7 @@ describe("POST /api/voice/session", () => {
   });
 
   it("returns a token and a brief for the concept, carrying the chat so far", async () => {
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ token: "tok" }), { status: 200 }));
+    const fetchMock = vi.fn(async (url: string) => new Response(JSON.stringify(String(url).includes("/token") ? { token: "tok" } : {}), { status: 200 }));
     vi.stubGlobal("fetch", fetchMock);
     const res = await POST(req({ ...ok, history: [{ role: "user", text: "It means 95% sure" }] }));
     const json = await res.json();
@@ -28,7 +28,7 @@ describe("POST /api/voice/session", () => {
     expect(json.prompt).toContain("live spoken call");
     expect(json.prompt).toContain("Student: It means 95% sure");
     expect(json.firstMessage).toContain("picking up");
-    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    const [url, init] = fetchMock.mock.calls.find((c) => String(c[0]).includes("/token")) as unknown as [string, RequestInit];
     expect(url).toContain("agent_id=agent_1");
     expect((init.headers as Record<string, string>)["xi-api-key"]).toBe("secret");
     expect(JSON.stringify(json)).not.toContain("secret");
@@ -38,6 +38,16 @@ describe("POST /api/voice/session", () => {
     vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({ token: "t" }), { status: 200 })));
     const json = await (await POST(req(ok))).json();
     expect(json.firstMessage).toContain("hear your take");
+  });
+
+  it("says what to switch on when the agent doesn't allow overrides", async () => {
+    const agent = { platform_settings: { overrides: { conversation_config_override: { agent: { first_message: false, prompt: { prompt: false } } } } } };
+    const fetchMock = vi.fn(async (url: string) => new Response(JSON.stringify(String(url).includes("/token") ? { token: "t" } : agent), { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const res = await POST(req(ok));
+    expect(res.status).toBe(502);
+    expect((await res.json()).error).toContain("Security tab");
+    expect(fetchMock.mock.calls.some((c) => String(c[0]).includes("/token"))).toBe(false);
   });
 
   it("is a 502 when the voice service refuses", async () => {
