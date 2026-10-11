@@ -84,6 +84,7 @@ Build the concept map a tutor would test them on.
 - Return ${MAX_UNITS} or fewer units in teaching order, each with at most ${MAX_PER_UNIT} concepts. At most ${MAX_UNITS * MAX_PER_UNIT} concepts in total, so keep the core ideas a student must be able to explain.
 - A concept is one testable idea, not a chapter title and not admin (grading, dates, policies, contact details).
 - prerequisites: add one only when "to" cannot be understood without "from". "from" must be in the same or an earlier unit. Use the exact concept names. Do not add links just to connect the map.
+- importance: give each concept 1 (supporting), 2 (important), or 3 (core), based on syllabus emphasis and prerequisite relationships. Use 2 when unclear.
 - Use only what the files cover. Do not add topics from outside them.`;
 
 /** Gemini reads PDFs, images and text directly, so no PDF parsing dependency is needed. */
@@ -132,3 +133,4 @@ export async function outlineFromTexts(courseName: string, docs: { name: string;
   if (!output.isCourseMaterial) throw new NotCourseMaterialError(output.reason || "Those files don't look like course material.");
   return { units: output.units, prerequisites: output.prerequisites };
 }
+

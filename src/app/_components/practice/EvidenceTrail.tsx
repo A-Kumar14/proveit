@@ -1,3 +1,4 @@
+import { AssessmentScore } from "./AssessmentScore";
 import { SourceLineage } from "./SourceLineage";
 import { cn } from "@proveit/lib/cn";
 import type { EvidenceAttemptView } from "@proveit/server/store";
@@ -34,6 +35,7 @@ export function EvidenceTrail({ rows }: { rows: EvidenceAttemptView[] }) {
               <div className="font-semibold text-ink">{LABEL[row.kind]}</div>
               <div className="mt-0.5 line-clamp-2 text-ink-muted">{row.answer}</div>
               {row.evaluation?.misconceptionName && <div className="mt-0.5 text-needswork-text">Caught: {row.evaluation.misconceptionName}</div>}
+              <AssessmentScore reward={row.assessmentReward} />
               <SourceLineage sources={row.sources} showExcerpt compact />
               {row.learningSpecRevision !== null && <div className="mt-1 text-ink-faint">Content revision {row.learningSpecRevision}</div>}
             </div>

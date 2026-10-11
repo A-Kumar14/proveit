@@ -1,3 +1,4 @@
+import { AssessmentScore } from "./AssessmentScore";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { buttonStyles } from "../Button";
@@ -45,6 +46,7 @@ export function MasteryChangeCard({ r }: { r: ResultView }) {
         </Row>
       </CardTable>
 
+      <AssessmentScore reward={r.assessmentReward} />
       <CalloutRow>
         <Callout kind="plain" title="Next review"><div className="text-[0.9375rem] font-semibold text-ink">{r.nextReview}</div><div className="text-xs text-ink-muted">Pass a quick check and it becomes Mastered.</div></Callout>
         <Callout kind="advice" title="Recommendation">{r.recommendation}</Callout>
@@ -61,3 +63,4 @@ export function MasteryChangeCard({ r }: { r: ResultView }) {
     </AssistantCard>
   );
 }
+

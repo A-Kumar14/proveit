@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { addCatalogCourse, browseCatalog, removeCatalogCourse } from "./courses";
 import { addMaterial, listMaterials } from "./materials";
-import { courseSpec, getCourse, getSidebar, getTodos, listCourses, NotFoundError } from "./store";
+import { courseSpec, createCourse, getCourse, getSidebar, getTodos, listCourses, NotFoundError } from "./store";
 
 beforeEach(() => {
   delete process.env.GOOGLE_GENERATIVE_AI_API_KEY;
@@ -53,6 +53,29 @@ describe("curated courses", () => {
     await addMaterial("accounting-101", new File(["Notes on ledgers."], "l.md", { type: "text/markdown" }));
     removeCatalogCourse("accounting-101");
     expect(listMaterials("accounting-101")).toEqual([]);
+  });
+
+  it("carries class-map importance into the frozen topic point allocations", () => {
+    const id = createCourse({
+      name: "Weighted Map",
+      outline: {
+        units: [{
+          name: "Core",
+          concepts: [
+            { name: "Supporting idea", short: "Supporting", desc: "Support.", importance: 1 },
+            { name: "Core idea", short: "Core", desc: "Core.", importance: 3 },
+          ],
+        }],
+        prerequisites: [],
+      },
+      files: [],
+      rewardSource: "weighted-map-source",
+    });
+    const byName = Object.fromEntries(getCourse(id).concepts.map((concept) => [concept.name, concept]));
+    expect(byName["Supporting idea"]!.rewards?.weight).toBe(1);
+    expect(byName["Core idea"]!.rewards?.weight).toBe(3);
+    expect(byName["Core idea"]!.rewards!.quiz).toBeGreaterThan(byName["Supporting idea"]!.rewards!.quiz);
+    expect(byName["Core idea"]!.rewards!.explanation).toBeGreaterThan(byName["Supporting idea"]!.rewards!.explanation);
   });
 
   it("rejects an unknown course", () => {

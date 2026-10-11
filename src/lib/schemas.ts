@@ -34,7 +34,15 @@ export type AssessInput = z.infer<typeof AssessInput>;
 
 export const ErrorType = z.enum(["none", "conceptual", "procedural", "slip", "interpretation", "flawed_reasoning", "uncertain"]);
 
+export const AssessmentReward = z.object({
+  score: z.number().min(0).max(100).nullable(),
+  level: z.enum(["Developing", "Proficient", "Assessment mastered"]).nullable(),
+  pointsGained: z.number().int().nonnegative(),
+});
+export type AssessmentReward = z.infer<typeof AssessmentReward>;
+
 export const Evaluation = z.object({
+  assessmentReward: AssessmentReward.optional(),
   verdict: z.enum(["correct", "incorrect", "uncertain"]),
   errorType: ErrorType,
   misconceptionId: z.string().nullable(),
@@ -204,18 +212,18 @@ export type FileUploadResult = z.infer<typeof FileUploadResult>;
 
 // ---- quiz ----
 
-export const QuizStartInput = z.object({ courseId: z.string(), count: z.number().int().min(1).max(15).optional(), /** Quiz one concept only. */ conceptId: z.string().optional() });
+export const QuizStartInput = z.object({ format: z.enum(["quiz", "explanation", "mixed"]).optional(), courseId: z.string(), count: z.number().int().min(1).max(15).optional(), /** Quiz one concept only. */ conceptId: z.string().optional() });
 /** A question as the student sees it. The answer stays on the server until the quiz is submitted. */
-export const QuizQuestion = z.object({ id: z.string(), concept: z.string(), prompt: z.string(), options: z.array(z.string()).length(4) });
+export const QuizQuestion = z.object({ id: z.string(), concept: z.string(), prompt: z.string(), options: z.array(z.string()).max(4), format: z.enum(["quiz", "explanation"]).optional(), marks: z.number().positive().optional() });
 export const QuizStartResult = z.object({ quizId: z.string(), courseName: z.string(), questions: z.array(QuizQuestion), aiWritten: z.boolean() });
 export type QuizQuestion = z.infer<typeof QuizQuestion>;
 export type QuizStartResult = z.infer<typeof QuizStartResult>;
 
-export const QuizSubmitInput = z.object({ quizId: z.string(), answers: z.array(z.number().int().min(0).max(3).nullable()).max(30) });
+export const QuizSubmitInput = z.object({ quizId: z.string(), answers: z.array(z.union([z.number().int().min(0).max(3), z.string().trim().max(4000)]).nullable()).max(30) });
 export const QuizResult = z.object({
   quizId: z.string(), courseId: z.string(), courseName: z.string(),
   score: z.number(), total: z.number(), pct: z.number(),
-  items: z.array(QuizQuestion.extend({ conceptId: z.string(), picked: z.number().nullable(), correct: z.number(), explanation: z.string() })),
+  items: z.array(QuizQuestion.extend({ conceptId: z.string(), picked: z.number().nullable(), correct: z.number(), explanation: z.string(), response: z.string().optional(), earnedMarks: z.number().optional(), explanationScore: z.number().nullable().optional(), learningSpecRevision: z.number().int().positive().optional(), sources: z.array(z.object({ id: z.string(), kind: z.enum(["authored_reference", "material_excerpt"]), title: z.string(), locator: z.string().nullable(), materialId: z.string().nullable(), excerpt: z.string().nullable(), retrieved: z.boolean() })).optional() })),
   byConcept: z.array(z.object({ conceptId: z.string(), concept: z.string(), right: z.number(), total: z.number() })),
   /** How the quiz moved the course map. Empty when nothing changed state. */
   changes: z.array(z.object({ conceptId: z.string(), concept: z.string(), from: MasteryState, to: MasteryState })),
@@ -242,6 +250,7 @@ export const CourseOutline = z.object({
       name: z.string().describe("Concept name, at most 5 words."),
       short: z.string().describe("1 or 2 word label for the map node."),
       desc: z.string().describe("One sentence saying what the student must be able to do."),
+      importance: z.number().int().min(1).max(3).optional().describe("1 supporting, 2 important, 3 core. Use syllabus emphasis and prerequisite importance; default 2 when unclear."),
     })),
   })),
   prerequisites: z.array(z.object({ from: z.string(), to: z.string() })).describe("Concept names. `from` must be understood before `to`. Only real logical dependencies."),

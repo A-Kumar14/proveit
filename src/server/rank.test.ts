@@ -6,24 +6,29 @@ beforeEach(() => {
   (globalThis as { __proveit?: unknown }).__proveit = undefined;
 });
 
-describe("rank scope", () => {
-  it("scores a course on its own concepts only, with no streak", () => {
+describe("assessment-ledger rank scope", () => {
+  it("uses only quiz, explanation and course-bonus awards", () => {
     const course = getRewards("intro-stats");
-    expect(course.breakdown.map((b) => b.label)).not.toContain("Streak days, up to 7");
+    expect(course.breakdown.map((b) => b.label)).toEqual([
+      "Quiz assessment mastery",
+      "Explanation assessment mastery",
+      "Course mastery bonuses",
+    ]);
     const overall = getRewards();
-    expect(overall.breakdown.map((b) => b.label)).toContain("Streak days, up to 7");
-    // The overall rank also counts the other courses, so it is never lower than any one course.
-    expect(overall.points).toBeGreaterThanOrEqual(course.points);
+    expect(overall.breakdown.map((b) => b.label)).toEqual([
+      "Quiz assessment mastery",
+      "Explanation assessment mastery",
+      "Course mastery bonuses",
+    ]);
   });
 
-  it("gives every course its own standing on the shared ladder", () => {
+  it("gives every course its own scaled standing without granting points from seeded mastery state", () => {
     const ranks = getCourseRanks();
     expect(ranks.map((r) => r.courseId)).toContain("intro-stats");
-    expect(ranks.every((r) => r.tier.id && r.points >= 0)).toBe(true);
-    expect(ranks.find((r) => r.courseId === "linear-algebra")!.points).toBeGreaterThan(ranks.find((r) => r.courseId === "intro-stats")!.points);
+    expect(ranks.every((r) => r.tier.id && r.points === 0)).toBe(true);
   });
 
-  it("never lowers a course rank, and hand ticks earn nothing", () => {
+  it("hand ticks earn nothing", () => {
     const before = getRewards("intro-stats").points;
     setTaskDone("cii", true);
     expect(getRewards("intro-stats").points).toBe(before);

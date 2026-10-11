@@ -1,21 +1,29 @@
-/**
- * Rank rules. Points come only from evidence (concepts proved or mastered, misconceptions repaired,
- * courses finished on their own merit, a daily streak). Ticking a task or marking a course done earns nothing,
- * so rank can't be farmed by clicking.
- */
-export const POINTS = {
-  /** Passed a new-question test (Provisional). */ proved: 200,
-  /** Mastered, which includes the proved points. */ mastered: 300,
-  /** Fixed a caught misconception, once per concept. */ repaired: 100,
-  /** Passed the new question on the first try, once per concept. */ firstTry: 50,
-  /** Every concept in a course Mastered. Marking it done by hand earns nothing. */ course: 1000,
-  /** Per day of streak, up to STREAK_CAP days. */ streakDay: 25,
-} as const;
-export const STREAK_CAP = 7;
+/** Points are earned once for assessment mastery, plus a completed-course bonus. */
+export const POINTS = { quiz: 150, explanation: 350, course: 2000 } as const;
+export const PROFICIENCY = 70;
+export const ASSESSMENT_MASTERY = 90;
+export const QUIZ_COVERAGE_QUESTIONS = 4;
+export const assessmentLevel = (pct: number): "Assessment mastered" | "Proficient" | "Developing" => pct >= ASSESSMENT_MASTERY ? "Assessment mastered" : pct >= PROFICIENCY ? "Proficient" : "Developing";
+/** Twenty distinct topics make a standard course; smaller maps have a proportional budget. */
+export const courseScale = (concepts: number) => Math.min(1, Math.max(1, concepts) / 20);
+export const courseBudget = (concepts: number) => ({ quiz: Math.round(3000 * courseScale(concepts)), explanation: Math.round(7000 * courseScale(concepts)), bonus: Math.round(POINTS.course * courseScale(concepts)) });
+
+/** Largest-remainder allocation preserves the exact budget with deterministic integer points. */
+export function allocateBudget(budget: number, weights: number[]): number[] {
+  if (!weights.length) return [];
+  const safe = weights.map(w => Number.isFinite(w) ? Math.max(1, Math.min(3, w)) : 2);
+  const total = safe.reduce((a, b) => a + b, 0);
+  const exact = safe.map(w => budget * w / total);
+  const out = exact.map(Math.floor);
+  const order = exact.map((v, i) => ({ i, rest: v - out[i]! })).sort((a, b) => b.rest - a.rest || a.i - b.i);
+  const remaining = budget - out.reduce((a, b) => a + b, 0);
+  for (let i = 0; i < remaining; i++) out[order[i]!.i]!++;
+  return out;
+}
 
 export type Tier = { id: string; name: string; min: number };
 
-/** The overall ladder. Each tier is a long climb: a fully mastered course is worth about 9,000 points. */
+/** The overall ladder. Each tier is a long climb: a standard fully mastered course is worth at most 12,000 points. */
 export const TIERS: Tier[] = [
   { id: "bronze", name: "Bronze", min: 0 },
   { id: "silver", name: "Silver", min: 1000 },
@@ -30,7 +38,7 @@ export const TIERS: Tier[] = [
 const COURSE_SHARE = [0, 0.1, 0.25, 0.45, 0.7, 0.9, 1];
 
 /** Most a course can give by mastering every concept and finishing it. */
-export const courseMaxPoints = (concepts: number) => concepts * POINTS.mastered + POINTS.course;
+export const courseMaxPoints = (concepts: number) => Object.values(courseBudget(concepts)).reduce((a, b) => a + b, 0);
 
 /** The same seven tiers, scaled to one course so a topic can be mastered in weeks, not years. */
 export function courseTiers(concepts: number): Tier[] {

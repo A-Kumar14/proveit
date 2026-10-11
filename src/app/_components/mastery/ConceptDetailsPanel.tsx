@@ -1,3 +1,4 @@
+import { assessmentLevel } from "@proveit/lib/rewards";
 import Link from "next/link";
 import { buttonStyles } from "../Button";
 import { cn } from "@proveit/lib/cn";
@@ -14,6 +15,12 @@ export function ConceptDetailsPanel({ c }: { c: ConceptView }) {
       </div>
       <div className="text-base font-semibold">{c.name}</div>
       <div className="text-xs leading-normal text-ink-muted">{c.desc}</div>
+      {c.rewards && <div className="rounded border border-line p-2 text-xs text-ink-muted" aria-label="Topic point allocation">
+        <p className="m-0">Importance: {c.rewards.weight === 3 ? "Core" : c.rewards.weight === 1 ? "Supporting" : "Important"}</p>
+        <p className="m-0">Quiz: {Math.floor(c.rewards.quiz * c.rewards.quizCoverage / 4)} / {c.rewards.quiz} points · Explanation: {c.rewards.explanationEarned ? c.rewards.explanation : 0} / {c.rewards.explanation} points</p>
+        {c.rewards.quizBest !== null && <p className="m-0">Best quiz assessment: {Math.floor(c.rewards.quizBest * 10) / 10}% · {assessmentLevel(c.rewards.quizBest)}</p>}
+        {c.rewards.explanationBest !== null && <p className="m-0">Best explanation: {Math.floor(c.rewards.explanationBest * 10) / 10}% · {assessmentLevel(c.rewards.explanationBest)}</p>}
+      </div>}
       {c.dims.map((d) => (
         <div key={d.label} className="flex flex-col gap-1">
           <div className="flex justify-between text-xs">
@@ -30,3 +37,4 @@ export function ConceptDetailsPanel({ c }: { c: ConceptView }) {
     </section>
   );
 }
+

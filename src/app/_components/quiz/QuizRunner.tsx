@@ -9,12 +9,13 @@ import type { QuizResult, QuizStartResult } from "@proveit/lib/schemas";
 import { buttonStyles } from "../Button";
 import { QuizResultView } from "./QuizResultView";
 
-type Phase = { name: "intro" } | { name: "loading" } | { name: "taking"; quiz: QuizStartResult; answers: (number | null)[]; at: number } | { name: "grading"; quiz: QuizStartResult; answers: (number | null)[] } | { name: "done"; quiz: QuizStartResult; result: QuizResult };
+type Phase = { name: "intro" } | { name: "loading" } | { name: "taking"; quiz: QuizStartResult; answers: (number | string | null)[]; at: number } | { name: "grading"; quiz: QuizStartResult; answers: (number | string | null)[] } | { name: "done"; quiz: QuizStartResult; result: QuizResult };
 
 const LETTERS = ["A", "B", "C", "D"];
 
-/** A self-check quiz. It gives a score and a review, and it never changes mastery or rank. */
+/** A self-check quiz. It gives a score and a review, and mastery scores can earn previously unearned quiz allocations. */
 export function QuizRunner({ courseId, courseName, conceptId, conceptName }: { courseId: string; courseName: string; conceptId?: string; conceptName?: string }) {
+  const [format, setFormat] = useState<"quiz" | "explanation" | "mixed">("quiz");
   const [phase, setPhase] = useState<Phase>({ name: "intro" });
   const [error, setError] = useState<string | null>(null);
 
@@ -22,7 +23,7 @@ export function QuizRunner({ courseId, courseName, conceptId, conceptName }: { c
     setPhase({ name: "loading" });
     setError(null);
     try {
-      const quiz = await api.startQuiz(courseId, undefined, conceptId);
+      const quiz = await api.startQuiz(courseId, undefined, conceptId, format);
       setPhase({ name: "taking", quiz, answers: quiz.questions.map(() => null), at: 0 });
     } catch (e) {
       setError(e instanceof Error ? e.message : "Couldn't build the quiz. Retry.");
@@ -30,7 +31,7 @@ export function QuizRunner({ courseId, courseName, conceptId, conceptName }: { c
     }
   }
 
-  async function finish(quiz: QuizStartResult, answers: (number | null)[]) {
+  async function finish(quiz: QuizStartResult, answers: (number | string | null)[]) {
     setPhase({ name: "grading", quiz, answers });
     setError(null);
     try {
@@ -46,11 +47,16 @@ export function QuizRunner({ courseId, courseName, conceptId, conceptName }: { c
     return (
       <section aria-label="Quiz" className="flex max-w-xl flex-col gap-4 rounded-md border border-line bg-surface p-6">
         <h2 className="m-0 text-lg font-semibold">{conceptName ? `Quiz on ${conceptName}` : `Quiz on ${courseName}`}</h2>
+        <label className="text-sm">Assessment format
+          <select aria-label="Assessment format" value={format} disabled={loading} onChange={e => setFormat(e.target.value as typeof format)} className="ml-3 rounded border border-line p-2">
+            <option value="quiz">Multiple choice</option><option value="explanation">Explanations (FRQ)</option><option value="mixed">Mixed quiz + explanations</option>
+          </select>
+        </label>
         <ul className="m-0 flex list-disc flex-col gap-1 pl-5 text-[0.8125rem] leading-normal text-ink-muted">
-          <li>{conceptName ? "4 multiple-choice questions on this one concept" : "8 multiple-choice questions"}, built from the course notes and your uploaded files.</li>
+          <li>Built from the course notes and your uploaded files. Choice questions are worth 1 mark; explanations are worth 4 marks. Mixed scores use total earned marks divided by available marks.</li>
           {!conceptName && <li>Questions lean on the concepts you are weakest in.</li>}
           <li>You get a score and a review of every answer, saved to your History.</li>
-          <li>Answered questions can start a concept as Developing and help prioritize practice. Quizzes do not diagnose misconceptions, demote concepts or earn rank points. Transfer establishes Provisional; delayed review establishes Mastered.</li>
+          <li>70% earns a Proficient milestone; 90% earns points for the topic coverage assessed. Four distinct questions on a topic cover its full quiz allocation; repeats never pay twice. Transfer establishes Provisional; delayed review establishes durable Mastered.</li>
         </ul>
         {error && <p role="alert" className="m-0 text-xs text-needswork-text">{error}</p>}
         <div className="flex items-center gap-2">
@@ -69,9 +75,9 @@ export function QuizRunner({ courseId, courseName, conceptId, conceptName }: { c
     const at = phase.name === "taking" ? phase.at : quiz.questions.length - 1;
     const q = quiz.questions[at]!;
     const last = at === quiz.questions.length - 1;
-    const answered = answers.filter((a) => a !== null).length;
+    const answered = answers.filter((a) => a !== null && a !== "").length;
     const go = (n: number) => setPhase({ name: "taking", quiz, answers, at: n });
-    const choose = (i: number) => setPhase({ name: "taking", quiz, answers: answers.map((a, j) => (j === at ? i : a)), at });
+    const choose = (i: number | string) => setPhase({ name: "taking", quiz, answers: answers.map((a, j) => (j === at ? i : a)), at });
     return (
       <section aria-label="Quiz" className="flex max-w-2xl flex-col gap-4">
         <div className="flex items-center justify-between gap-3 text-xs text-ink-muted">
@@ -85,6 +91,7 @@ export function QuizRunner({ courseId, courseName, conceptId, conceptName }: { c
           <legend className="sr-only">Question {at + 1}</legend>
           <p className="m-0 text-base font-semibold leading-normal">{q.prompt}</p>
           <div className="flex flex-col gap-2">
+            {q.format === "explanation" && <label className="flex flex-col gap-2">Your explanation · {q.marks ?? 4} marks<textarea aria-label="Your explanation" maxLength={4000} value={typeof answers[at] === "string" ? answers[at] as string : ""} onChange={e => choose(e.target.value)} className="min-h-40 rounded border border-line p-3" /></label>}
             {q.options.map((o, i) => (
               <label key={i} className={cn("flex cursor-pointer items-start gap-3 rounded-sm border px-3.5 py-3 text-sm leading-normal hover:bg-surface-hover", answers[at] === i ? "border-ink bg-surface-hover" : "border-line")}>
                 <input type="radio" name={q.id} checked={answers[at] === i} onChange={() => choose(i)} className="mt-1 accent-ink" />

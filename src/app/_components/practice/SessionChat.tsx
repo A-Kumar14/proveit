@@ -1,5 +1,7 @@
 "use client";
 
+import { AssessmentScore } from "./AssessmentScore";
+import type { AssessmentReward } from "@proveit/lib/schemas";
 import { SourceLineage } from "./SourceLineage";
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -26,7 +28,7 @@ import { ClarificationCard } from "./QuestionCard";
 type Item =
   | { id: number; kind: "chat"; role: "user" | "assistant"; text: string }
   | { id: number; kind: "check"; text: string }
-  | { id: number; kind: "answer"; answer: string; followUp: string };
+  | { id: number; kind: "answer"; answer: string; followUp: string; reward?: AssessmentReward };
 type Saved = { items: Item[]; mode: "chat" | "check"; followUpTo?: string };
 
 const DONT_KNOW = "I don't know yet";
@@ -43,7 +45,7 @@ const chip = "h-9 cursor-pointer rounded-full border px-3.5 text-xs transition-c
 
 /** Test this concept, as a conversation first. The student says what they think, the tutor agrees or corrects, and a graded check comes only when they ask for it. */
 export function SessionChat({ userId, courseId, question, opening, resume }: {
-  userId: string; courseId: string; question: QuestionView; opening: string; resume?: { attemptId: string; answer: string; followUp: string };
+  userId: string; courseId: string; question: QuestionView; opening: string; resume?: { attemptId: string; answer: string; followUp: string; reward?: AssessmentReward };
 }) {
   const router = useRouter();
   const storeKey = sessionStorageKey(userId, courseId, question.conceptId);
@@ -132,7 +134,7 @@ export function SessionChat({ userId, courseId, question, opening, resume }: {
     try {
       const { attemptId, evaluation } = await api.assess({ courseId, conceptId: question.conceptId, learningSpecRevision: question.learningSpecRevision, answer, followUpTo });
       if (evaluation.verdict === "uncertain") {
-        put([...itemsRef.current, { id: nextId.current++, kind: "answer", answer, followUp: evaluation.followUp ?? "Say a bit more." }]);
+        put([...itemsRef.current, { id: nextId.current++, kind: "answer", answer, followUp: evaluation.followUp ?? "Say a bit more.", reward: evaluation.assessmentReward }]);
         setFollowUpTo(attemptId);
         setDraft("");
         return;
@@ -186,7 +188,7 @@ export function SessionChat({ userId, courseId, question, opening, resume }: {
             return (
               <div key={it.id} className="contents">
                 <UserBubble>{it.answer}</UserBubble>
-                <AssistantMessage><ClarificationCard text={it.followUp} /></AssistantMessage>
+                <AssistantMessage><AssessmentScore reward={it.reward} /><ClarificationCard text={it.followUp} /></AssistantMessage>
               </div>
             );
           }
