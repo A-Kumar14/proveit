@@ -25,7 +25,7 @@ function ReviewPage() {
   const connected = calendar.mode === "ics";
   return (
     <AppShell active="review" crumbs={[{ label: "Review queue" }]}>
-      <div className="grid min-h-0 flex-1 grid-cols-1 items-start gap-8 overflow-y-auto px-7 py-6 xl:grid-cols-[minmax(0,1fr)_300px]">
+      <div className="grid min-h-0 flex-1 grid-cols-1 items-start gap-8 overflow-y-auto px-4 lg:px-7 py-6 xl:grid-cols-[minmax(0,1fr)_300px]">
         <section aria-label="Review queue" className="flex min-w-0 flex-col gap-4">
           <div>
             <div className="eyebrow">{connected ? calendar.provider : "No calendar connected"}</div>

@@ -113,7 +113,7 @@ function Call({ userId, courseId, conceptId, chatHref }: { userId: string; cours
     : "Listening. Talk like you would to a person.";
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col items-center justify-between px-7 py-8">
+    <div className="flex min-h-0 flex-1 flex-col items-center justify-between px-4 lg:px-7 py-8">
       <div className="flex w-full max-w-[640px] justify-end">
         <Link href={chatHref} onClick={() => c.endSession()} className="inline-flex h-9 items-center gap-2 rounded-full border border-line bg-surface px-3.5 text-xs font-medium text-ink-3 no-underline hover:bg-surface-hover">
           <MessageSquare size={13} aria-hidden />Back to chat

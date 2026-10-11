@@ -6,7 +6,7 @@ export const dynamic = "force-dynamic";
 export default function SignBridgePage() {
   return (
     <AppShell active="signbridge" crumbs={[{ label: "SignBridge" }]}>
-      <div className="flex min-h-0 flex-1 overflow-y-auto px-7 py-6">
+      <div className="flex min-h-0 flex-1 overflow-y-auto px-4 lg:px-7 py-6">
         <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
           <header className="flex flex-wrap items-end justify-between gap-4">
             <div className="flex max-w-2xl flex-col gap-2">

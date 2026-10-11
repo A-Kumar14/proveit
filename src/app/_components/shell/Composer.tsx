@@ -44,7 +44,7 @@ export function Composer({ value, onChange, onSubmit, status, error, placeholder
   }, [value]);
 
   return (
-    <div className="shrink-0 px-7 pb-[18px] pt-2">
+    <div className="shrink-0 px-4 lg:px-7 pb-[18px] pt-2">
       <div className="w-full max-w-[822px]">
         <div className={cn(
           "flex flex-col gap-2 rounded-[14px] border bg-surface px-3.5 pb-3 pt-3 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_4px_16px_rgba(0,0,0,0.04)] transition-colors focus-within:border-ink-faint",

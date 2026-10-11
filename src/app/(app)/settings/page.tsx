@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 function SettingsPage() {
   return (
     <AppShell active="settings" crumbs={[{ label: "Settings" }]}>
-      <div className="min-h-0 flex-1 overflow-y-auto px-7 py-6"><h1 className="sr-only">Settings</h1><SettingsPanel initialPrefs={getPrefs()} courses={listCourses().map((c) => ({ id: c.id, name: c.name }))} /></div>
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 lg:px-7 py-6"><h1 className="sr-only">Settings</h1><SettingsPanel initialPrefs={getPrefs()} courses={listCourses().map((c) => ({ id: c.id, name: c.name }))} /></div>
     </AppShell>
   );
 }

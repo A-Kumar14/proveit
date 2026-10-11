@@ -27,7 +27,7 @@ async function CoursePage({ params, searchParams }: PageProps<"/course/[courseId
   const first = course.concepts[0];
   return (
     <AppShell active="map" courseId={courseId} crumbs={[{ label: course.name }]} right={course.deadline}>
-      <div className="min-h-0 flex-1 overflow-y-auto px-7 py-6">
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 lg:px-7 py-6">
         <h1 className="sr-only">{course.name}</h1>
         {first ? (
           <div className="flex flex-col gap-4">
