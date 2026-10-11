@@ -383,7 +383,9 @@ export function SignBridgeDemo({ compact = false, autoStart = false, onRecognize
     }
   };
 
-  startCameraRef.current = startCamera;
+  useEffect(() => {
+    startCameraRef.current = startCamera;
+  }, [startCamera]);
 
   useEffect(() => {
     if (autoStart && !autoStartAttemptedRef.current) {
