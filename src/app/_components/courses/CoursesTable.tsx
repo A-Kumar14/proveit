@@ -172,7 +172,7 @@ function RowMenu({ menu, rows, onClose, onApply, onDelete }: { menu: Menu; rows:
   return (
     <div ref={ref} role="menu" aria-label="Course actions" onContextMenu={(e) => e.preventDefault()}
       style={{ left: Math.min(menu.x, window.innerWidth - 232), top: Math.min(menu.y, window.innerHeight - 140) }}
-      className="fixed z-50 w-56 rounded-md border border-line bg-surface p-1 shadow-[0_8px_24px_rgba(0,0,0,0.10)]">
+      className="glass fixed z-50 w-56 rounded-md border p-1">
       {openable && <Link role="menuitem" href={`/course/${openable.id}`} className={item}>Open course</Link>}
       {toComplete.length > 0 && <button role="menuitem" type="button" className={item} onClick={() => onApply(toComplete.map((r) => r.id), true)}><CircleCheck size={14} strokeWidth={2} className="text-mastered" aria-hidden />Mark as completed{rows.length > 1 ? ` (${toComplete.length})` : ""}</button>}
       {toReopen.length > 0 && <button role="menuitem" type="button" className={item} onClick={() => onApply(toReopen.map((r) => r.id), false)}>Mark as in progress{rows.length > 1 ? ` (${toReopen.length})` : ""}</button>}

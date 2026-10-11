@@ -11,6 +11,7 @@ import { splitOptions } from "@proveit/lib/sessionText";
 import { streamTutor } from "@proveit/lib/tutorStream";
 import { useSettings } from "@proveit/lib/settings";
 import { useVoiceSupport } from "../voice/speech";
+import { SignInput } from "../signbridge/SignInput";
 import { sessionStorageKey } from "@proveit/lib/sessionStorageKey";
 import { cn } from "@proveit/lib/cn";
 import type { QuestionView } from "@proveit/server/store";
@@ -65,6 +66,7 @@ export function SessionChat({ userId, courseId, question, opening, resume, autoT
   const [grading, setGrading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hideChips, setHideChips] = useState<number | null>(null);
+  const [signing, setSigning] = useState(false);
   const itemsRef = useRef(items);
   const abort = useRef<AbortController | null>(null);
   const end = useRef<HTMLDivElement>(null);
@@ -223,6 +225,7 @@ export function SessionChat({ userId, courseId, question, opening, resume, autoT
         </div>
       </Log>
       <div className="mx-auto w-full max-w-[822px]">
+      {signing && <SignInput onUse={(t) => setDraft((d) => (d.trim() ? `${d.trimEnd()} ${t}` : t))} onClose={() => setSigning(false)} />}
       <Composer
         value={draft} onChange={setDraft} onSubmit={submit} status={status} error={error}
         placeholder={mode === "check" ? "Explain it in your own words" : talked ? "Reply to your tutor" : "Tell me what you think"}
@@ -230,6 +233,7 @@ export function SessionChat({ userId, courseId, question, opening, resume, autoT
         loadingText={grading ? "Checking your reasoning..." : "Your tutor is replying..."}
         hint={mode === "check" ? "This answer is graded." : "Just talking. Nothing here is graded."}
         onTalk={() => router.push(`/course/${courseId}/practice/${question.conceptId}/talk`)}
+        onSign={settings.signInput ? () => setSigning((s) => !s) : undefined} signing={signing}
         onStop={replying ? () => abort.current?.abort() : undefined}
         leading={mode === "check"
           ? <button type="button" onClick={() => { setMode("chat"); setError(null); }} disabled={busy} className={cn(chip, "border-line bg-surface font-medium text-ink-3 hover:bg-surface-hover")}>Keep talking</button>

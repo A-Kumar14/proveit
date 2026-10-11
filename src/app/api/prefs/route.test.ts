@@ -46,7 +46,7 @@ describe("/api/courses/reset", () => {
 describe("/api/account/export", () => {
   it("downloads the learner's record as a file", async () => {
     const res = await exportData();
-    expect(res.headers.get("content-disposition")).toContain("mastery-export.json");
+    expect(res.headers.get("content-disposition")).toContain("proveit-export.json");
     const json = await res.json();
     expect(json.courses.length).toBeGreaterThan(0);
     expect(json.preferences).toHaveProperty("tutorVoice");

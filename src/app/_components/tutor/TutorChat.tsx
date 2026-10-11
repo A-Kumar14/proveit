@@ -4,12 +4,14 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Mic, Paperclip, X } from "lucide-react";
 import { streamTutor } from "@proveit/lib/tutorStream";
 import { cn } from "@proveit/lib/cn";
+import { useSettings } from "@proveit/lib/settings";
 import type { ReviewBase } from "@proveit/server/store";
 import { AssistantMessage } from "../chat/AssistantMessage";
 import { Prose } from "../chat/Prose";
 import { Typing } from "../chat/Typing";
 import { UserBubble } from "../chat/UserBubble";
 import { MasteryReviewCard } from "../mastery/MasteryReviewCard";
+import { SignInput } from "../signbridge/SignInput";
 import { Composer, type Status } from "../shell/Composer";
 import { Log } from "../shell/Log";
 import { speakThen, useVoiceSupport } from "../voice/speech";
@@ -45,6 +47,8 @@ export function TutorChat({ courseId, courseName, base, aiWritten, enabled }: { 
   const [dictating, setDictating] = useState(false);
   const [voice, setVoice] = useState<VoicePhase | null>(null);
   const [muted, setMuted] = useState(false);
+  const [signing, setSigning] = useState(false);
+  const [settings] = useSettings();
   const messagesRef = useRef<Msg[]>([]);
   const voiceOn = useRef(false);
   const abort = useRef<AbortController | null>(null);
@@ -209,12 +213,15 @@ export function TutorChat({ courseId, courseName, base, aiWritten, enabled }: { 
           actions={active && <button type="button" onClick={() => finish.current()} disabled={!heard} className="h-9 cursor-pointer rounded-full border-0 bg-ink px-4 text-xs font-semibold text-white hover:bg-ink-3 disabled:cursor-not-allowed disabled:bg-surface-strong disabled:text-ink-faint">Done talking</button>}
         />
       ) : (
+        <>
+        {signing && <div className="shrink-0 px-4 lg:px-7"><SignInput onUse={(t) => setDraft((d) => (d.trim() ? `${d.trimEnd()} ${t}` : t))} onClose={() => setSigning(false)} /></div>}
         <Composer
           value={draft} onChange={setDraft} onSubmit={submit} status={enabled ? status : "idle"} error={enabled ? error : null}
           placeholder={enabled ? "Ask the tutor anything" : "The tutor is temporarily unavailable"} submitLabel="Send" loadingText="Tutor is replying..."
           hint={dictating ? (heard || "Listening. Tap the mic to stop.") : "Proof of understanding comes from Test this concept."}
           onStop={() => abort.current?.abort()}
           onTalk={enabled ? startVoice : undefined} talkUnavailable={!canTalk}
+          onSign={enabled && settings.signInput ? () => setSigning((s) => !s) : undefined} signing={signing}
           leading={(
             <>
               <input ref={picker} type="file" multiple accept={TYPES.join(",")} className="sr-only" tabIndex={-1} aria-label="Choose files" onChange={(e) => pick(e.target.files)} />
@@ -233,6 +240,7 @@ export function TutorChat({ courseId, courseName, base, aiWritten, enabled }: { 
             </div>
           )}
         />
+        </>
       )}
     </>
   );

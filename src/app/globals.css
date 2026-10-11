@@ -42,6 +42,27 @@
   --radius-lg: 10px;
 }
 
+/* Frosted surfaces for the chrome: header, sidebar, composer, menus and dialogs. Content cards stay solid so text stays crisp. */
+@utility glass {
+  background: color-mix(in srgb, var(--color-surface) 76%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(1.6);
+  backdrop-filter: blur(18px) saturate(1.6);
+  border-color: rgba(31, 31, 31, 0.08);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04), 0 10px 30px rgba(0, 0, 0, 0.05), inset 0 1px 0 rgba(255, 255, 255, 0.75);
+}
+@utility glass-side {
+  background: color-mix(in srgb, var(--color-surface-sidebar) 82%, transparent);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  backdrop-filter: blur(18px) saturate(1.4);
+}
+/* A faint wash behind everything, so the frosted chrome has something to blur. */
+@utility app-canvas {
+  background:
+    radial-gradient(900px 500px at 8% -10%, rgba(46, 158, 91, 0.07), transparent 60%),
+    radial-gradient(800px 500px at 100% 0%, rgba(201, 138, 12, 0.06), transparent 55%),
+    linear-gradient(180deg, #fbfbfc 0%, #f6f7f9 100%);
+}
+
 @utility eyebrow {
   font-size: 11px;
   letter-spacing: 0.08em;

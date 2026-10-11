@@ -20,12 +20,12 @@ export function Sidebar({ data, active, courseId, profile = null }: { data: Side
   const inProgress = data.courses.filter((c) => !c.completed);
   const completed = data.courses.filter((c) => c.completed);
   return (
-    <nav aria-label="Sidebar" className="flex w-[232px] shrink-0 flex-col gap-3.5 overflow-y-auto border-r border-line bg-surface-sidebar px-3.5 py-4">
+    <nav aria-label="Sidebar" className="flex w-[232px] shrink-0 flex-col gap-3.5 overflow-y-auto glass-side border-r border-line/70 px-3.5 py-4">
       <Link href="/" className="flex items-center gap-2.5 px-1 pb-0.5 text-ink no-underline">
         <span className="flex size-7 items-center justify-center rounded-md bg-ink">
           <BarChart3 size={16} strokeWidth={2.2} className="text-white" aria-hidden />
         </span>
-        <span className="text-base font-semibold tracking-tight">Mastery</span>
+        <span className="text-base font-semibold tracking-tight">ProveIt</span>
       </Link>
 
       <div className="flex flex-col gap-0.5">

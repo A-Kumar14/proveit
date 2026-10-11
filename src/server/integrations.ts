@@ -38,7 +38,7 @@ class StoredProvider implements OAuthClientProvider {
   private patch = (p: Partial<Saved>) => saveJson(this.key, { ...this.read(), ...p });
   get redirectUrl() { return this.redirect; }
   get clientMetadata(): OAuthClientMetadata {
-    return { client_name: "Mastery", redirect_uris: [this.redirect], grant_types: ["authorization_code", "refresh_token"], response_types: ["code"], token_endpoint_auth_method: "none" };
+    return { client_name: "ProveIt", redirect_uris: [this.redirect], grant_types: ["authorization_code", "refresh_token"], response_types: ["code"], token_endpoint_auth_method: "none" };
   }
   tokens() { return this.read().tokens; }
   saveTokens(tokens: OAuthTokens) { this.patch({ tokens }); }

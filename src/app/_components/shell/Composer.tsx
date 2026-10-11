@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { ArrowUp, LoaderCircle, Square } from "lucide-react";
+import { ArrowUp, Hand, LoaderCircle, Square } from "lucide-react";
 import { cn } from "@proveit/lib/cn";
 
 export type Status = "idle" | "evaluating" | "error";
@@ -17,7 +17,7 @@ function TalkPill({ onClick, unavailable }: { onClick: () => void; unavailable: 
 }
 
 /** ResponseBox. Pinned answer input. Only controls that work are rendered. */
-export function Composer({ value, onChange, onSubmit, status, error, placeholder, submitLabel = "Submit", loadingText = "Checking your reasoning...", hint, leading, chip, onTalk, talkUnavailable, onStop }: {
+export function Composer({ value, onChange, onSubmit, status, error, placeholder, submitLabel = "Submit", loadingText = "Checking your reasoning...", hint, leading, chip, onTalk, talkUnavailable, onStop, onSign, signing }: {
   value: string; onChange: (v: string) => void; onSubmit: () => void; status: Status; error?: string | null;
   placeholder: string; submitLabel?: string; loadingText?: string; hint?: string;
   /** Controls shown left of the status line. Only pass ones that work. */
@@ -30,6 +30,9 @@ export function Composer({ value, onChange, onSubmit, status, error, placeholder
   talkUnavailable?: boolean;
   /** While busy, the send button becomes a stop button that calls this. */
   onStop?: () => void;
+  /** When set, a Sign button opens the camera spelling panel. */
+  onSign?: () => void;
+  signing?: boolean;
 }) {
   const busy = status === "evaluating";
   const box = useRef<HTMLTextAreaElement>(null);
@@ -47,7 +50,7 @@ export function Composer({ value, onChange, onSubmit, status, error, placeholder
     <div className="shrink-0 px-4 lg:px-7 pb-[18px] pt-2">
       <div className="w-full max-w-[822px]">
         <div className={cn(
-          "flex flex-col gap-2 rounded-[14px] border bg-surface px-3.5 pb-3 pt-3 shadow-[0_1px_2px_rgba(0,0,0,0.04),0_4px_16px_rgba(0,0,0,0.04)] transition-colors focus-within:border-ink-faint",
+          "glass flex flex-col gap-2 rounded-[14px] border px-3.5 pb-3 pt-3 transition-colors focus-within:border-ink-faint",
           error ? "border-needswork-line" : "border-line-button",
         )}>
           {chip}
@@ -65,6 +68,11 @@ export function Composer({ value, onChange, onSubmit, status, error, placeholder
                 : error ? <span className="text-needswork-text">{error}</span>
                 : <span className="text-ink-faint">{hint ?? "Cmd + Enter to send"}</span>}
             </div>
+            {onSign && !busy && (
+              <button type="button" onClick={onSign} aria-pressed={!!signing} aria-label="Sign your message" title="Spell with your hands (ASL letters)" className={cn("flex h-9 shrink-0 cursor-pointer items-center gap-1.5 rounded-full border px-3 text-xs font-semibold transition-colors", signing ? "border-ink bg-ink text-white" : "border-line-button bg-surface text-ink hover:bg-surface-hover")}>
+                <Hand size={14} strokeWidth={2} aria-hidden />Sign
+              </button>
+            )}
             {onTalk && !busy && <TalkPill onClick={onTalk} unavailable={!!talkUnavailable} />}
             {busy && onStop ? (
               <button type="button" onClick={onStop} aria-label="Stop" title="Stop" className="flex size-9 shrink-0 cursor-pointer items-center justify-center rounded-full border-0 bg-ink text-white hover:bg-ink-3">

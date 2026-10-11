@@ -52,7 +52,7 @@ describe("connecting", () => {
     await beginConnect(U, "wispr", ORIGIN, "/account");
     const provider = auth.mock.calls[0]![0];
     expect(provider.redirectUrl).toBe("http://localhost:3000/api/integrations/wispr/callback");
-    expect(provider.clientMetadata).toMatchObject({ client_name: "Mastery", token_endpoint_auth_method: "none", redirect_uris: ["http://localhost:3000/api/integrations/wispr/callback"] });
+    expect(provider.clientMetadata).toMatchObject({ client_name: "ProveIt", token_endpoint_auth_method: "none", redirect_uris: ["http://localhost:3000/api/integrations/wispr/callback"] });
     expect(auth.mock.calls[0]![1].serverUrl).toBe("https://api.wisprflow.ai/connect/mcp");
   });
 

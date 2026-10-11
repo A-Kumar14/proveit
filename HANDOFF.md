@@ -387,3 +387,11 @@ Settings has five tabs: Learning, Tutor, Voice, Data and privacy, Accessibility.
 - Pages have their own browser tab titles, there is a styled 404, and screen-reader headings exist on settings, the course map and the tutor.
 - Text sizes use rem everywhere, so the Text size setting scales them. The sidebar is a drawer under 1024 px and page padding tightens. No page overflows sideways from 768 px up.
 - Every "talk it through" link (diagnosis, lesson, `?mode=speak`) opens the live call when a model is on, and Settings, Learning, Answer by Talk now opens it when you start a concept. A bad follow-up link opens the concept fresh instead of a 404.
+
+## Sign input (SignBridge in the tutor)
+
+The product name is ProveIt everywhere in the app (tab titles, masthead, sign-in, the OAuth client name, the data export filename).
+
+SignBridge now feeds the tutor instead of living only on `/signbridge`. A **Sign** button sits in the prompt bar of Test this concept and of the course tutor. It opens a camera panel (`SignInput`, hook `useSignSpelling` in `src/app/_components/signbridge/`): hold an ASL letter steady for four frames and it lands in a letter strip, with Space, Backspace, Clear, and **Use this**, which drops the word into the message box. Nothing goes to the tutor until the student sends. The panel reuses the existing `/api/signbridge/*` routes and the local Python service; if the service isn't running it says the exact command to start it and leaves the camera off. Settings, Accessibility has a **Sign input** switch (browser-local, default on). Letters only: it spells words, it does not sign sentences.
+
+Chrome is frosted (`glass`, `glass-side`, `app-canvas` utilities in `globals.css`): header, sidebar, composer, menus and dialogs blur what's behind them over a faint page wash. Content cards stay solid. Layout is unchanged; the overflow check still passes from 768 px up.

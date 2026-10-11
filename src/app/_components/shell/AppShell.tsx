@@ -11,7 +11,7 @@ async function AppShellForUser({ active, courseId, crumbs, state, right, childre
   active: NavKey; courseId?: string; crumbs: Crumb[]; state?: MasteryState; right?: React.ReactNode; children: React.ReactNode;
 }) {
   return (
-    <div className="flex h-screen bg-surface">
+    <div className="app-canvas flex h-screen">
       <SidebarFrame><Sidebar data={getSidebar()} active={active} courseId={courseId} profile={await currentProfile()} /></SidebarFrame>
       <main className="flex min-w-0 flex-1 flex-col">
         <HeaderBar crumbs={crumbs} state={state} right={right} />
