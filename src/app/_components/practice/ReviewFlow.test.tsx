@@ -14,7 +14,7 @@ import { ReviewFlow } from "./ReviewFlow";
 
 const challenge: ReviewChallengeView = {
   courseId: "intro-stats", conceptId: "cii", conceptName: "CI interpretation", state: "provisional", dueDay: "2026-10-10",
-  review: { question: "Is the report valid?", hint: "Think repeated samples." },
+  review: { question: "Is the report valid?", hint: "Think repeated samples.", sources: [] },
 };
 
 beforeEach(() => { push.mockReset(); review.mockReset(); });
