@@ -45,3 +45,15 @@ export function sessionOpening(courseId: string, conceptId: string): string {
   const { conceptName } = getQuestion(courseId, conceptId);
   return `Let's talk about ${conceptName}. Before I say anything, I'd like to hear your take. In plain terms, what do you think ${conceptName} means? Rough is fine, and "I'm not sure" is a fine place to start too.`;
 }
+
+const VOICE_RULES = `
+This is a live spoken call. Keep each reply under 40 words in short spoken sentences. Never write an OPTIONS line, lists, markdown or symbols. When it is time to check what they know, say so and suggest they end the call and tap "Check what I've got" in the chat. You never grade by voice.`;
+
+type Turn = { role: "user" | "assistant"; text: string };
+
+/** The tutor's brief for a voice call, plus whatever was already said in the chat so the call carries on from it. */
+export function voiceBrief(courseId: string, conceptId: string, history: Turn[]): { prompt: string; firstMessage: string } {
+  const said = history.map((t) => `${t.role === "user" ? "Student" : "Tutor"}: ${t.text}`).join("\n");
+  const prompt = `${sessionSystem(courseId, conceptId)}${VOICE_RULES}${said ? `\n\nThe conversation so far, from the chat. Carry on from it and don't repeat yourself:\n"""\n${said}\n"""` : ""}`;
+  return { prompt, firstMessage: said ? "Okay, picking up from the chat. Go ahead whenever you're ready." : sessionOpening(courseId, conceptId) };
+}

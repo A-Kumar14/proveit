@@ -367,3 +367,7 @@ After this backend hardening milestone, do one deliberate frontend/backend integ
 ## Rank ladder
 
 Overall tiers start at 0 / 1,000 / 5,000 / 10,000 / 50,000 / 100,000 / 500,000 points (Bronze to Legend). Each course uses `courseTiers(conceptCount)`, at 0, 10, 25, 45, 70, 90 and 100% of the course mastery point budget. Quiz answers award no rank. The course map and dashboard use `CourseRankBar`. Historical peak totals remain preserved.
+
+## Voice calls (ElevenLabs agent)
+
+`/course/[courseId]/practice/[conceptId]/talk` runs a live WebRTC call with an ElevenLabs agent when `ELEVENLABS_API_KEY` and `ELEVENLABS_AGENT_ID` are set (`AgentTalk`, `@elevenlabs/react` 1.16.0). Without them it falls back to the older browser-recognition page (`TalkChat`). `/api/voice/session` keeps the key on the server, returns a conversation token, and sends the concept's tutor brief (`voiceBrief` in `server/session.ts`) as a prompt override plus the chat so far, so the call carries on from the chat. The agent needs Security overrides on for system prompt and first message. The transcript goes into the same sessionStorage thread as the chat, and nothing said on a call is graded. Not built yet: a voice picker in settings (override `tts.voiceId`).
