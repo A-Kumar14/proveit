@@ -1299,7 +1299,7 @@ export class TaskLockedError extends Error {}
 
 export const taskRank = (t: Task) => (t.kind === "review" ? 1 : t.state === "needs_work" ? 0 : t.state === "developing" ? 2 : 3);
 
-function tasksFor(c: Course, _active: boolean): Task[] {
+function tasksFor(c: Course): Task[] {
   const today = isoDay(new Date());
   return c.concepts.flatMap((x): Task[] => {
     const provedByWork = x.state === "provisional" || x.state === "mastered";
@@ -1321,7 +1321,7 @@ export function getTodos(): TodoGroup[] {
   return [course, ...samples]
     .filter((c) => !isCompleted(c) && (!c.runtime || c.concepts.some((concept) => canPractice(c, concept))))
     .map((c) => {
-    const all = tasksFor(c, c === course);
+    const all = tasksFor(c);
     const open = all.filter((t) => !t.done).sort((a, b) => taskRank(a) - taskRank(b));
     return { courseId: c.id, courseName: c.name, open, done: all.filter((t) => t.done), total: all.length, doneCount: all.filter((t) => t.done).length };
   });
@@ -1330,7 +1330,7 @@ export function getTodos(): TodoGroup[] {
 /** Ticks or unticks a task by hand. Progress-based completion can't be undone, and a hand tick never changes mastery. */
 export function setTaskDone(id: string, done: boolean): void {
   const { course, samples } = db();
-  const task = [course, ...samples].flatMap((c) => tasksFor(c, c === course)).find((t) => t.id === id);
+  const task = [course, ...samples].flatMap((c) => tasksFor(c)).find((t) => t.id === id);
   if (!task) throw new NotFoundError(`task ${id}`);
   if (task.doneBy === "progress") throw new TaskLockedError("Your answers already completed this task.");
   if (done) db().taskDone.add(id);
