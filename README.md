@@ -125,7 +125,7 @@ SQLite is the hackathon/local persistence adapter, **not** a hosted production d
 | `src/server/practice.ts` / `quiz.ts` / `converse.ts` | Study modalities, scored assessments and low-stakes mastery evidence |
 | `src/server/rewardLedger.ts` | Weighted, anti-farming quiz/explanation point allocations |
 | `src/server/calendar.ts` / `schedule.ts` | Calendar and review scheduling |
-| `examples/signbridge/service.py` | Local model-service entry point for the isolated SignBridge feature |
+| `examples/signbridge/service.py` | Local model-service entry point for the isolated ASL Assistant feature |
 
 ## Current scope
 
@@ -143,6 +143,6 @@ Important remaining production/integration work:
 
 See `HANDOFF.md` for the agent-facing implementation state and `docs/concept-learning-spec.md` for the content/evidence contract.
 
-## SignBridge
+## ASL Assistant
 
 ProveIt includes an isolated sign-to-speech conversation backed by hand detection and a pretrained ASL landmark classifier. Static letters are not added when no hand is detected or the model score is uncertain. Movement recognition is opt-in and needs a configured vision provider or trained upstream sequence model. See [docs/signbridge.md](docs/signbridge.md) for setup and run commands.

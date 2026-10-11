@@ -99,12 +99,12 @@ describe("SignBridge session health", () => {
       ok: true,
       json: async () => ({ ok: true, service: "signbridge" }),
     }));
-    await expect(checkSignBridgeHealth()).rejects.toThrow("not a compatible SignBridge model service");
+    await expect(checkSignBridgeHealth()).rejects.toThrow("not a compatible ASL Assistant model service");
   });
 
   it("explains when the model service is not running", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("fetch failed")));
-    await expect(checkSignBridgeHealth()).rejects.toThrow("No SignBridge model service responded");
+    await expect(checkSignBridgeHealth()).rejects.toThrow("No ASL Assistant model service responded");
   });
 
   it("resets temporal prediction state", async () => {

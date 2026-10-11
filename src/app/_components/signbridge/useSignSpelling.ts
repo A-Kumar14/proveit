@@ -11,7 +11,7 @@ export type SignState = "off" | "starting" | "live";
 
 /**
  * Spells with the camera. A held ASL letter that stays steady for four frames is added to `letters`.
- * The same letter is not added twice until the hand moves. Camera frames go to the local SignBridge
+ * The same letter is not added twice until the hand moves. Camera frames go to the local ASL Assistant
  * service and are never stored. Without that service the hook stops with a message that says how to start it.
  */
 export function useSignSpelling() {

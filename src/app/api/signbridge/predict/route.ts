@@ -15,7 +15,7 @@ export async function POST(request: Request) {
       headers: { "Cache-Control": "no-store" },
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : "The SignBridge model request failed.";
+    const message = error instanceof Error ? error.message : "The ASL Assistant model request failed.";
     return NextResponse.json({ error: message }, { status: 503 });
   }
 }
