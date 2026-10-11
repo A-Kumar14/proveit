@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // The SignBridge Python environment ships JavaScript of its own.
+    ".venv-signbridge/**",
   ]),
 ]);
 
