@@ -124,6 +124,7 @@ SQLite is the hackathon/local persistence adapter, **not** a hosted production d
 | `src/server/materials.ts` / `ingest.ts` | Course material and ingestion |
 | `src/server/practice.ts` / `quiz.ts` / `converse.ts` | Study modalities and low-stakes evidence |
 | `src/server/calendar.ts` / `schedule.ts` | Calendar and review scheduling |
+| `examples/signbridge/service.py` | Local model-service entry point for the isolated SignBridge feature |
 
 ## Current scope
 
@@ -140,3 +141,7 @@ Important remaining production/integration work:
 - generated grounding/source lineage should not be described as hallucination-free or as proof of factual entailment.
 
 See `HANDOFF.md` for the agent-facing implementation state and `docs/concept-learning-spec.md` for the content/evidence contract.
+
+## SignBridge
+
+ProveIt includes an isolated sign-to-speech conversation backed by hand detection and a pretrained ASL landmark classifier. Static letters are not added when no hand is detected or the model score is uncertain. Movement recognition is opt-in and needs a configured vision provider or trained upstream sequence model. See [docs/signbridge.md](docs/signbridge.md) for setup and run commands.
