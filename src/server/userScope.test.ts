@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { clearUserCachesForTests, runAsUser, scopedUserId, userStorageKey } from "./userScope";
 import { closePersistenceForTests, loadJson, saveJson } from "./persistence";
-import { assess, createCourse, getCourse, getEvidenceAttempt, getHistory, getRewards, getTodos, listCourses, setTaskDone, setCoursesCompleted, submitTransfer } from "./store";
+import { assess, createCourse, getCourse, getEvidenceAttempt, getHistory, getRewards, getTodos, listCourses, recordQuiz, setTaskDone, setCoursesCompleted, submitTransfer } from "./store";
 import { listMaterials, removeMaterial, saveMaterial } from "./materials";
 import { disconnectCalendar, getCalendarState } from "./calendar";
 import { startQuiz, submitQuiz } from "./quiz";
@@ -45,6 +45,13 @@ describe("account state isolation", () => {
       const answer = await assess({ courseId: "intro-stats", conceptId: "cii", answer: sound });
       await submitTransfer(answer.attemptId, "About 95 intervals contain the true mean. One calculated interval either contains it or does not; 95% describes the method.");
       expect(cii().state).toBe("provisional");
+      recordQuiz({
+        courseId: "intro-stats",
+        items: ["A", "B", "C", "D"].map((suffix) => ({
+          conceptId: "cii", concept: "CI interpretation", prompt: `CI coverage ${suffix}`,
+          options: ["right", "wrong"], picked: 0, correct: 0, explanation: "right",
+        })),
+      });
       expect(getRewards().points).toBeGreaterThan(0);
       return { id, material, attempt: answer.attemptId };
     });
