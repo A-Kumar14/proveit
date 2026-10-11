@@ -20,9 +20,19 @@ describe("getSignBridgeServiceUrl", () => {
 describe("predictSignBridgeFrame", () => {
   it("surfaces the model response body on success", async () => {
     const landmarks = Array.from({ length: 21 }, (_, index) => [index / 20, index / 20]);
+    const faceLandmarks = Array.from({ length: 12 }, (_, index) => [index / 12, index / 12]);
     vi.stubGlobal("fetch", vi.fn().mockResolvedValue({
       ok: true,
-      json: async () => ({ label: "A", confidence: 0.91, source: "static", handDetected: true, landmarks }),
+      json: async () => ({
+        label: "A",
+        confidence: 0.91,
+        source: "static",
+        handDetected: true,
+        landmarks,
+        faceDetected: true,
+        faceLandmarks,
+        facialCues: { mouthOpen: 0.1, browEyeGap: 1.2 },
+      }),
     }));
 
     await expect(predictSignBridgeFrame(crypto.randomUUID(), "YWJj")).resolves.toMatchObject({
@@ -31,6 +41,9 @@ describe("predictSignBridgeFrame", () => {
       source: "static",
       handDetected: true,
       landmarks,
+      faceDetected: true,
+      faceLandmarks,
+      facialCues: { mouthOpen: 0.1, browEyeGap: 1.2 },
     });
   });
 

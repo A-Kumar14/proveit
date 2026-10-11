@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+/.venv-signbridge/
 /.pnp
 .pnp.*
 .yarn/*
@@ -12,6 +13,8 @@
 
 # testing
 /coverage
+__pycache__/
+*.py[cod]
 
 # next.js
 /.next/
