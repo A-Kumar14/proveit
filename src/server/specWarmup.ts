@@ -1,7 +1,7 @@
 import "server-only";
 import { aiEnabled } from "./ai";
 import { ensureConceptLearningSpec } from "./learningSpecGenerator";
-import { getCourse, isRuntimeCourse } from "./store";
+import { canGenerateFor, getCourse } from "./store";
 import { scopedUserId } from "./userScope";
 
 const running = new Set<string>();
@@ -18,7 +18,7 @@ export async function warmCourseSpecs(courseId: string, concurrency = 4): Promis
   running.add(key);
   try {
     const course = getCourse(courseId);
-    if (!isRuntimeCourse(courseId)) return;
+    if (!canGenerateFor(courseId)) return;
     const todo = course.concepts.map((c) => c.id);
     await Promise.all(Array.from({ length: Math.min(concurrency, todo.length) }, async () => {
       for (let id = todo.shift(); id !== undefined; id = todo.shift()) {

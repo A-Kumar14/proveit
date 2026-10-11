@@ -1,5 +1,7 @@
 import { dropUserCache, userCache } from "./userScope";
 import "server-only";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { cardStatus, type AssessInput, type AssessResult, type AttemptKind, type AttemptOutcome, type CourseOutline, type Evaluation, type MasteryState, type ReviewSubmitResult, type AssessmentReward, type ReviewText, type TransferResult } from "@proveit/lib/schemas";
 import { toneForPct, type Tone } from "@proveit/lib/mastery";
 import { judgeAnswerForSpec, judgeReviewForSpec, judgeTransferForSpec, type AnswerContext } from "./evaluator";
@@ -345,6 +347,20 @@ export const addedCourseIds = (): string[] => db().samples.flatMap((c) => (c.spe
 /** True for courses added at runtime (uploads, imports, the catalog), whose learning content is written on demand. */
 export const isRuntimeCourse = (courseId: string): boolean => Boolean(courseFor(courseId).runtime);
 
+const notesCache = new Map<string, string | null>();
+/** Notes shipped for a built-in course in content/notes/<id>.md. They let the model write content for every concept, not only the authored ones. */
+export function builtinNotes(courseId: string): string | null {
+  if (!notesCache.has(courseId) || process.env.NODE_ENV !== "production") {
+    let text: string | null = null;
+    try { text = readFileSync(join(process.cwd(), "content", "notes", `${courseId}.md`), "utf8").trim() || null; } catch { text = null; }
+    notesCache.set(courseId, text);
+  }
+  return notesCache.get(courseId) ?? null;
+}
+/** Whether a course's missing learning content can be written by the model: courses you added, and built-in ones that ship notes. */
+const canGenerate = (course: Course) => course.runtime === true || builtinNotes(course.id) !== null;
+export const canGenerateFor = (courseId: string): boolean => canGenerate(courseFor(courseId));
+
 /** The notes a course was built from, or null for a course with authored content only. */
 export function courseSpec(courseId: string): CourseSpec | null {
   return courseFor(courseId).spec ?? null;
@@ -630,7 +646,7 @@ const dueConcepts = () => {
 };
 
 const testableIn = (courseId: string, c: Concept) => Boolean(getLearningSpec(courseId, c.id));
-const canPractice = (course: Course, c: Concept) => testableIn(course.id, c) || (course.runtime === true && aiEnabled());
+const canPractice = (course: Course, c: Concept) => testableIn(course.id, c) || (canGenerate(course) && aiEnabled());
 const upsertSkill = (c: Concept, skill: Skill) => {
   const skills = c.skills ?? [];
   c.skills = skills.some((x) => x.label === skill.label)
@@ -859,7 +875,7 @@ export function getQuestion(courseId: string, conceptId: string, revision?: numb
 /** Generate runtime-course content on demand, then return the same question view used for authored content. */
 export async function ensureQuestion(courseId: string, conceptId: string): Promise<QuestionView> {
   const course = courseFor(courseId);
-  if (course.runtime) await ensureConceptLearningSpec(courseId, conceptId);
+  if (canGenerate(course) && aiEnabled()) await ensureConceptLearningSpec(courseId, conceptId);
   return getQuestion(courseId, conceptId);
 }
 
@@ -886,7 +902,7 @@ export async function assess(input: AssessInput): Promise<AssessResult> {
   const course = courseFor(input.courseId);
   const spec = parent
     ? specForAttempt(parent)
-    : course.runtime
+    : canGenerate(course) && aiEnabled()
       ? await ensureConceptLearningSpec(input.courseId, input.conceptId)
       : specFor(input.courseId, input.conceptId);
   if (input.learningSpecRevision !== undefined && input.learningSpecRevision !== spec.revision) {
@@ -1630,7 +1646,7 @@ function tasksFor(c: Course): Task[] {
 export function getTodos(): TodoGroup[] {
   const { course, samples } = db();
   return [course, ...samples]
-    .filter((c) => !isCompleted(c) && (!c.runtime || c.concepts.some((concept) => canPractice(c, concept))))
+    .filter((c) => !isCompleted(c) && (!canGenerate(c) || c.concepts.some((concept) => canPractice(c, concept))))
     .map((c) => {
     const all = tasksFor(c);
     const open = all.filter((t) => !t.done).sort((a, b) => taskRank(a) - taskRank(b));

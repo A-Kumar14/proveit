@@ -29,7 +29,7 @@ export function SignInput({ onUse, onClose }: { onUse: (text: string) => void; o
   }
 
   return (
-    <section aria-label="Sign your message" className="glass mx-auto mb-2 flex w-full max-w-[822px] flex-col gap-3 rounded-[14px] border p-3.5">
+    <section aria-label="Sign your message" className="glass mb-2 flex w-full max-w-[822px] flex-col gap-3 rounded-[14px] border p-3.5">
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2 text-sm">
           <span className={cn("size-2 shrink-0 rounded-full", live ? "bg-mastered" : "bg-ink-faint")} aria-hidden />

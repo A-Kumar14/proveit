@@ -5,7 +5,7 @@ const course = vi.hoisted(() => ({ runtime: true, concepts: Array.from({ length:
 
 vi.mock("./ai", () => ({ aiEnabled: () => true }));
 vi.mock("./learningSpecGenerator", () => ({ ensureConceptLearningSpec: gen.ensure }));
-vi.mock("./store", () => ({ getCourse: () => course, isRuntimeCourse: () => course.runtime }));
+vi.mock("./store", () => ({ getCourse: () => course, canGenerateFor: () => course.runtime }));
 vi.mock("./userScope", () => ({ scopedUserId: () => "u1" }));
 
 import { warmCourseSpecs } from "./specWarmup";
