@@ -92,20 +92,20 @@ function RankTrack({ r }: { r: Rewards }) {
   const fill = Math.min(100, ((r.tierIndex + (r.next ? r.pct / 100 : 0)) / steps) * 100);
   const c = tierColor(r.tier.id);
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-1.5">
       <div className="flex flex-wrap items-baseline gap-x-3">
-        <span className="text-base font-semibold" data-tier-text style={{ color: c.text }}>{r.tier.name}</span>
+        <span className="text-sm font-semibold" data-tier-text style={{ color: c.text }}>{r.tier.name}</span>
         <span className="text-sm tabular-nums text-ink-muted">{fmt(r.points)} points</span>
         <span className="ml-auto text-xs text-ink-muted">{r.next ? `${fmt(r.toNext)} to ${r.next.name}` : "Top tier reached"}</span>
       </div>
-      <div className="relative px-4 pb-6 pt-4">
+      <div className="relative px-4 pb-7 pt-3">
         <div role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={r.pct} aria-label={r.next ? `Progress to ${r.next.name}` : "Top tier reached"} className="h-2 rounded-full bg-surface-active">
           <div className="h-full rounded-full" style={{ width: `${fill}%`, background: `linear-gradient(90deg, ${tierColor(r.ladder[0]!.id).from}, ${c.to})` }} />
         </div>
         <ol className="absolute inset-x-4 top-0 m-0 list-none p-0" aria-label="Tiers">
           {r.ladder.map((t, i) => (
-            <li key={t.id} aria-current={t.current ? "step" : undefined} className="absolute flex -translate-x-1/2 flex-col items-center gap-1" style={{ left: `${(i / steps) * 100}%` }}>
-              <TierBadge id={t.id} size={t.current ? 30 : 24} filled={t.reached} className={cn(t.current && "outline outline-2 outline-offset-2")} style={t.current ? { outlineColor: tierColor(t.id).to } : undefined} />
+            <li key={t.id} aria-current={t.current ? "step" : undefined} className="absolute flex -translate-x-1/2 flex-col items-center gap-0.5" style={{ left: `${(i / steps) * 100}%` }}>
+              <TierBadge id={t.id} size={t.current ? 24 : 20} filled={t.reached} className={cn(t.current && "outline outline-2 outline-offset-2")} style={t.current ? { outlineColor: tierColor(t.id).to } : undefined} />
               <span className={cn("whitespace-nowrap text-[0.625rem]", t.current ? "font-semibold" : t.reached ? "text-ink-3" : "text-ink-faint")} data-tier-text style={t.current ? { color: tierColor(t.id).text } : undefined}>{t.name}</span>
             </li>
           ))}

@@ -19,9 +19,9 @@ export function RankExpander({ collapsed, expanded }: { collapsed: React.ReactNo
   return (
     <>
       <div id="rank-details">{open ? expanded : collapsed}</div>
-      <div className="-mb-2 flex justify-center">
+      <div className="-mb-2 -mt-1 flex justify-center">
         <button type="button" onClick={toggle} aria-expanded={open} aria-controls="rank-details" aria-label={open ? "Show less rank detail" : "Show full rank details"}
-          className="flex h-7 w-12 cursor-pointer items-center justify-center rounded-full border border-line bg-surface text-ink-muted hover:bg-surface-hover hover:text-ink">
+          className="flex h-6 w-11 cursor-pointer items-center justify-center rounded-full border border-line bg-surface text-ink-muted hover:bg-surface-hover hover:text-ink">
           <ChevronDown size={16} strokeWidth={2} aria-hidden className={cn("transition-transform duration-200", open && "rotate-180")} />
         </button>
       </div>
