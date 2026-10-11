@@ -214,7 +214,7 @@ export function TutorChat({ courseId, courseName, base, aiWritten, enabled }: { 
         />
       ) : (
         <>
-        {signing && <div className="shrink-0 px-4 lg:px-7"><SignInput onUse={(t) => setDraft((d) => (d.trim() ? `${d.trimEnd()} ${t}` : t))} onClose={() => setSigning(false)} /></div>}
+        {signing && <SignInput onUse={(t) => setDraft((d) => (d.trim() ? `${d.trimEnd()} ${t}` : t))} onClose={() => setSigning(false)} />}
         <Composer
           value={draft} onChange={setDraft} onSubmit={submit} status={enabled ? status : "idle"} error={enabled ? error : null}
           placeholder={enabled ? "Ask the tutor anything" : "The tutor is temporarily unavailable"} submitLabel="Send" loadingText="Tutor is replying..."
@@ -245,4 +245,3 @@ export function TutorChat({ courseId, courseName, base, aiWritten, enabled }: { 
     </>
   );
 }
-

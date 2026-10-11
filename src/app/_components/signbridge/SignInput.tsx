@@ -29,14 +29,14 @@ export function SignInput({ onUse, onClose }: { onUse: (text: string) => void; o
   }
 
   return (
-    <section aria-label="Sign your message" className="glass mb-2 flex w-full max-w-[822px] flex-col gap-3 rounded-[14px] border p-3.5">
+    <aside aria-label="ASL Assistant panel" className="glass fixed inset-y-4 right-4 z-[60] flex w-[min(50vw,560px)] min-w-0 flex-col gap-3 overflow-y-auto rounded-2xl border border-line bg-surface p-3.5 shadow-[0_16px_48px_rgba(0,0,0,0.2)] max-[640px]:w-[calc(100vw-2rem)]">
       <div className="flex items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-2 text-sm">
           <span className={cn("size-2 shrink-0 rounded-full", live ? "bg-mastered" : "bg-ink-faint")} aria-hidden />
-          <span className="shrink-0 font-semibold">Sign</span>
+          <span className="shrink-0 font-semibold">ASL Assistant</span>
           <span role="status" className="truncate text-ink-muted">{s.status}</span>
         </div>
-        <button type="button" onClick={() => { s.stop(); onClose(); }} aria-label="Close sign input" className="flex size-8 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent text-ink-muted hover:bg-surface-hover"><X size={15} aria-hidden /></button>
+        <button type="button" onClick={() => { s.stop(); onClose(); }} aria-label="Close ASL Assistant" className="flex size-8 cursor-pointer items-center justify-center rounded-full border-0 bg-transparent text-ink-muted hover:bg-surface-hover"><X size={15} aria-hidden /></button>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-[220px_minmax(0,1fr)]">
@@ -75,6 +75,6 @@ export function SignInput({ onUse, onClose }: { onUse: (text: string) => void; o
           </div>
         </div>
       </div>
-    </section>
+    </aside>
   );
 }
