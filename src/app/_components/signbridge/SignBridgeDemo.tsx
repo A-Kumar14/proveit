@@ -15,6 +15,9 @@ const HAND_CONNECTIONS = [
   [5, 9], [9, 10], [10, 11], [11, 12], [9, 13], [13, 14], [14, 15], [15, 16],
   [13, 17], [17, 18], [18, 19], [19, 20], [0, 17],
 ] as const;
+const FACE_CONNECTIONS = [
+  [0, 1], [1, 2], [2, 3], [3, 0], [4, 5], [6, 7], [8, 9], [10, 11],
+] as const;
 
 export function SignBridgeDemo() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -23,6 +26,8 @@ export function SignBridgeDemo() {
   const streamRef = useRef<MediaStream | null>(null);
   const sessionRef = useRef<string | null>(null);
   const liveTimerRef = useRef<number | null>(null);
+  const predictionAbortRef = useRef<AbortController | null>(null);
+  const motionAbortRef = useRef<AbortController | null>(null);
   const startingRef = useRef(false);
   const activeRef = useRef(false);
   const mountedRef = useRef(true);
@@ -30,6 +35,7 @@ export function SignBridgeDemo() {
   const acceptedRef = useRef<string | null>(null);
   const releaseFramesRef = useRef(0);
   const liveRequestRef = useRef(false);
+  const consecutiveFailuresRef = useRef(0);
   const motionCaptureRef = useRef(false);
   const speakOnCaptureRef = useRef(false);
   const [status, setStatus] = useState("Start the camera to begin live sign recognition.");
@@ -61,6 +67,9 @@ export function SignBridgeDemo() {
 
   const stopCamera = () => {
     activeRef.current = false;
+    predictionAbortRef.current?.abort();
+    motionAbortRef.current?.abort();
+    motionCaptureRef.current = false;
     if (liveTimerRef.current !== null) window.clearTimeout(liveTimerRef.current);
     liveTimerRef.current = null;
     streamRef.current?.getTracks().forEach((track) => track.stop());
@@ -79,6 +88,8 @@ export function SignBridgeDemo() {
     return () => {
       mountedRef.current = false;
       activeRef.current = false;
+      predictionAbortRef.current?.abort();
+      motionAbortRef.current?.abort();
       if (liveTimerRef.current !== null) window.clearTimeout(liveTimerRef.current);
       streamRef.current?.getTracks().forEach((track) => track.stop());
       if (sessionRef.current) clearRecognitionSession(sessionRef.current);
@@ -94,42 +105,58 @@ export function SignBridgeDemo() {
     }
     const context = canvas.getContext("2d");
     if (!context) throw new Error("The camera frame could not be prepared.");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
+    const scale = Math.min(1, 480 / Math.max(video.videoWidth, video.videoHeight));
+    const width = Math.max(1, Math.round(video.videoWidth * scale));
+    const height = Math.max(1, Math.round(video.videoHeight * scale));
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
+    }
     context.drawImage(video, 0, 0, canvas.width, canvas.height);
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.72));
+    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/jpeg", 0.62));
     if (!blob) throw new Error("The camera frame could not be encoded.");
     const bytes = new Uint8Array(await blob.arrayBuffer());
-    return btoa(Array.from(bytes, (byte) => String.fromCharCode(byte)).join(""));
+    let binary = "";
+    for (let offset = 0; offset < bytes.length; offset += 0x8000) {
+      binary += String.fromCharCode(...bytes.subarray(offset, offset + 0x8000));
+    }
+    return btoa(binary);
   };
 
   const requestPrediction = async (image: string, sessionId = sessionRef.current) => {
     if (!sessionId) throw new Error("Start the camera before recognizing a sign.");
-    const response = await fetch("/api/signbridge/predict", {
-      method: "POST",
-      cache: "no-store",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ sessionId, image }),
-    });
-    const payload = await response.json().catch(() => null);
-    if (!response.ok) throw new Error(typeof payload?.error === "string" ? payload.error : "The SignBridge model request failed.");
-    const parsed = SignBridgePrediction.safeParse(payload);
-    if (!parsed.success) throw new Error("The SignBridge service returned an invalid prediction.");
-    return parsed.data;
+    const controller = new AbortController();
+    predictionAbortRef.current = controller;
+    try {
+      const response = await fetch("/api/signbridge/predict", {
+        method: "POST",
+        cache: "no-store",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ sessionId, image }),
+        signal: controller.signal,
+      });
+      const payload = await response.json().catch(() => null);
+      if (!response.ok) throw new Error(typeof payload?.error === "string" ? payload.error : "The SignBridge model request failed.");
+      const parsed = SignBridgePrediction.safeParse(payload);
+      if (!parsed.success) throw new Error("The SignBridge service returned an invalid prediction.");
+      return parsed.data;
+    } finally {
+      if (predictionAbortRef.current === controller) predictionAbortRef.current = null;
+    }
   };
 
-  const drawLandmarks = (result: SignBridgePrediction) => {
+  const drawTrackingOverlay = (result: SignBridgePrediction) => {
     const canvas = landmarkCanvasRef.current;
     const video = videoRef.current;
     if (!canvas || !video) return;
-    if (!result.landmarks || !result.handDetected) {
-      clearLandmarkCanvas();
-      return;
-    }
     const bounds = canvas.getBoundingClientRect();
     const pixelRatio = window.devicePixelRatio || 1;
-    canvas.width = Math.round(bounds.width * pixelRatio);
-    canvas.height = Math.round(bounds.height * pixelRatio);
+    const width = Math.round(bounds.width * pixelRatio);
+    const height = Math.round(bounds.height * pixelRatio);
+    if (canvas.width !== width || canvas.height !== height) {
+      canvas.width = width;
+      canvas.height = height;
+    }
     const context = canvas.getContext("2d");
     if (!context) return;
     context.clearRect(0, 0, canvas.width, canvas.height);
@@ -140,24 +167,38 @@ export function SignBridgeDemo() {
     const renderedHeight = video.videoHeight * scale;
     const offsetX = (canvas.width - renderedWidth) / 2;
     const offsetY = (canvas.height - renderedHeight) / 2;
-    context.lineWidth = Math.max(2, canvas.width / 320);
-    context.strokeStyle = "#f08a55";
-    for (const [start, end] of HAND_CONNECTIONS) {
-      const [x1, y1] = result.landmarks[start];
-      const [x2, y2] = result.landmarks[end];
-      context.beginPath();
-      context.moveTo(offsetX + x1 * renderedWidth, offsetY + y1 * renderedHeight);
-      context.lineTo(offsetX + x2 * renderedWidth, offsetY + y2 * renderedHeight);
-      context.stroke();
+    if (result.landmarks && result.handDetected) {
+      context.lineWidth = Math.max(2, canvas.width / 320);
+      context.strokeStyle = "#f08a55";
+      for (const [start, end] of HAND_CONNECTIONS) {
+        const [x1, y1] = result.landmarks[start];
+        const [x2, y2] = result.landmarks[end];
+        context.beginPath();
+        context.moveTo(offsetX + x1 * renderedWidth, offsetY + y1 * renderedHeight);
+        context.lineTo(offsetX + x2 * renderedWidth, offsetY + y2 * renderedHeight);
+        context.stroke();
+      }
+      context.fillStyle = "#fffaf5";
+      context.strokeStyle = "#b75e32";
+      context.lineWidth = Math.max(1.5, canvas.width / 420);
+      for (const [x, y] of result.landmarks) {
+        context.beginPath();
+        context.arc(offsetX + x * renderedWidth, offsetY + y * renderedHeight, Math.max(3, canvas.width / 150), 0, Math.PI * 2);
+        context.fill();
+        context.stroke();
+      }
     }
-    context.fillStyle = "#fffaf5";
-    context.strokeStyle = "#b75e32";
-    context.lineWidth = Math.max(1.5, canvas.width / 420);
-    for (const [x, y] of result.landmarks) {
-      context.beginPath();
-      context.arc(offsetX + x * renderedWidth, offsetY + y * renderedHeight, Math.max(3, canvas.width / 150), 0, Math.PI * 2);
-      context.fill();
-      context.stroke();
+    if (result.faceLandmarks && result.faceDetected) {
+      context.lineWidth = Math.max(1.5, canvas.width / 500);
+      context.strokeStyle = "#65d6c4";
+      for (const [start, end] of FACE_CONNECTIONS) {
+        const [x1, y1] = result.faceLandmarks[start];
+        const [x2, y2] = result.faceLandmarks[end];
+        context.beginPath();
+        context.moveTo(offsetX + x1 * renderedWidth, offsetY + y1 * renderedHeight);
+        context.lineTo(offsetX + x2 * renderedWidth, offsetY + y2 * renderedHeight);
+        context.stroke();
+      }
     }
   };
 
@@ -171,7 +212,7 @@ export function SignBridgeDemo() {
 
   const processLivePrediction = (result: SignBridgePrediction) => {
     setPrediction(result);
-    drawLandmarks(result);
+    drawTrackingOverlay(result);
     const isConfidentLetter = result.handDetected
       && result.source === "static"
       && /^[A-Z]$/.test(result.label)
@@ -228,18 +269,23 @@ export function SignBridgeDemo() {
     try {
       const result = await requestPrediction(await captureFrame(), sessionId);
       if (!activeRef.current || !mountedRef.current || sessionRef.current !== sessionId) return;
+      consecutiveFailuresRef.current = 0;
       processLivePrediction(result);
       setError(null);
     } catch (trackingError) {
       if (activeRef.current) {
+        consecutiveFailuresRef.current += 1;
         setError(trackingError instanceof Error ? trackingError.message : "Live hand recognition failed.");
-        setStatus("Recognition paused. Stop and restart the camera to retry.");
-        activeRef.current = false;
+        setStatus("Connection interrupted. Keeping the camera on and retrying recognition.");
       }
     } finally {
       liveRequestRef.current = false;
       if (activeRef.current) {
-        liveTimerRef.current = window.setTimeout(() => void trackNextFrame(), LIVE_INTERVAL_MS);
+        const retryDelay = Math.min(500 * 2 ** Math.min(consecutiveFailuresRef.current, 3), 4_000);
+        liveTimerRef.current = window.setTimeout(
+          () => void trackNextFrame(),
+          consecutiveFailuresRef.current ? retryDelay : LIVE_INTERVAL_MS,
+        );
       }
     }
   };
@@ -252,6 +298,7 @@ export function SignBridgeDemo() {
     setHealth(null);
     setPrediction(null);
     setSuggestion(null);
+    consecutiveFailuresRef.current = 0;
     candidateRef.current = null;
     acceptedRef.current = null;
     releaseFramesRef.current = 0;
@@ -276,7 +323,12 @@ export function SignBridgeDemo() {
     try {
       if (!navigator.mediaDevices?.getUserMedia) throw new Error("This browser does not support camera access.");
       stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user", width: { ideal: 640 }, height: { ideal: 480 } },
+        video: {
+          facingMode: "user",
+          width: { ideal: 480 },
+          height: { ideal: 360 },
+          frameRate: { ideal: 15, max: 24 },
+        },
         audio: false,
       });
       if (!mountedRef.current) {
@@ -330,11 +382,14 @@ export function SignBridgeDemo() {
         }
       }
       if (!activeRef.current || sessionRef.current !== sessionId) return;
+      const controller = new AbortController();
+      motionAbortRef.current = controller;
       const response = await fetch("/api/signbridge/motion", {
         method: "POST",
         cache: "no-store",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ sessionId, frames }),
+        signal: controller.signal,
       });
       const payload = await response.json().catch(() => null);
       if (!response.ok) throw new Error(typeof payload?.error === "string" ? payload.error : "The motion model request failed.");
@@ -349,9 +404,12 @@ export function SignBridgeDemo() {
         setStatus("Movement model suggestion ready. Review it before adding it.");
       }
     } catch (motionError) {
-      setError(motionError instanceof Error ? motionError.message : "Motion recognition failed.");
-      setStatus("Movement capture failed.");
+      if (activeRef.current && sessionRef.current === sessionId) {
+        setError(motionError instanceof Error ? motionError.message : "Motion recognition failed.");
+        setStatus("Movement capture failed.");
+      }
     } finally {
+      motionAbortRef.current = null;
       motionCaptureRef.current = false;
       if (mountedRef.current) {
         setRecognizingMotion(false);
@@ -426,6 +484,11 @@ export function SignBridgeDemo() {
           <div className="pointer-events-none absolute left-3 top-3 rounded-full bg-black/60 px-3 py-1 text-xs font-medium text-white">
             {prediction?.handDetected ? "HAND TRACKED" : "WAITING FOR HAND"}
           </div>
+          {prediction?.faceDetected && (
+            <div className="pointer-events-none absolute right-3 top-3 rounded-full bg-black/60 px-3 py-1 text-xs font-medium text-[#a8f3e6]">
+              FACE TRACKED
+            </div>
+          )}
           {prediction?.handDetected && prediction.source === "static" && prediction.confidence !== null && (
             <div className="pointer-events-none absolute bottom-3 right-3 rounded-xl bg-black/75 px-4 py-2 text-white">
               <span className="block text-[0.625rem] uppercase tracking-widest text-white/65">Possible letter</span>
@@ -437,9 +500,17 @@ export function SignBridgeDemo() {
         </div>
 
         <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-ink-muted">
-          <span>Hold each fingerspelled letter steady; move your hand between repeated letters.</span>
+          <span>Hold each fingerspelled letter steady; move your hand between repeated letters. Teal lines track facial landmarks.</span>
           {health && <span>Model: <strong className="font-medium text-ink">{health.model}</strong></span>}
         </div>
+        {prediction?.faceDetected && prediction.facialCues && (
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-line bg-surface-subtle px-3 py-2 text-xs text-ink-muted" aria-live="polite">
+            <span className="font-medium text-ink">Experimental non-manual cues</span>
+            <span>Mouth opening: {Math.round(prediction.facialCues.mouthOpen * 100)}%</span>
+            <span>Brow/eye spacing: {prediction.facialCues.browEyeGap.toFixed(1)}×</span>
+            <span>These are landmarks, not interpreted ASL grammar.</span>
+          </div>
+        )}
         <div className="flex flex-wrap gap-1.5" aria-label="Supported ASL fingerspelling letters">
           {"ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").map((letter) => (
             <span key={letter} className="rounded-md border border-line bg-surface-subtle px-2 py-1 text-xs font-medium text-ink-muted">{letter}</span>
@@ -514,7 +585,7 @@ export function SignBridgeDemo() {
         </div>
 
         <p className="m-0 border-t border-line pt-3 text-xs leading-5 text-ink-muted">
-          Live model: hand-tracked ASL alphabet fingerspelling (A–Z). Full ASL word and sentence translation needs trained movement data/model support; it is not inferred from an alphabet classifier.
+          Live model: hand-tracked ASL alphabet fingerspelling (A–Z). Face landmarks and basic mouth/brow measurements run locally; they do not identify people or interpret facial grammar. Full ASL sentence translation needs a trained continuous-sign model.
         </p>
       </section>
     </div>
