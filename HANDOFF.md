@@ -162,3 +162,7 @@ The no-auth `local` namespace keeps original keys and test reset hooks. Pre-auth
 ## Concept learning spec architecture
 
 `docs/concept-learning-spec.md` describes the versioned JSON contract in `src/lib/conceptLearningSpec.ts`. CI interpretation and Standard Error now have canonical validated specs in `src/server/authoredLearningSpecs.ts`. `content.ts` derives its legacy view from those specs; deterministic grader functions live separately in `authoredJudges.ts`. Existing mastery/evaluator behavior is preserved. Generated content, its persistence/revision lifecycle, generalized evaluation and runtime-course mastery remain subsequent milestones.
+
+## Speech mode
+
+`/course/[courseId]/practice/[conceptId]/talk` is a spoken two-way conversation with the same tutor as the chat. It shares the transcript with `SessionChat` through sessionStorage, so the student can switch both ways. Speech in uses the browser's recognition (silence for 1.6s ends a turn). Speech out goes through `/api/voice/speak`, which proxies ElevenLabs (`ELEVENLABS_API_KEY`, optional `ELEVENLABS_VOICE_ID`, `ELEVENLABS_MODEL`) and falls back to browser speech on a 501. Nothing is graded in speech mode; the check happens in the chat.

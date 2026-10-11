@@ -207,6 +207,7 @@ export function SessionChat({ courseId, question, opening, resume }: {
         submitLabel={mode === "check" ? "Submit" : "Send"}
         loadingText={grading ? "Checking your reasoning..." : "Your tutor is replying..."}
         hint={mode === "check" ? "This answer is graded." : "Just talking. Nothing here is graded."}
+        onTalk={() => router.push(`/course/${courseId}/practice/${question.conceptId}/talk`)}
         onStop={replying ? () => abort.current?.abort() : undefined}
         leading={mode === "check"
           ? <button type="button" onClick={() => { setMode("chat"); setError(null); }} disabled={busy} className={cn(chip, "border-line bg-surface font-medium text-ink-3 hover:bg-surface-hover")}>Keep talking</button>
