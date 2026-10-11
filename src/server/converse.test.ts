@@ -5,17 +5,21 @@ let ai = false;
 vi.mock("ai", () => ({ generateText: (...a: unknown[]) => generateText(...a), Output: { object: (o: unknown) => o } }));
 vi.mock("./ai", () => ({ aiEnabled: () => ai, model: () => "mock-model" }));
 const judgeAnswer = vi.fn();
+const ensureSpec = vi.fn();
 vi.mock("./evaluator", () => ({
   judgeAnswerForSpec: (...a: unknown[]) => judgeAnswer(...a),
   judgeTransferForSpec: vi.fn(),
   judgeReviewForSpec: vi.fn(),
+}));
+vi.mock("./learningSpecGenerator", () => ({
+  ensureConceptLearningSpec: (...a: unknown[]) => ensureSpec(...a),
 }));
 
 import { audit, nextTurn } from "./converse";
 import type { Turn } from "@proveit/lib/schemas";
 import type { ConceptLearningSpec } from "@proveit/lib/conceptLearningSpec";
 import { createCourse, getCourse } from "./store";
-import { saveGeneratedLearningSpec } from "./learningSpecStore";
+import { getLearningSpec, saveGeneratedLearningSpec } from "./learningSpecStore";
 
 const Q: Turn = { role: "ai", text: "Explain what a 95% confidence interval means." };
 const WRONG = "There is a 95% probability that the true mean is inside my interval.";
@@ -24,6 +28,12 @@ const base = { courseId: "intro-stats", conceptId: "cii" };
 beforeEach(() => {
   generateText.mockReset();
   judgeAnswer.mockReset();
+  ensureSpec.mockReset();
+  ensureSpec.mockImplementation(async (courseId: string, conceptId: string) => {
+    const spec = getLearningSpec(courseId, conceptId);
+    if (!spec) throw new Error(`no content for ${conceptId}`);
+    return spec;
+  });
   ai = false;
   (globalThis as { __proveit?: unknown; __proveitLearningSpecs?: unknown }).__proveit = undefined;
   (globalThis as { __proveitLearningSpecs?: unknown }).__proveitLearningSpecs = undefined;
@@ -105,7 +115,7 @@ describe("audit", () => {
     const r = await audit({ ...base, turns: [Q, { role: "student", text: WRONG }] });
     expect(r.verdict).toBe("incorrect");
     expect(r.off[0]!.quote).toBe("95% probability that the true mean is inside my interval");
-    expect(r.off[0]!.fix).toContain("describes the method");
+    expect(r.off[0]!.fix).toContain("Repeat the study many times");
     expect(r.attemptId).toBeTruthy();
   });
 
