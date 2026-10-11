@@ -30,7 +30,7 @@ export function RankCard({ r, courses, previewable, userId = "local" }: { r: Rew
             {r.ladder.map((t) => (
               <li key={t.id} aria-current={t.current ? "step" : undefined} className="flex flex-col items-center gap-1.5 text-center">
                 <TierBadge id={t.id} size={t.current ? 38 : 30} filled={t.reached} className={cn(t.current && "outline outline-2 outline-offset-2")} style={t.current ? { outlineColor: tierColor(t.id).to } : undefined} />
-                <span className={cn("text-[0.6875rem]", t.current ? "font-semibold" : t.reached ? "text-ink-3" : "text-ink-faint")} style={t.current ? { color: tierColor(t.id).text } : undefined}>{t.name}</span>
+                <span className={cn("text-[0.6875rem]", t.current ? "font-semibold" : t.reached ? "text-ink-3" : "text-ink-faint")} data-tier-text style={t.current ? { color: tierColor(t.id).text } : undefined}>{t.name}</span>
                 <span className="text-[0.625rem] tabular-nums text-ink-faint">{fmt(t.min)}</span>
               </li>
             ))}

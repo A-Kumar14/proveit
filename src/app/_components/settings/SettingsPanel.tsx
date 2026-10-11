@@ -36,6 +36,9 @@ export function SettingsPanel({ initialPrefs, courses }: { initialPrefs: Prefs; 
         {tab === "learning" && (
           <>
             <h2 className="m-0 mb-1 text-lg font-semibold">Learning</h2>
+            <SettingRow title="Appearance" description="Light, dark, or match your computer. Saved in this browser.">
+              <Segmented label="Appearance" value={s.theme} onChange={(theme) => update({ theme })} options={[{ value: "light", label: "Light" }, { value: "dark", label: "Dark" }, { value: "system", label: "System" }]} />
+            </SettingRow>
             <SettingRow title="Answer by" description={canTalk ? "Talk opens the live voice call when you start Test this concept. You can switch to the chat from the call." : "Talk needs Chrome, Edge or Safari. This browser can only type."}>
               <Segmented label="Answer by" value={s.answerMode} onChange={(answerMode) => update({ answerMode })} options={[{ value: "type", label: "Type" }, { value: "talk", label: "Talk" }]} />
             </SettingRow>

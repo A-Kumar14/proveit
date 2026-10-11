@@ -13,6 +13,7 @@ export const TEXT_SIZES = [100, 115, 130, 150] as const;
 /** Capped at 150%: past that the fixed sidebar leaves too little room for the page. */
 export const ZOOMS = [100, 110, 125, 150] as const;
 export const READ_RATES = [0.8, 1, 1.25] as const;
+export const THEMES = ["system", "light", "dark"] as const;
 
 export type ReadingFont = (typeof READING_FONTS)[number];
 export type Spacing = (typeof SPACING)[number];
@@ -28,11 +29,13 @@ export type A11ySettings = {
   readAloudRate: (typeof READ_RATES)[number];
   textSize: (typeof TEXT_SIZES)[number];
   zoom: (typeof ZOOMS)[number];
+  /** Light, dark, or follow the operating system. */
+  theme: (typeof THEMES)[number];
 };
 
 export const A11Y_DEFAULTS: A11ySettings = {
   readingFont: "default", letterSpacing: "normal", wordSpacing: "normal", lineSpacing: "normal",
-  lineFocus: false, readAloud: false, readAloudRate: 1, textSize: 100, zoom: 100,
+  lineFocus: false, readAloud: false, readAloudRate: 1, textSize: 100, zoom: 100, theme: "system",
 };
 
 const pick = <T,>(options: readonly T[], value: unknown, fallback: T): T => (options.includes(value as T) ? (value as T) : fallback);
@@ -49,6 +52,7 @@ export function sanitizeA11y(raw: Partial<Record<keyof A11ySettings, unknown>>):
     readAloudRate: pick(READ_RATES, raw.readAloudRate, d.readAloudRate),
     textSize: pick(TEXT_SIZES, raw.textSize, d.textSize),
     zoom: pick(ZOOMS, raw.zoom, d.zoom),
+    theme: pick(THEMES, raw.theme, d.theme),
   };
 }
 
@@ -75,6 +79,9 @@ export function applyA11y(root: HTMLElement, s: Record<string, unknown>): void {
   set("data-a11y-zoom", String(zoom), "100");
   root.style.setProperty("--a11y-text", String(text / 100));
   root.style.setProperty("--a11y-zoom", String(zoom / 100));
+  const theme = one(["system", "light", "dark"], s.theme) as string;
+  const dark = theme === "dark" || (theme === "system" && typeof window !== "undefined" && !!window.matchMedia && window.matchMedia("(prefers-color-scheme: dark)").matches);
+  root.setAttribute("data-theme", dark ? "dark" : "light");
 }
 
 /** Inline <head> script: reads the saved settings and applies them before React hydrates. */

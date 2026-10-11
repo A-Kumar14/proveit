@@ -7,8 +7,8 @@ export const NodeIcon = ({ state }: { state: MasteryState }) =>
   state === "mastered" || state === "provisional" ? <Check size={16} strokeWidth={3} className="text-mastered" aria-hidden />
   : state === "developing" ? (
     <svg width="16" height="16" viewBox="0 0 24 24" aria-hidden>
-      <circle cx="12" cy="12" r="8" fill="none" stroke="#C98A0C" strokeWidth="2.4" />
-      <path d="M12 4a8 8 0 0 1 0 16z" fill="#C98A0C" />
+      <circle cx="12" cy="12" r="8" fill="none" stroke="var(--color-developing)" strokeWidth="2.4" />
+      <path d="M12 4a8 8 0 0 1 0 16z" fill="var(--color-developing)" />
     </svg>
   )
   : state === "needs_work" ? <span aria-hidden className="text-base font-bold leading-none text-needswork">!</span>
