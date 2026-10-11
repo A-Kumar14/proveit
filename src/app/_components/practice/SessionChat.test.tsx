@@ -215,7 +215,7 @@ describe("sign input", () => {
     mount();
     await userEvent.click(screen.getByRole("button", { name: "Open ASL Assistant" }));
     expect(screen.getByLabelText("ASL Assistant panel")).toBeTruthy();
-    await userEvent.click(screen.getByRole("button", { name: "Close ASL Assistant" }));
+    await userEvent.click(within(screen.getByLabelText("ASL Assistant panel")).getByRole("button", { name: "Close ASL Assistant" }));
     expect(screen.queryByLabelText("ASL Assistant panel")).toBeNull();
   });
 

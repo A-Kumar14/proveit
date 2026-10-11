@@ -387,7 +387,7 @@ export function SignBridgeDemo({ compact = false, autoStart = false, onRecognize
       autoStartAttemptedRef.current = true;
       void startCamera();
     }
-  }, [autoStart]);
+  }, [autoStart, startCamera]);
 
   const captureMovement = async () => {
     const sessionId = sessionRef.current;
