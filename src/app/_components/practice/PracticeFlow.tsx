@@ -5,8 +5,10 @@ import type { AssessmentReward } from "@proveit/lib/schemas";
 import { useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { useSettings } from "@proveit/lib/settings";
+import { appendRecognizedSignText } from "@proveit/lib/signbridgeText";
 import { useVoiceSupport } from "../voice/speech";
 import { TalkSession } from "../voice/TalkSession";
+import { SignInput } from "../signbridge/SignInput";
 import { Typing } from "../chat/Typing";
 import { Log } from "../shell/Log";
 import { Composer, type Status } from "../shell/Composer";
@@ -35,6 +37,7 @@ export function PracticeFlow({ courseId, question, resume, uploads, modeParam }:
   const [error, setError] = useState<string | null>(null);
   const [upload, setUpload] = useState<UploadState | null>(null);
   const [talking, setTalking] = useState(false);
+  const [signing, setSigning] = useState(false);
 
   // "Answer by: Talk" in Settings opens voice mode first, unless the student just chose typing.
   useEffect(() => {
@@ -84,10 +87,16 @@ export function PracticeFlow({ courseId, question, resume, uploads, modeParam }:
         {status === "evaluating" && <AssistantMessage><Typing /></AssistantMessage>}
         {upload && <UploadReply upload={upload} onRetry={() => { setUpload(null); document.querySelector<HTMLInputElement>("input[type=file]")?.click(); }} onDismiss={() => setUpload(null)} />}
       </Log>
+      {signing && <SignInput
+        onRecognizedText={(text, kind, startsTranscript) => setAnswer((current) =>
+          appendRecognizedSignText(current, text, kind, startsTranscript))}
+        onClose={() => setSigning(false)}
+      />}
       <Composer
         value={answer} onChange={setAnswer} onSubmit={submit} status={status} error={error}
         placeholder={turns.length ? "Your next answer" : "Explain it in your own words"}
         onTalk={() => setTalking(true)} talkUnavailable={!canTalk}
+        onSign={settings.signInput ? () => setSigning((current) => !current) : undefined} signing={signing}
         leading={(
           <>
             {uploads.enabled && <AddFileMenu
@@ -108,4 +117,3 @@ export function PracticeFlow({ courseId, question, resume, uploads, modeParam }:
     </>
   );
 }
-
