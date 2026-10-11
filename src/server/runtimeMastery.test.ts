@@ -177,7 +177,7 @@ describe("runtime course mastery", () => {
   });
 
   it("keeps transfer and review pinned to the exact spec revision that started the evidence episode", async () => {
-    const { courseId, conceptId, spec } = runtimeCourse();
+    const { courseId, conceptId } = runtimeCourse();
     const first = await assess({ courseId, conceptId, answer: "It controls what enters and leaves." });
     expect(first.evaluation.verdict).toBe("correct");
     expect(getTransferChallenge(first.attemptId).transfer.question).toContain("molecule");
