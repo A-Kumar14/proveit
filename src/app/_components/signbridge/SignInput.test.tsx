@@ -34,6 +34,7 @@ describe("SignInput", () => {
   it("says how to start the service when it isn't running, and keeps the camera off", async () => {
     fetchMock.mockImplementation(async () => new Response("{}", { status: 503 }));
     render(<SignInput onUse={vi.fn()} onClose={vi.fn()} />);
+    expect(screen.getByLabelText("ASL Assistant panel")).toBeTruthy();
     await userEvent.click(screen.getByRole("button", { name: "Start camera" }));
     expect((await screen.findByRole("alert")).textContent).toContain("examples/signbridge/service.py");
     expect(navigator.mediaDevices.getUserMedia).not.toHaveBeenCalled();
@@ -64,7 +65,7 @@ describe("SignInput", () => {
     render(<SignInput onUse={vi.fn()} onClose={onClose} />);
     await userEvent.click(screen.getByRole("button", { name: "Start camera" }));
     await flush(50);
-    await userEvent.click(screen.getByRole("button", { name: "Close sign input" }));
+    await userEvent.click(screen.getByRole("button", { name: "Close ASL Assistant" }));
     expect(stop).toHaveBeenCalled();
     expect(onClose).toHaveBeenCalled();
   });
