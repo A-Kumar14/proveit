@@ -140,6 +140,24 @@ describe("course-grounded ConceptLearningSpec generation", () => {
     expect(mocked.generateText).not.toHaveBeenCalled();
   });
 
+  it("generates a missing built-in concept from shipped notes on first use", async () => {
+    const spec = await ensureConceptLearningSpec("intro-stats", "pop");
+
+    expect(spec).toMatchObject({
+      courseId: "intro-stats",
+      conceptId: "pop",
+      revision: 1,
+      provenance: { kind: "generated", model: "google:gemini-test" },
+    });
+    expect(spec.sources.length).toBeGreaterThan(0);
+    expect(spec.sources.every((source) => source.kind === "material_excerpt")).toBe(true);
+    expect(spec.sources.some((source) => source.kind === "material_excerpt" && source.materialId === "notes:intro-stats")).toBe(true);
+    expect(mocked.generateText).toHaveBeenCalledTimes(1);
+
+    expect(await ensureConceptLearningSpec("intro-stats", "pop")).toEqual(spec);
+    expect(mocked.generateText).toHaveBeenCalledTimes(1);
+  });
+
   it("generates from exact saved material excerpts and reuses the revision while sources are unchanged", async () => {
     const { id, conceptId, material } = makeRuntimeCourse("Generated Biology", "\r\n");
     const spec = await ensureConceptLearningSpec(id, conceptId);

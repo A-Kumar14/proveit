@@ -5,7 +5,7 @@ const course = vi.hoisted(() => ({ runtime: true, concepts: Array.from({ length:
 
 vi.mock("./ai", () => ({ aiEnabled: () => true }));
 vi.mock("./learningSpecGenerator", () => ({ ensureConceptLearningSpec: gen.ensure }));
-vi.mock("./store", () => ({ getCourse: () => course, canGenerateFor: () => course.runtime }));
+vi.mock("./store", () => ({ getCourse: () => course, isRuntimeCourse: () => course.runtime }));
 vi.mock("./userScope", () => ({ scopedUserId: () => "u1" }));
 
 import { warmCourseSpecs } from "./specWarmup";
@@ -31,7 +31,7 @@ describe("warmCourseSpecs", () => {
     expect(gen.peak).toBe(3);
   });
 
-  it("skips courses with built-in content", async () => {
+  it("does not fan out generation for built-in courses; those generate on first use", async () => {
     course.runtime = false;
     await warmCourseSpecs("c");
     expect(gen.ensure).not.toHaveBeenCalled();

@@ -1,6 +1,5 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { exportLearning, getAccountStats, getCourse, getHistory, NotFoundError, resetCourseProgress } from "./store";
-import { assess } from "./store";
+import { assess, exportLearning, getAccountStats, getCourse, getHistory, getRewards, NotFoundError, recordQuiz, resetCourseProgress } from "./store";
 
 beforeEach(() => {
   delete process.env.GOOGLE_GENERATIVE_AI_API_KEY;
@@ -33,6 +32,29 @@ describe("start a course over", () => {
     const course = getCourse("intro-stats");
     expect(course.concepts.every((c) => c.state === "not_started")).toBe(true);
     expect(exportLearning().attempts.filter((a) => a.courseId === "intro-stats")).toEqual([]);
+  });
+
+  it("keeps earned assessment points but cannot re-farm them after a reset", () => {
+    const quiz = () => recordQuiz({
+      courseId: "intro-stats",
+      items: ["A", "B", "C", "D"].map((suffix) => ({
+        conceptId: "cii",
+        concept: "CI interpretation",
+        prompt: `Reset coverage ${suffix}`,
+        options: ["right", "wrong"],
+        picked: 0,
+        correct: 0,
+        explanation: "right",
+      })),
+    });
+
+    const first = quiz();
+    expect(first.pointsGained).toBeGreaterThan(0);
+    const before = getRewards("intro-stats").points;
+    resetCourseProgress("intro-stats");
+    expect(getRewards("intro-stats").points).toBe(before);
+    expect(quiz().pointsGained).toBe(0);
+    expect(getRewards("intro-stats").points).toBe(before);
   });
 
   it("refuses a course that doesn't exist", () => {
