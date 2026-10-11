@@ -213,7 +213,7 @@ describe("answer by talk", () => {
 describe("sign input", () => {
   it("opens the ASL Assistant panel from the composer and closes it", async () => {
     mount();
-    await userEvent.click(screen.getByRole("button", { name: "Sign your message" }));
+    await userEvent.click(screen.getByRole("button", { name: "Open ASL Assistant" }));
     expect(screen.getByLabelText("ASL Assistant panel")).toBeTruthy();
     await userEvent.click(screen.getByRole("button", { name: "Close ASL Assistant" }));
     expect(screen.queryByLabelText("ASL Assistant panel")).toBeNull();
@@ -222,7 +222,7 @@ describe("sign input", () => {
   it("hides the Sign button when it is switched off in Settings", async () => {
     localStorage.setItem("proveit.settings", JSON.stringify({ signInput: false }));
     mount();
-    expect(screen.queryByRole("button", { name: "Sign your message" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Open ASL Assistant" })).toBeNull();
     localStorage.clear();
   });
 });
