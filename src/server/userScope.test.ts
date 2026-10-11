@@ -45,7 +45,7 @@ describe("account state isolation", () => {
       const answer = await assess({ courseId: "intro-stats", conceptId: "cii", answer: sound });
       await submitTransfer(answer.attemptId, "About 95 intervals contain the true mean. One calculated interval either contains it or does not; 95% describes the method.");
       expect(cii().state).toBe("provisional");
-      recordQuiz({
+      const rewardQuiz = recordQuiz({
         courseId: "intro-stats",
         items: ["A", "B", "C", "D"].map((suffix) => ({
           conceptId: "cii", concept: "CI interpretation", prompt: `CI coverage ${suffix}`,
@@ -53,7 +53,7 @@ describe("account state isolation", () => {
         })),
       });
       expect(getRewards().points).toBeGreaterThan(0);
-      return { id, material, attempt: answer.attemptId };
+      return { id, material, attempt: answer.attemptId, rewardQuiz: rewardQuiz.id };
     });
     for (let reload = 0; reload < 2; reload++) {
       if (reload) { clearUserCachesForTests(); closePersistenceForTests(); }
@@ -72,7 +72,8 @@ describe("account state isolation", () => {
       runAsUser("A", () => {
         expect(cii().state).toBe("provisional");
         expect(listMaterials(owned.id).map(m => m.text)).toEqual(["A private course"]);
-        expect(getHistory()).toHaveLength(2);
+        expect(getHistory().some((event) => event.id === owned.rewardQuiz)).toBe(true);
+        expect(getHistory().some((event) => event.id === owned.attempt)).toBe(true);
         expect(getTodos()[0].done.some(t => t.id === "se" && t.doneBy === "you")).toBe(true);
         expect(getRewards().points).toBeGreaterThan(0);
       });
