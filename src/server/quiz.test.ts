@@ -7,7 +7,7 @@ vi.mock("./ai", () => ({ aiEnabled: () => ai, model: () => "mock-model" }));
 
 import { startQuiz, submitQuiz } from "./quiz";
 import { addCatalogCourse } from "./courses";
-import { assess, getCourse, getHistory, getMisconceptionLog, getQuizSignal, getRewards, NotFoundError, recordQuizEvidence, submitTransfer } from "./store";
+import { assess, getCourse, getEvidenceAttempt, getHistory, getMisconceptionLog, getQuizSignal, getRewards, NotFoundError, recordQuizEvidence, submitTransfer } from "./store";
 
 beforeEach(() => {
   ai = false;
@@ -87,6 +87,7 @@ describe("submitQuiz", () => {
     expect(getCourse("accounting-101").concepts.every((c) => c.state !== "provisional" && c.state !== "mastered")).toBe(true);
     expect(getMisconceptionLog("accounting-101")).toEqual([]);
     expect(getHistory()[0]).toMatchObject({ title: `Quiz check on ${concept.name}`, tone: "warn" });
+    expect(getEvidenceAttempt(getHistory()[0]!.id).sources).toEqual([]);
 
     const historyCount = getHistory().length;
     submitQuiz(q.quizId, q.questions.map(() => correct));
