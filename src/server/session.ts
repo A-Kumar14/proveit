@@ -1,5 +1,6 @@
 import "server-only";
 import { getLearningSpec } from "./learningSpecStore";
+import { getPrefs } from "./prefs";
 import { courseMaterial } from "./materials";
 import { getQuestion } from "./store";
 
@@ -29,7 +30,13 @@ export function sessionSystem(courseId: string, conceptId: string): string {
   const spec = getLearningSpec(courseId, conceptId);
   const notes = courseMaterial(courseId, 20_000);
   const watch = spec ? spec.misconceptions.map((m) => `- ${m.name}: ${m.description}`).join("\n") : "";
-  return `${SYSTEM}
+  const prefs = getPrefs();
+  const style = [
+    prefs.detail === "detailed" ? "The student prefers fuller answers. Up to 160 words a reply, with a worked example when it helps." : "",
+    prefs.approach === "direct" ? "The student prefers you explain first and then ask. When they are unsure, give the idea plainly in a few sentences, then ask one question about it." : "",
+    prefs.quickReplies ? "" : "Never write an OPTIONS line. The student has turned quick replies off.",
+  ].filter(Boolean).join("\n");
+  return `${SYSTEM}${style ? `\n\nThe student's preferences\n${style}` : ""}
 
 You already opened the conversation with: "${sessionOpening(courseId, conceptId)}"
 

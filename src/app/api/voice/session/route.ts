@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { withUserRoute } from "@proveit/server/userBoundary";
 import { voiceBrief } from "@proveit/server/session";
+import { getPrefs, getVoiceUsage, voiceCapSeconds } from "@proveit/server/prefs";
 import { ensureQuestion, NotFoundError } from "@proveit/server/store";
 
 export const maxDuration = 30;
@@ -32,6 +33,8 @@ async function POSTForUser(req: Request) {
   const parsed = Body.safeParse(await req.json().catch(() => null));
   if (!parsed.success) return NextResponse.json({ error: "Missing concept." }, { status: 400 });
   const { courseId, conceptId, history } = parsed.data;
+  const cap = voiceCapSeconds();
+  if (cap !== null && getVoiceUsage().seconds >= cap) return NextResponse.json({ error: `You've used your ${Math.round(cap / 60)} minutes of voice. You can keep going in the chat.` }, { status: 429 });
 
   let brief: { prompt: string; firstMessage: string };
   try {
@@ -51,7 +54,8 @@ async function POSTForUser(req: Request) {
   }).catch(() => null);
   const body = (await res?.json().catch(() => null)) as { token?: unknown } | null;
   if (!res?.ok || typeof body?.token !== "string") return NextResponse.json({ error: "The voice service didn't start a call. Check the ElevenLabs key and agent ID." }, { status: 502 });
-  return NextResponse.json({ conversationToken: body.token, prompt: brief.prompt, firstMessage: brief.firstMessage });
+  const prefs = getPrefs();
+  return NextResponse.json({ conversationToken: body.token, prompt: brief.prompt, firstMessage: brief.firstMessage, voiceId: prefs.tutorVoice, startMuted: prefs.startMuted });
 }
 
 export const POST = withUserRoute(POSTForUser);

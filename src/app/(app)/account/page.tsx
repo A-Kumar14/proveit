@@ -7,7 +7,9 @@ import { ConnectedApps } from "@proveit/app/_components/apps/ConnectedApps";
 import { TierBadge } from "@proveit/app/_components/dashboard/TierBadge";
 import { authEnabled, currentProfile, currentUserId } from "@proveit/server/auth";
 import { connectionStatus } from "@proveit/server/integrations";
-import { getRewards, listCourses } from "@proveit/server/store";
+import { getCalendarState } from "@proveit/server/calendar";
+import { getVoiceUsage, voiceCapSeconds } from "@proveit/server/prefs";
+import { getAccountStats, getRewards, listCourses } from "@proveit/server/store";
 
 export const dynamic = "force-dynamic";
 
@@ -20,10 +22,20 @@ async function AccountPage({ searchParams }: PageProps<"/account">) {
   const profile = await currentProfile();
   const rank = getRewards();
   const courses = listCourses();
+  const activity = getAccountStats();
+  const usage = getVoiceUsage();
+  const cap = voiceCapSeconds();
+  const calendar = getCalendarState();
+  const minutes = (sec: number) => `${Math.floor(sec / 60)} min`;
   const stats: [string, string][] = [
     ["Courses", `${courses.filter((c) => !c.completed).length} in progress, ${courses.filter((c) => c.completed).length} completed`],
     ["Concepts mastered", fmt(courses.reduce((n, c) => n + c.proven, 0))],
-    ["Overall rank", `${rank.tier.name}, ${fmt(rank.points)} points`],
+    ["Overall rank", `${rank.tier.name}, ${fmt(rank.points)} points${rank.next ? `, ${fmt(rank.toNext)} to ${rank.next.name}` : ""}`],
+    ["Study streak", `${activity.streak} ${activity.streak === 1 ? "day" : "days"} now, ${activity.bestStreak} best`],
+    ["Days with proof", fmt(activity.activeDays)],
+    ["Concepts by state", `${activity.byState.mastered} mastered, ${activity.byState.provisional} proved, ${activity.byState.developing + activity.byState.needs_work} in progress, ${activity.byState.not_started} not started`],
+    ["Quizzes taken", fmt(activity.quizzesTaken)],
+    ["Voice calls", usage.calls === 0 ? "None yet" : `${fmt(usage.calls)} ${usage.calls === 1 ? "call" : "calls"}, ${minutes(usage.seconds)}${cap ? ` of ${minutes(cap)}` : ""}`],
   ];
   return (
     <AppShell active="account" crumbs={[{ label: "Account" }]}>
@@ -37,7 +49,6 @@ async function AccountPage({ searchParams }: PageProps<"/account">) {
             <div className="truncate text-lg font-semibold">{profile?.name ?? "Local learner"}</div>
             <div className="truncate text-[0.8125rem] text-ink-muted">{profile?.email ?? (enabled ? "Not signed in" : "No account connected")}</div>
             <div className="mt-1 flex flex-wrap items-center gap-2 text-[0.6875rem] text-ink-faint">
-              <span className="rounded-full bg-surface-hover px-2 py-0.5 text-ink-3">Free plan</span>
               {profile?.joined && <span>Member since {new Date(profile.joined).toLocaleDateString("en-US", { month: "long", year: "numeric" })}</span>}
             </div>
           </div>
@@ -58,6 +69,14 @@ async function AccountPage({ searchParams }: PageProps<"/account">) {
           {stats.map(([k, v]) => (
             <div key={k} className="flex items-center justify-between gap-3 border-t border-line px-4 py-3 text-[0.8125rem] first:border-t-0"><span className="text-ink-muted">{k}</span><span className="font-semibold">{v}</span></div>
           ))}
+        </section>
+        <section aria-label="Calendar" className="flex items-center justify-between gap-3 rounded-md border border-line bg-surface px-4 py-3 text-[0.8125rem]">
+          <div className="min-w-0"><div className="font-semibold">Calendar</div><div className="text-ink-muted">{calendar.mode === "ics" ? `Connected${calendar.provider ? `, ${calendar.provider}` : ""}. Review times fit around your events.` : "Not connected. Connect an iCal link and review times fit around your events."}</div></div>
+          <Link href="/?connect=1" className="shrink-0 text-ink">{calendar.mode === "ics" ? "Manage" : "Connect"}</Link>
+        </section>
+        <section aria-label="Your data" className="flex items-center justify-between gap-3 rounded-md border border-line bg-surface px-4 py-3 text-[0.8125rem]">
+          <div className="min-w-0"><div className="font-semibold">Your data</div><div className="text-ink-muted">Download everything, clear chats, or start a course over.</div></div>
+          <Link href="/settings" className="shrink-0 text-ink">Open settings</Link>
         </section>
         <ConnectedApps apps={connectionStatus(await currentUserId())} notice={{ connected: typeof connected === "string" ? connected : undefined, error: typeof integrationError === "string" ? integrationError : undefined }} />
       </ListPage>

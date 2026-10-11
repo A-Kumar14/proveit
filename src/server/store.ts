@@ -1650,3 +1650,62 @@ export function getCourseRanks(): CourseRank[] {
   });
 }
 
+
+// ---- account: stats, export, reset ----
+
+export type AccountStats = { streak: number; bestStreak: number; activeDays: number; quizzesTaken: number; byState: Record<MasteryState, number> };
+
+/** Longest run of consecutive days with proof, over all time. */
+const bestStreak = (): number => {
+  const days = [...db().provenDays].sort();
+  let best = 0;
+  let run = 0;
+  let prev: string | null = null;
+  for (const day of days) {
+    run = prev && isoDay(addDays(new Date(`${prev}T00:00:00`), 1)) === day ? run + 1 : 1;
+    best = Math.max(best, run);
+    prev = day;
+  }
+  return best;
+};
+
+export function getAccountStats(): AccountStats {
+  const byState: Record<MasteryState, number> = { not_started: 0, developing: 0, needs_work: 0, provisional: 0, mastered: 0 };
+  for (const c of allCourses()) for (const k of c.concepts) byState[k.state]++;
+  return { streak: streak(), bestStreak: bestStreak(), activeDays: db().provenDays.size, quizzesTaken: (db().quizzes ?? []).length, byState };
+}
+
+/** Everything the learner has done, as plain data they can keep. */
+export function exportLearning() {
+  const data = db();
+  return {
+    courses: allCourses().map((c) => ({
+      id: c.id, name: c.name, examDate: c.examDate, completedOverride: c.completedOverride,
+      concepts: c.concepts.map((k) => ({ id: k.id, name: k.name, unit: k.unit, state: k.state, evidence: k.evidence, nextReview: k.nextReview })),
+    })),
+    attempts: data.attempts.map((a) => ({ id: a.id, courseId: a.courseId, conceptId: a.conceptId, kind: a.kind, outcome: a.outcome, answer: a.answer, createdAt: new Date(a.createdAt).toISOString() })),
+    quizzes: (data.quizzes ?? []).map((q) => ({ id: q.id, courseId: q.courseId, takenAt: new Date(q.at).toISOString(), score: q.score, total: q.total, pct: q.pct })),
+    provenDays: [...data.provenDays].sort(),
+  };
+}
+
+/**
+ * Puts one course back to the start: every concept Not started, its attempts and quizzes gone.
+ * Rank points already earned stay, because rank never drops.
+ */
+export function resetCourseProgress(courseId: string): void {
+  const data = db();
+  const course = courseFor(courseId);
+  for (const k of course.concepts) {
+    k.state = "not_started";
+    k.skills = null;
+    k.evidence = { answers: 0, sound: 0, transferPassed: false };
+    k.nextReview = null;
+    data.taskDone.delete(k.id);
+    data.taskDone.delete(`review:${k.id}`);
+  }
+  data.attempts = data.attempts.filter((a) => a.courseId !== courseId);
+  data.quizzes = (data.quizzes ?? []).filter((q) => q.courseId !== courseId);
+  course.completedOverride = null;
+  persistLearning();
+}

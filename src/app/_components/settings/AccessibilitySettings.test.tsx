@@ -3,6 +3,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 import { AccessibilityLayer } from "../a11y/AccessibilityLayer";
+import { DEFAULT_PREFS } from "@proveit/lib/prefs";
 import { SettingsPanel } from "./SettingsPanel";
 
 const html = document.documentElement;
@@ -13,14 +14,13 @@ afterEach(() => {
 });
 
 const open = async () => {
-  render(<><SettingsPanel /><AccessibilityLayer /></>);
+  render(<><SettingsPanel initialPrefs={DEFAULT_PREFS} courses={[]} /><AccessibilityLayer /></>);
   await userEvent.click(screen.getByRole("tab", { name: "Accessibility Features" }));
 };
 
 describe("Accessibility Features settings", () => {
-  it("replaces the Voice tab and still holds the voice setting", async () => {
+  it("holds dyslexia, vision and the read-questions-aloud setting", async () => {
     await open();
-    expect(screen.queryByRole("tab", { name: "Voice" })).toBeNull();
     expect(screen.getByRole("heading", { name: "Dyslexia support" })).toBeTruthy();
     expect(screen.getByRole("heading", { name: "Vision support" })).toBeTruthy();
     expect(screen.getByRole("switch", { name: "Read questions aloud" })).toBeTruthy();

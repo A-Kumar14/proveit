@@ -16,14 +16,14 @@ type Item = { id: number; kind: string; role?: "user" | "assistant"; text?: stri
 type Saved = { items: Item[]; mode?: string; followUpTo?: string };
 
 /** After this much silence the student's turn is over and the tutor answers. */
-const SILENCE_MS = 1600;
+const DEFAULT_SILENCE_MS = 1600;
 
 /**
  * A spoken, back-and-forth conversation with the tutor about one concept. It shares its transcript with the chat
  * through sessionStorage, so the student can switch between talking and typing without losing the thread.
  * Nothing here is graded. The check happens back in the chat.
  */
-export function TalkChat({ userId, courseId, conceptId, opening, chatHref }: { userId: string; courseId: string; conceptId: string; opening: string; chatHref: string }) {
+export function TalkChat({ userId, courseId, conceptId, opening, chatHref, silenceMs = DEFAULT_SILENCE_MS }: { silenceMs?: number; userId: string; courseId: string; conceptId: string; opening: string; chatHref: string }) {
   const storeKey = sessionStorageKey(userId, courseId, conceptId);
   const supported = useVoiceSupport();
   const [phase, setPhase] = useState<"idle" | "listening" | "thinking" | "speaking">("idle");
@@ -42,7 +42,7 @@ export function TalkChat({ userId, courseId, conceptId, opening, chatHref }: { u
 
   const dictation = useDictation(() => {
     if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => turn.current?.(), SILENCE_MS);
+    timer.current = setTimeout(() => turn.current?.(), silenceMs);
   });
   const { start, stop, take } = dictation;
 
