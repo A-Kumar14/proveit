@@ -2,17 +2,21 @@
 
 **Know what you actually know.**
 
-ProveIt finds the specific misconception behind a wrong answer, teaches only that gap, makes the learner prove the idea on a different problem, and later checks whether the idea was retained.
+ProveIt is an AI mastery/evidence engine. It finds a specific misconception, repairs only that gap, requires proof on a materially different question, and later checks whether the knowledge was retained.
 
 Core loop:
 
 ```
-assess -> evaluate -> diagnose -> remediate -> transfer -> provisional
-                                                     |
-                                              delayed review
-                                                     |
-                                                  mastered
+course material -> concept learning spec -> assess -> evaluate
+  -> uncertain: ask for more visible evidence
+  -> misconception: diagnose -> focused remediation -> transfer
+  -> sound answer: transfer
+transfer pass -> provisional
+delayed retrieval pass -> mastered
+later retained-knowledge failure -> needs_work
 ```
+
+A single immediate correct answer is never Mastered.
 
 ## Run it
 
@@ -32,25 +36,44 @@ pnpm test
 pnpm build
 ```
 
-## Data and persistence
-
-The runtime on `main` does **not** start with fake learner progress, fake courses, fake calendar events, fake upload examples, or fake rank points. Intro Statistics is the current authored course catalog; every concept begins `not_started`, rank begins at 0, and progress is produced by actual evidence events.
-
-Learner state is persisted locally in SQLite through `src/server/persistence.ts`. The default development file is:
-
-```
-.data/proveit.sqlite
-```
-
-Set `PROVEIT_DB_PATH` to choose another SQLite file. Tests do not use persistent storage unless they explicitly provide a path. On Vercel, local filesystem persistence is intentionally disabled unless a persistent path is provided; production cloud persistence still needs a durable database/storage adapter.
-
-Fabricated presentation/demo state is kept off `main` on the dedicated demo-data branches.
-
 ## Model calls
 
-Set `OPENROUTER_API_KEY` (model from `OPENROUTER_MODEL`, default `google/gemini-3.8-flash`) or `GOOGLE_GENERATIVE_AI_API_KEY` to use Gemini for grading, tutoring, upload checks, and generated text. Assessment grading uses independent model votes. When no key is present, deterministic judges keep the two authored end-to-end concepts repeatable.
+Set `OPENROUTER_API_KEY` (model from `OPENROUTER_MODEL`) or `GOOGLE_GENERATIVE_AI_API_KEY` (model from `GEMINI_MODEL`). OpenRouter wins when both are set.
 
-## Mastery semantics
+The two gold authored concepts, CI interpretation and Standard Error, retain deterministic offline graders. Generated runtime-course concepts require an AI evaluator; model failure or a missing AI key does not silently fall back to a weaker grader.
+
+Assessment, transfer and delayed-review grading use three independent structured checks. A diagnosis is accepted only when a majority agrees on a declared misconception. Ambiguous evidence remains `uncertain`.
+
+## Course-grounded learning content
+
+`ConceptLearningSpec` is the canonical, versioned JSON contract for assessment, misconceptions, targeted remediation, transfer, delayed review, skills and source references.
+
+For uploaded/imported/runtime courses:
+
+1. saved course material is split into exact server-selected excerpts;
+2. the model generates a learning spec using only those excerpts and server-created source IDs;
+3. the validated spec is stored per user with an immutable revision;
+4. unchanged material reuses the existing revision;
+5. changed material creates a new revision;
+6. every mastery attempt records the exact revision used to judge it.
+
+Generated source objects retain material ID, title, locator and exact excerpt. Backend mastery views expose structured source lineage. This is grounding/provenance, not a claim that an excerpt independently proves every generated pedagogical statement.
+
+The built-in Intro Statistics course still has deterministic authored end-to-end content only for CI interpretation and Standard Error. Other built-in nodes remain unavailable for mastery until they have canonical content. Runtime courses can generate canonical content on demand when AI is configured.
+
+## Evidence and mastery
+
+Evidence kinds:
+
+- `initial`
+- `clarification`
+- `transfer`
+- `review`
+- `quiz`
+
+Quiz answers are intentionally low-stakes signals. They may move an unseen concept to `developing` and influence what ProveIt recommends studying, but they never diagnose a misconception, grant transfer proof, schedule a review, demote stronger mastery, or directly award rank.
+
+Mastery states:
 
 ```
 not_started
@@ -64,35 +87,56 @@ provisional     <- passed a materially different transfer question
 mastered        <- passed a later delayed-retrieval review
 ```
 
-An incomplete or ambiguous answer creates an `uncertain` evidence event and does not invent a misconception. A later review failure can return a mastered/provisional concept to `needs_work`.
+An incomplete or ambiguous response records evidence but does not invent a misconception. Reviews use spaced retrieval after the latest transfer proof; relearning resets that progression.
 
-## Where things live
+## Account isolation and persistence
+
+With Clerk enabled, trusted server identity scopes learner progress, evidence, runtime courses, generated learning specs, materials, calendar state, tasks/rank and quiz sessions. Auth-enabled unscoped state access fails closed. Legacy pre-auth records stay owned by local/no-auth mode rather than being copied to new accounts.
+
+Local durable state uses Node SQLite through `src/server/persistence.ts`. Default development path:
+
+```
+.data/proveit.sqlite
+```
+
+Set `PROVEIT_DB_PATH` to choose another file. Tests use persistent storage only when they explicitly configure a path.
+
+SQLite is the hackathon/local persistence adapter, **not** a hosted production database. Vercel filesystem persistence is intentionally disabled unless a path is explicitly supplied, and there is no multi-process write coordination.
+
+## Runtime data policy
+
+`main` starts with no fabricated learner progress, sample courses, sample calendar events, sample upload answers or rank points. Test fixtures live under `src/test` and presentation data remains isolated on dedicated demo-data branches. Do not merge demo seed behavior into `main`.
+
+## Where the backend lives
 
 | Path | Purpose |
 | --- | --- |
-| `src/server/store.ts` | Learner-state/model seam, mastery transitions, evidence history, review lifecycle |
+| `src/lib/conceptLearningSpec.ts` | Strict canonical learning-content contract |
+| `src/server/authoredLearningSpecs.ts` | Gold authored specs |
+| `src/server/authoredJudges.ts` | Deterministic graders for gold authored fixtures |
+| `src/server/learningSpecGenerator.ts` | Course-grounded runtime spec generation |
+| `src/server/learningSpecStore.ts` | User-scoped immutable generated revisions |
+| `src/server/sourceLineage.ts` | Structured source/citation provenance projection |
+| `src/server/evaluator.ts` | Spec-first assessment/transfer/review evaluation |
+| `src/server/store.ts` | Evidence lineage, mastery state machine, review lifecycle and views |
+| `src/server/userScope.ts` / `userBoundary.ts` | Trusted per-user server isolation |
 | `src/server/persistence.ts` | SQLite persistence adapter |
-| `src/lib/conceptLearningSpec.ts` | Validated JSON contract shared by authored and future generated concept content |
-| `src/server/authoredLearningSpecs.ts` | Canonical authored questions, misconceptions, lessons, transfer and review content |
-| `src/server/content.ts` | Compatibility view of canonical specs for the current mastery engine |
-| `src/server/authoredJudges.ts` | Authored-only deterministic offline graders |
-| `src/server/evaluator.ts` | Assessment/transfer/review evaluators and model voting |
-| `src/server/calendar.ts` | Real iCal connection and persisted calendar state |
-| `src/server/schedule.ts` | Review queue, course events and suggested study slots |
-| `src/lib/schemas.ts` | Shared Zod contracts |
-| `src/app/api/*` | Route-handler mutation boundary |
-| `src/app/_components/*` | UI |
+| `src/server/materials.ts` / `ingest.ts` | Course material and ingestion |
+| `src/server/practice.ts` / `quiz.ts` / `converse.ts` | Study modalities and low-stakes evidence |
+| `src/server/calendar.ts` / `schedule.ts` | Calendar and review scheduling |
 
 ## Current scope
 
-Built: dashboard, course map, practice, misconception diagnosis, dispute/clarification, focused remediation, transfer proof, delayed review, retained mastery, history/evidence trail, review queue, tutor chat, upload validation, voice/dictation, rank, to-dos, and iCal integration.
+Built: course upload/import and concept maps, source-grounded generated mastery content, practice, misconception diagnosis, clarification, targeted remediation, transfer proof, delayed review/retention, evidence history, source lineage, review queue, tutor/spoken flows, quizzes and practice documents, rank/to-dos, Clerk account isolation, iCal integration, local persistence, curated courses, and Granola/Wispr Flow connector plumbing.
 
-Still intentionally incomplete: course ingestion/concept extraction, broader authored course coverage (only CI interpretation and Standard Error run fully end-to-end), source retrieval/citations, dynamic validated transfer generation, durable hosted persistence.
+Important remaining production/integration work:
 
-## Account isolation
+- one deliberate end-to-end UI integration/smoke pass against the latest frontend;
+- hosted/durable production storage instead of local SQLite;
+- real account-switch, connector callback/import, Gemini, calendar, mic/camera and presentation-device smoke tests;
+- production browser E2E/error/loading hardening;
+- `tectonic` is still required for local PDF generation and is not available on Vercel by default;
+- calendar study-slot suggestions are not written back to a provider;
+- generated grounding/source lineage should not be described as hallucination-free or as proof of factual entailment.
 
-With Clerk enabled, server pages and every API route resolve authenticated identity before reading or writing learner data. Learning progress, evidence, runtime courses, rank/tasks, calendar, materials and quiz sessions are isolated per user in memory. Durable learner/calendar/material records use user-namespaced SQLite keys. OAuth connection keys retain their existing per-user format. Anonymous requests do not fall back to the local user while Clerk is enabled.
-
-Auth-disabled local mode retains the original unscoped keys and local data. Existing global records are treated as local-owned; they are not copied into signed-in accounts without known ownership. Quiz sessions remain ephemeral, with their existing two-hour lifetime. Browser tier/task celebration memories are also keyed by account; nonsensitive answer-mode/hint preferences remain device preferences. This does not add a hosted database, multi-process write coordination or dynamic-course mastery support.
-
-The learning-content architecture and remaining generation/evaluation milestones are documented in [`docs/concept-learning-spec.md`](docs/concept-learning-spec.md).
+See `HANDOFF.md` for the agent-facing implementation state and `docs/concept-learning-spec.md` for the content/evidence contract.

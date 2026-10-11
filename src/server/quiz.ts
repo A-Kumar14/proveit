@@ -51,9 +51,10 @@ function pick(concepts: Weak[], count: number): Weak[] {
 function offline(concepts: Weak[], count: number, pool: Weak[] = concepts): Keyed[] {
   const chosen = pick(concepts, Math.min(count, concepts.length));
   return chosen.flatMap((c, i) => {
-    const wrong = shuffle(pool.filter((x) => x.id !== c.id)).slice(0, 3).map((x) => x.desc);
+    const right = c.material ?? c.desc;
+    const wrong = shuffle(pool.filter((x) => x.id !== c.id)).slice(0, 3).map((x) => x.material ?? x.desc);
     if (wrong.length < 3) return [];
-    return [place(c, `Which statement describes "${c.name}"?`, c.desc, wrong, `${c.name}: ${c.desc}`, i)];
+    return [place(c, `Which statement describes "${c.name}"?`, right, wrong, `${c.name}: ${right}`, i)];
   });
 }
 
@@ -93,7 +94,7 @@ async function written(courseId: string, courseName: string, concepts: Weak[], c
       system: QUIZ_SYSTEM(slots.length),
       output: Output.object({ schema: Out }),
       abortSignal: AbortSignal.timeout(90_000),
-      prompt: JSON.stringify({ course: courseName, notes, concepts: [...wanted.values()].map(({ c, n }) => ({ name: c.name, about: c.desc, questions: n, weak: c.weak, misconceptions: c.mistakes.map((m) => m.name) })) }),
+      prompt: JSON.stringify({ course: courseName, notes, concepts: [...wanted.values()].map(({ c, n }) => ({ name: c.name, about: c.desc, courseMaterial: c.material, questions: n, weak: c.weak, misconceptions: c.mistakes.map((m) => m.name) })) }),
     });
     return { concepts: [...wanted.values()].map((x) => x.c), questions: output.questions };
   }));

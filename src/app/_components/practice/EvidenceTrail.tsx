@@ -6,6 +6,7 @@ const LABEL = {
   clarification: "Clarification",
   transfer: "New-question proof",
   review: "Delayed review",
+  quiz: "Quiz signal",
 } as const;
 
 const TONE = {

@@ -12,6 +12,7 @@ import type { CourseSpec } from "@proveit/lib/courseSpec";
 import type { CalEvent } from "./calendar";
 import { POINTS, STREAK_CAP, standing, TIERS, type Standing } from "@proveit/lib/rewards";
 import { aiEnabled } from "./ai";
+import { learningSourceViews, sourceIdUnion, type LearningSourceView } from "./sourceLineage";
 
 /**
  * The course catalog stays in code for the hackathon, while learner state is persisted through
@@ -225,6 +226,18 @@ const misconceptionForSpec = (spec: ConceptLearningSpec, misconceptionId: string
 const primaryMisconceptionFor = (courseId: string, conceptId: string) =>
   getLearningSpec(courseId, conceptId)?.misconceptions[0] ?? null;
 
+function sourceViewsForAttempt(a: Attempt): LearningSourceView[] {
+  // Legacy attempts without a pinned revision and low-stakes quiz signals cannot claim exact source lineage.
+  if (a.kind === "quiz" || a.learningSpecRevision === undefined) return [];
+  const spec = specFor(a.courseId, a.conceptId, a.learningSpecRevision);
+  const sectionIds =
+    a.kind === "transfer" ? spec.transfer.sourceIds :
+    a.kind === "review" ? spec.review.sourceIds :
+    spec.assessment.sourceIds;
+  const diagnosed = misconceptionForSpec(spec, a.evaluation?.misconceptionId ?? null);
+  return learningSourceViews(spec, sourceIdUnion(sectionIds, diagnosed?.sourceIds ?? []));
+}
+
 function clarificationPromptFor(a: Attempt): string {
   if (a.evaluation?.followUp) return a.evaluation.followUp;
   const spec = specForAttempt(a);
@@ -254,6 +267,77 @@ function recordAttempt(data: NewAttempt): Attempt {
   db().attempts.push(rec);
   persistLearning();
   return rec;
+}
+
+export type QuizEvidenceObservation = {
+  conceptId: string;
+  prompt: string;
+  selected: string;
+  correct: boolean;
+};
+
+/**
+ * Multiple-choice quiz answers are supporting evidence only.
+ * They can establish that a concept has been seen, but never diagnose a misconception,
+ * prove transfer, schedule review, award rank points, or demote stronger mastery states.
+ */
+export function recordQuizEvidence(courseId: string, observations: QuizEvidenceObservation[], at = Date.now()): string[] {
+  const course = courseFor(courseId);
+  const ids: string[] = [];
+  for (const observation of observations) {
+    const c = course.concepts.find((concept) => concept.id === observation.conceptId);
+    if (!c) throw new NotFoundError(`concept ${observation.conceptId}`);
+
+    const previousState = c.state;
+    c.evidence.answers++;
+    if (observation.correct) c.evidence.sound++;
+    if (c.state === "not_started") c.state = "developing";
+
+    const id = newId();
+    const rec: Attempt = {
+      id,
+      courseId,
+      conceptId: c.id,
+      kind: "quiz",
+      outcome: observation.correct ? "correct" : "incorrect",
+      parentAttemptId: null,
+      rootAttemptId: id,
+      answer: `Question: ${observation.prompt}\nSelected: ${observation.selected}`,
+      evaluation: null,
+      previousState,
+      createdAt: at,
+    };
+    db().attempts.push(rec);
+    ids.push(id);
+  }
+  if (observations.length) persistLearning();
+  return ids;
+}
+
+export type QuizSignal = { right: number; total: number; pct: number; lastAt: number };
+
+/** Recent quiz performance is a prioritization hint, never a mastery verdict. */
+export function getQuizSignal(courseId: string, conceptId: string, limit = 5): QuizSignal | null {
+  courseFor(courseId);
+  const rows = [...db().attempts]
+    .reverse()
+    .filter((a) => a.courseId === courseId && a.conceptId === conceptId && a.kind === "quiz")
+    .slice(0, Math.max(1, limit));
+  if (!rows.length) {
+    // Quizzes taken through the quiz page are stored as quiz records, newest last.
+    const seen = (db().quizzes ?? []).filter((q) => q.courseId === courseId).flatMap((q) => q.items.filter((it) => it.conceptId === conceptId && it.picked !== null).map((it) => ({ ok: it.picked === it.correct, at: q.at })));
+    const recent = seen.slice(-Math.max(1, limit));
+    if (!recent.length) return null;
+    const ok = recent.filter((r) => r.ok).length;
+    return { right: ok, total: recent.length, pct: Math.round((ok / recent.length) * 100), lastAt: Math.max(...recent.map((r) => r.at)) };
+  }
+  const right = rows.filter((a) => a.outcome === "correct").length;
+  return {
+    right,
+    total: rows.length,
+    pct: Math.round((right / rows.length) * 100),
+    lastAt: Math.max(...rows.map((a) => a.createdAt)),
+  };
 }
 
 const transferMissesFor = (rootAttemptId: string, beforeOrAt = Number.POSITIVE_INFINITY) =>
@@ -321,8 +405,13 @@ const latestConfirmedIncorrect = (conceptId: string, courseId?: string) =>
 const latestEvaluatedInRoot = (rootAttemptId: string) =>
   [...db().attempts].reverse().find((a) => a.rootAttemptId === rootAttemptId && a.evaluation) ?? null;
 
+/** Low-stakes quiz signals never supersede an in-flight assess/clarify/transfer/review episode. */
 const latestAttemptForConcept = (conceptId: string, courseId?: string) =>
-  [...db().attempts].reverse().find((a) => a.conceptId === conceptId && (!courseId || a.courseId === courseId)) ?? null;
+  [...db().attempts].reverse().find((a) =>
+    a.kind !== "quiz" &&
+    a.conceptId === conceptId &&
+    (!courseId || a.courseId === courseId)
+  ) ?? null;
 
 const rootIsCurrentForConcept = (conceptId: string, rootAttemptId: string, courseId?: string) =>
   latestAttemptForConcept(conceptId, courseId)?.rootAttemptId === rootAttemptId;
@@ -497,7 +586,10 @@ export function getDashboard(): DashboardView {
   };
 }
 
-export type QuestionView = { courseName: string; conceptId: string; conceptName: string; state: MasteryState; prompt: string; why: string; probe: string; source: string };
+export type QuestionView = {
+  courseName: string; conceptId: string; conceptName: string; state: MasteryState;
+  prompt: string; why: string; probe: string; source: string; sources: LearningSourceView[];
+};
 export function getQuestion(courseId: string, conceptId: string): QuestionView {
   const course = courseFor(courseId);
   const c = conceptFor(courseId, conceptId);
@@ -519,6 +611,7 @@ export function getQuestion(courseId: string, conceptId: string): QuestionView {
     why,
     probe: spec.assessment.probe,
     source: firstSource?.title ?? "your course material",
+    sources: learningSourceViews(spec, spec.assessment.sourceIds),
   };
 }
 
@@ -634,7 +727,7 @@ export async function assess(input: AssessInput): Promise<AssessResult> {
 export type EvidenceAttemptView = {
   id: string; courseId: string; conceptId: string; kind: AttemptKind; outcome: AttemptOutcome;
   parentAttemptId: string | null; rootAttemptId: string; learningSpecRevision: number | null; answer: string; evaluation: Evaluation | null;
-  previousState: MasteryState; createdAt: number;
+  sources: LearningSourceView[]; previousState: MasteryState; createdAt: number;
 };
 /** Raw evidence view: unlike the diagnosis view, transfer passes and non-diagnostic misses are valid records. */
 export function getEvidenceAttempt(id: string): EvidenceAttemptView {
@@ -642,7 +735,7 @@ export function getEvidenceAttempt(id: string): EvidenceAttemptView {
   return {
     id: a.id, courseId: a.courseId, conceptId: a.conceptId, kind: a.kind, outcome: a.outcome,
     parentAttemptId: a.parentAttemptId, rootAttemptId: a.rootAttemptId, learningSpecRevision: a.learningSpecRevision ?? null, answer: a.answer, evaluation: a.evaluation,
-    previousState: a.previousState, createdAt: a.createdAt,
+    sources: sourceViewsForAttempt(a), previousState: a.previousState, createdAt: a.createdAt,
   };
 }
 
@@ -685,8 +778,8 @@ export function clarify(attemptId: string) {
 
 export type RemediationView = {
   attemptId: string; courseId: string; conceptId: string; conceptName: string; state: MasteryState;
-  lesson: { title: string; said: string; actuallyTrue: string; explanation: string; rule: string | null; aiWording: boolean; figure: "ci-intervals" | null };
-  transfer: { question: string; hint: string };
+  lesson: { title: string; said: string; actuallyTrue: string; explanation: string; rule: string | null; aiWording: boolean; figure: "ci-intervals" | null; sources: LearningSourceView[] };
+  transfer: { question: string; hint: string; sources: LearningSourceView[] };
 };
 export function getRemediation(attemptId: string): RemediationView {
   const a = attempt(attemptId);
@@ -707,14 +800,15 @@ export function getRemediation(attemptId: string): RemediationView {
       rule: remediation.sourceLabel,
       aiWording: spec.provenance.kind === "generated",
       figure: remediation.figure,
+      sources: learningSourceViews(spec, remediation.sourceIds),
     },
-    transfer: { question: spec.transfer.question, hint: spec.transfer.hint },
+    transfer: { question: spec.transfer.question, hint: spec.transfer.hint, sources: learningSourceViews(spec, spec.transfer.sourceIds) },
   };
 }
 
 export type TransferChallengeView = {
   attemptId: string; courseId: string; conceptId: string; conceptName: string; state: MasteryState;
-  transfer: { question: string; hint: string };
+  transfer: { question: string; hint: string; sources: LearningSourceView[] };
 };
 
 export function getTransferChallenge(attemptId: string): TransferChallengeView {
@@ -733,7 +827,7 @@ export function getTransferChallenge(attemptId: string): TransferChallengeView {
   }
   return {
     attemptId: source.id, courseId: source.courseId, conceptId: c.id, conceptName: c.name, state: c.state,
-    transfer: { question: spec.transfer.question, hint: spec.transfer.hint },
+    transfer: { question: spec.transfer.question, hint: spec.transfer.hint, sources: learningSourceViews(spec, spec.transfer.sourceIds) },
   };
 }
 
@@ -936,7 +1030,7 @@ export function getReviews(now = new Date()): { due: ReviewItem[]; upcoming: Rev
 export type ReviewChallengeView = {
   courseId: string; conceptId: string; conceptName: string; state: MasteryState; dueDay: string;
   learningSpecRevision?: number;
-  review: { question: string; hint: string };
+  review: { question: string; hint: string; sources: LearningSourceView[] };
 };
 
 const reviewIsDue = (c: Concept, now: Date) =>
@@ -960,7 +1054,7 @@ export function getReviewChallenge(courseId: string, conceptId: string, now = ne
   return {
     courseId, conceptId: c.id, conceptName: c.name, state: c.state, dueDay: c.nextReview!,
     learningSpecRevision: spec.revision,
-    review: { question: spec.review.question, hint: spec.review.hint },
+    review: { question: spec.review.question, hint: spec.review.hint, sources: learningSourceViews(spec, spec.review.sourceIds) },
   };
 }
 
@@ -1075,6 +1169,8 @@ export function getHistory(): HistoryEvent[] {
   const fromAttempts = [...attempts].reverse().map((a) => {
     const c = conceptFor(a.courseId, a.conceptId);
     const base = `/course/${a.courseId}`;
+    if (a.kind === "quiz" && a.outcome === "correct") return { id: a.id, at: a.createdAt, title: `Quiz check on ${c.name}`, detail: "Correct multiple-choice signal · mastery not proved", tone: "good" as const, href: `${base}/practice/${c.id}` };
+    if (a.kind === "quiz" && a.outcome === "incorrect") return { id: a.id, at: a.createdAt, title: `Quiz check on ${c.name}`, detail: "Missed multiple-choice signal · no misconception inferred", tone: "warn" as const, href: `${base}/practice/${c.id}` };
     if (a.kind === "review" && a.outcome === "pass") return { id: a.id, at: a.createdAt, title: `Passed delayed review on ${c.name}`, detail: "Mastered with delayed retrieval", tone: "good" as const, href: `${base}/review-result/${a.id}` };
     if (a.kind === "review" && a.outcome === "fail" && a.evaluation?.verdict === "incorrect") return { id: a.id, at: a.createdAt, title: `Review exposed a gap in ${c.name}`, detail: `Caught: ${a.evaluation.misconceptionName}`, tone: "bad" as const, href: `${base}/diagnosis/${a.id}` };
     if (a.kind === "review" && a.outcome === "uncertain") return { id: a.id, at: a.createdAt, title: `Reviewed ${c.name}`, detail: "Needs more evidence", tone: "warn" as const, href: "/review" };
@@ -1252,7 +1348,7 @@ export class TaskLockedError extends Error {}
 
 export const taskRank = (t: Task) => (t.kind === "review" ? 1 : t.state === "needs_work" ? 0 : t.state === "developing" ? 2 : 3);
 
-function tasksFor(c: Course, _active: boolean): Task[] {
+function tasksFor(c: Course): Task[] {
   const today = isoDay(new Date());
   return c.concepts.flatMap((x): Task[] => {
     const provedByWork = x.state === "provisional" || x.state === "mastered";
@@ -1274,7 +1370,7 @@ export function getTodos(): TodoGroup[] {
   return [course, ...samples]
     .filter((c) => !isCompleted(c) && (!c.runtime || c.concepts.some((concept) => canPractice(c, concept))))
     .map((c) => {
-    const all = tasksFor(c, c === course);
+    const all = tasksFor(c);
     const open = all.filter((t) => !t.done).sort((a, b) => taskRank(a) - taskRank(b));
     return { courseId: c.id, courseName: c.name, open, done: all.filter((t) => t.done), total: all.length, doneCount: all.filter((t) => t.done).length };
   });
@@ -1283,7 +1379,7 @@ export function getTodos(): TodoGroup[] {
 /** Ticks or unticks a task by hand. Progress-based completion can't be undone, and a hand tick never changes mastery. */
 export function setTaskDone(id: string, done: boolean): void {
   const { course, samples } = db();
-  const task = [course, ...samples].flatMap((c) => tasksFor(c, c === course)).find((t) => t.id === id);
+  const task = [course, ...samples].flatMap((c) => tasksFor(c)).find((t) => t.id === id);
   if (!task) throw new NotFoundError(`task ${id}`);
   if (task.doneBy === "progress") throw new TaskLockedError("Your answers already completed this task.");
   if (done) db().taskDone.add(id);

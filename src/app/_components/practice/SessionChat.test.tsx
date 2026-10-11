@@ -14,7 +14,7 @@ Element.prototype.scrollIntoView = vi.fn();
 import { SessionChat } from "./SessionChat";
 import type { QuestionView } from "@proveit/server/store";
 
-const question: QuestionView = { courseName: "Intro Statistics", conceptId: "cii", conceptName: "CI interpretation", state: "needs_work", prompt: "Explain what a 95% confidence interval means.", why: "Why", probe: "Probe?", source: "Unit 03" };
+const question: QuestionView = { courseName: "Intro Statistics", conceptId: "cii", conceptName: "CI interpretation", state: "needs_work", prompt: "Explain what a 95% confidence interval means.", why: "Why", probe: "Probe?", source: "Unit 03", sources: [] };
 const OPENING = "Let's talk about CI interpretation. What do you think it means?";
 const mount = (resume?: { attemptId: string; answer: string; followUp: string }) => render(<SessionChat courseId="intro-stats" question={question} opening={OPENING} resume={resume} />);
 /** A tutor that replies with the given texts, one per call, streaming each in two pieces. */
