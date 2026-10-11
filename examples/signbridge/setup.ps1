@@ -20,7 +20,7 @@ if (Test-Path $python) {
     }
 } else {
     & py -3.12 -m venv $venv
-    if ($LASTEXITCODE -ne 0) { throw "Could not create the SignBridge Python environment." }
+    if ($LASTEXITCODE -ne 0) { throw "Could not create the ASL Assistant Python environment." }
 }
 
 # pip checks HTTPS through the Windows certificate store by default, and on some Windows machines that crashes
@@ -34,16 +34,16 @@ function Invoke-Pip([string[]]$pipArgs) {
 }
 
 Invoke-Pip @("install", "--upgrade", "pip")
-if ($LASTEXITCODE -ne 0) { throw "Could not update pip in the SignBridge environment." }
+if ($LASTEXITCODE -ne 0) { throw "Could not update pip in the ASL Assistant environment." }
 
 Invoke-Pip @("install", "-r", (Join-Path $scriptDir "requirements.txt"))
-if ($LASTEXITCODE -ne 0) { throw "Could not install the SignBridge dependencies." }
+if ($LASTEXITCODE -ne 0) { throw "Could not install the ASL Assistant dependencies." }
 
 & $python (Join-Path $scriptDir "download_landmark_model.py")
-if ($LASTEXITCODE -ne 0) { throw "Could not download the verified SignBridge models." }
+if ($LASTEXITCODE -ne 0) { throw "Could not download the verified ASL Assistant models." }
 
 Write-Host ""
-Write-Host "SignBridge setup is complete."
+Write-Host "ASL Assistant setup is complete."
 Write-Host "Check the model installation with:"
 Write-Host "  & `"$python`" `"$scriptDir\check_environment.py`""
 Write-Host "Start the model service with:"

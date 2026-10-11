@@ -63,16 +63,16 @@ export async function checkSignBridgeHealth() {
       signal: AbortSignal.timeout(5_000),
     });
   } catch {
-    throw new Error(`No SignBridge model service responded at ${url.origin}. Start examples/signbridge/service.py with the quick demo model or a trained upstream model; see docs/signbridge.md.`);
+    throw new Error(`No ASL Assistant model service responded at ${url.origin}. Start examples/signbridge/service.py with the quick demo model or a trained upstream model; see docs/signbridge.md.`);
   }
 
   const payload = await parseJson(response);
   if (!response.ok) {
-    const message = typeof payload?.error === "string" ? payload.error : `The SignBridge service is unavailable (${response.status}).`;
+    const message = typeof payload?.error === "string" ? payload.error : `The ASL Assistant service is unavailable (${response.status}).`;
     throw new Error(message);
   }
   const parsed = HealthSchema.safeParse(payload);
-  if (!parsed.success) throw new Error(`A service is responding at ${url.origin}, but it is not a compatible SignBridge model service. Stop that service and start examples/signbridge/service.py; see docs/signbridge.md.`);
+  if (!parsed.success) throw new Error(`A service is responding at ${url.origin}, but it is not a compatible ASL Assistant model service. Stop that service and start examples/signbridge/service.py; see docs/signbridge.md.`);
   return parsed.data;
 }
 
@@ -97,12 +97,12 @@ export async function predictSignBridgeFrame(sessionId: string, image: string): 
   if (!response.ok) {
     const message = typeof payload?.error === "string"
       ? payload.error
-      : `The SignBridge model request failed (${response.status}).`;
+      : `The ASL Assistant model request failed (${response.status}).`;
     throw new Error(message);
   }
 
   const parsed = PredictionSchema.safeParse(payload);
-  if (!parsed.success) throw new Error("The SignBridge service did not return a valid prediction.");
+  if (!parsed.success) throw new Error("The ASL Assistant service did not return a valid prediction.");
   return parsed.data;
 }
 
@@ -119,11 +119,11 @@ export async function recognizeSignBridgeMotion(sessionId: string, frames: strin
   if (!response.ok) {
     const message = typeof payload?.error === "string"
       ? payload.error
-      : `The SignBridge motion request failed (${response.status}).`;
+      : `The ASL Assistant motion request failed (${response.status}).`;
     throw new Error(message);
   }
   const parsed = PredictionSchema.safeParse(payload);
-  if (!parsed.success) throw new Error("The SignBridge service did not return a valid motion prediction.");
+  if (!parsed.success) throw new Error("The ASL Assistant service did not return a valid motion prediction.");
   return parsed.data;
 }
 
@@ -138,8 +138,8 @@ export async function resetSignBridgeSession(sessionId: string) {
   });
   const payload = await parseJson(response);
   if (!response.ok) {
-    const message = typeof payload?.error === "string" ? payload.error : `The SignBridge session could not be reset (${response.status}).`;
+    const message = typeof payload?.error === "string" ? payload.error : `The ASL Assistant session could not be reset (${response.status}).`;
     throw new Error(message);
   }
-  if (payload?.reset !== true) throw new Error("The SignBridge service returned an invalid reset response.");
+  if (payload?.reset !== true) throw new Error("The ASL Assistant service returned an invalid reset response.");
 }

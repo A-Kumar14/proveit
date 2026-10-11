@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Download and verify the hand landmark models used by the SignBridge demo."""
+"""Download and verify the hand landmark models used by the ASL Assistant demo."""
 
 import hashlib
 import os

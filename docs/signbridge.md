@@ -1,6 +1,6 @@
-# SignBridge in ProveIt
+# ASL Assistant in ProveIt
 
-SignBridge is a sign-to-speech conversation at `/signbridge`. The browser uses ProveIt's same-origin API routes; the Python model service does hand detection and inference locally. Camera frames are handled in memory and are not stored by ProveIt.
+The ASL Assistant is a sign-to-speech conversation at `/signbridge`. The browser uses ProveIt's same-origin API routes; the Python model service does hand detection and inference locally. Camera frames are handled in memory and are not stored by ProveIt. Existing `signbridge` paths and configuration names are retained internally for compatibility.
 
 The integration combines the attached SignBridge project’s hand-landmark classifier and short-sequence recognition flow with the existing SignBridge-ML adapter. The default local model identifies held ASL fingerspelling letters A–Z. It detects a hand and face, classifies hand landmarks, and shows experimental mouth-opening and brow/eye measurements. Those facial measurements do not identify a person or interpret ASL facial grammar. No-hand and low-score results are rejected rather than added as letters. The alphabet model does not identify motion-based signs or produce sentences on its own.
 
@@ -32,11 +32,11 @@ powershell -ExecutionPolicy Bypass -File examples/signbridge/setup.ps1
 
 In a second terminal on the same computer, install the ProveIt Node dependencies if needed and run `pnpm dev`. Use a Node.js version supported by the ProveIt project (the CI build currently uses Node 24).
 
-The environment check reports the OS and runtime versions, initializes both the hand and face models, and verifies that a blank camera frame is rejected. The GitHub Actions `SignBridge platforms` workflow runs this check on Linux, Windows, and macOS.
+The environment check reports the OS and runtime versions, initializes both the hand and face models, and verifies that a blank camera frame is rejected. The GitHub Actions `ASL Assistant platforms` workflow runs this check on Linux, Windows, and macOS.
 
 The downloader stores two assets under `~/.cache/proveit/signbridge/landmark/`, pins the public model repository revision, and verifies each SHA-256 digest before saving:
 
-- `asl_landmark_mlp.pt` — the SignBridge hand-landmark ASL alphabet classifier.
+- `asl_landmark_mlp.pt` — the hand-landmark ASL alphabet classifier.
 - `hand_landmarker.task` — MediaPipe's hand detector/landmark model.
 
 The Python service listens on `127.0.0.1:8001`. Leave it running. In a second terminal, with the repository's Node.js dependencies installed, start ProveIt:

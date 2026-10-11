@@ -37,7 +37,7 @@ export function Sidebar({ data, active, courseId, profile = null }: { data: Side
         </NavLink>
         <NavLink href="/history" on={active === "history"}><History {...icon} />History</NavLink>
         <NavLink href="/calendar" on={active === "calendar"}><CalendarDays {...icon} />Calendar</NavLink>
-        <NavLink href="/signbridge" on={active === "signbridge"}><Hand {...icon} />SignBridge</NavLink>
+        <NavLink href="/signbridge" on={active === "signbridge"}><Hand {...icon} />ASL Assistant</NavLink>
       </div>
 
       <div className="flex flex-col gap-0.5">

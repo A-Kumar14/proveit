@@ -1,4 +1,4 @@
-name: SignBridge platforms
+name: ASL Assistant platforms
 
 on:
   pull_request:
@@ -50,11 +50,11 @@ jobs:
           cache: pip
           cache-dependency-path: examples/signbridge/requirements.txt
 
-      - name: Set up SignBridge on Windows
+      - name: Set up ASL Assistant on Windows
         if: runner.os == 'Windows'
         run: powershell -ExecutionPolicy Bypass -File examples/signbridge/setup.ps1
 
-      - name: Set up SignBridge on macOS/Linux
+      - name: Set up ASL Assistant on macOS/Linux
         if: runner.os != 'Windows'
         run: bash examples/signbridge/setup.sh
 
