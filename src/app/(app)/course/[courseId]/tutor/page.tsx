@@ -12,6 +12,7 @@ async function TutorPage({ params }: PageProps<"/course/[courseId]/tutor">) {
   const { course, base } = orNotFound(() => ({ course: getCourse(courseId), base: getReviewBase(courseId) }));
   return (
     <AppShell active="tutor" courseId={courseId} crumbs={[{ label: course.name, href: `/course/${courseId}` }, { label: "Tutor" }]}>
+      <h1 className="sr-only">Tutor for {course.name}</h1>
       <TutorChat courseId={courseId} courseName={course.name} base={base} aiWritten={aiEnabled()} enabled={aiEnabled()} />
     </AppShell>
   );

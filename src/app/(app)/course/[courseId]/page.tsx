@@ -28,6 +28,7 @@ async function CoursePage({ params, searchParams }: PageProps<"/course/[courseId
   return (
     <AppShell active="map" courseId={courseId} crumbs={[{ label: course.name }]} right={course.deadline}>
       <div className="min-h-0 flex-1 overflow-y-auto px-7 py-6">
+        <h1 className="sr-only">{course.name}</h1>
         {first ? (
           <div className="flex flex-col gap-4">
             {built && <p role="status" className="m-0 rounded-md border border-mastered-line bg-mastered-bg px-3 py-2 text-[0.8125rem] text-mastered-text">{course.name} is ready. The concept map was built from your files.</p>}
