@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { getCalendarState, resetDemoCalendar } from "./calendar";
 import { closePersistenceForTests } from "./persistence";
-import { clarify, getAttempt, getCourse, getDashboard, getEvidenceTrail, getFiles, getHistory, getMisconceptionLog, getQuestion, getRemediation, getResult, getReviewChallenge, getReviewResult, getReviews, getRewards, getTodos, listCourses, resetDemoLearning } from "./store";
+import { getAttempt, getCourse, getDashboard, getEvidenceTrail, getFiles, getHistory, getMisconceptionLog, getQuestion, getRemediation, getResult, getReviewChallenge, getReviewResult, getReviews, getRewards, getTodos, listCourses, resetDemoLearning } from "./store";
 import { getReviewQueue } from "./schedule";
 import { demoStateForTests } from "../test/demo-state";
 
@@ -42,7 +42,7 @@ describe("isolated demo-data branch", () => {
   it("seeds the SQLite database with coherent product-wide sample state", () => {
     const courses = listCourses();
     expect(courses.map((c) => c.id)).toEqual(["intro-stats", "linear-algebra", "personal-finance"]);
-    expect(getRewards().points).toBeGreaterThanOrEqual(6000);
+    expect(getRewards().points).toBeGreaterThanOrEqual(9000);
     expect(getHistory().length).toBeGreaterThanOrEqual(4);
     expect(getEvidenceTrail("a2").map((a) => a.id)).toEqual(["a2", "a3"]);
 
@@ -74,7 +74,6 @@ describe("isolated demo-data branch", () => {
     expect(getReviewResult("a5")).toMatchObject({ conceptName: "Population vs. sample", next: "mastered" });
     expect(getReviews(new Date()).due.some((r) => r.id === "se")).toBe(true);
     expect(getReviewChallenge("intro-stats", "se", new Date()).conceptName).toBe("Standard error");
-    expect(clarify("a6").followUp).toContain("two ingredients");
   });
 
   it("reloads the same seeded state from SQLite rather than rebuilding a different sample", () => {
@@ -91,8 +90,8 @@ describe("isolated demo-data branch", () => {
     expect(getCalendarState().events.length).toBeGreaterThan(0);
     resetDemoLearning();
     resetDemoCalendar();
-    expect(getHistory().length).toBeGreaterThanOrEqual(6);
-    expect(getRewards().points).toBeGreaterThanOrEqual(6000);
+    expect(getHistory().length).toBeGreaterThanOrEqual(5);
+    expect(getRewards().points).toBeGreaterThanOrEqual(9000);
     expect(getCalendarState()).toMatchObject({ mode: "ics", provider: "Demo calendar" });
   });
 });

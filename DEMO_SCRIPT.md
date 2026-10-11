@@ -8,7 +8,7 @@ Before you start: tap **Reset demo** on the dashboard, check the microphone is a
 
 | # | Beat | You do | The engine shows | Time |
 |---|---|---|---|---|
-| 0 | Frame it | Dashboard | Rank, open misconception, Platinum is 220 points away | 0:20 |
+| 0 | Frame it | Dashboard | Rank, open misconception, Platinum is about 230 points away | 0:20 |
 | 1 | Fully wrong | Type the wrong idea | Kind correction, a picture, a question back | 0:30 |
 | 2 | Lost | Tap "I don't know yet", then "Teach me from scratch" | Asks what confuses you, then teaches in small steps | 0:50 |
 | 3 | Half right | Type the half-right answer | Credits the right half, fixes only the wrong half | 0:35 |
@@ -21,7 +21,7 @@ Before you start: tap **Reset demo** on the dashboard, check the microphone is a
 
 Open the dashboard. Point at the rank card and at Intro Statistics.
 
-> "Mastery doesn't ask whether you got it right. It asks whether you can prove you understand. This student is 220 points from Platinum, and has one open misconception on confidence intervals. Watch what the tutor does with each kind of answer."
+> "Mastery doesn't ask whether you got it right. It asks whether you can prove you understand. This student is about 230 points from Platinum, and has one open misconception on confidence intervals. Watch what the tutor does with each kind of answer."
 
 Open **Intro Statistics**, tap **CI interpretation**, then **Test this concept**.
 
@@ -99,7 +99,7 @@ Optional, 15 seconds: type **"About 80 of them."** It fails and tells the studen
 
 Type: **"About 95 of the 100 should contain the true mean. Once one interval is calculated, it either contains the fixed mean or it doesn't, so the 95% describes the method."**
 
-What it does: passes. The concept moves to Provisional, and Intro Statistics crosses into **Platinum** with the tier-up celebration.
+What it does: passes. The concept moves to Provisional, and Intro Statistics crosses into **Platinum**, the account does too, and the tier-up celebration plays. (Checked on a fresh seed: course 2,977 to 3,300, account 9,777 to about 10,100.)
 
 Say: *"Mastery moved because the student proved it on a question they hadn't seen. Not because they were told the answer."*
 
