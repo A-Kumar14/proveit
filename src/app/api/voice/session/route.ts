@@ -12,6 +12,15 @@ const Body = z.object({
   history: z.array(z.object({ role: z.enum(["user", "assistant"]), text: z.string().max(2000) })).max(24).default([]),
 });
 
+/** Whether the agent allows the prompt and first-message overrides we send. Unknown (a failed lookup) counts as allowed, so a flaky check never blocks a call. */
+async function overridesAllowed(agent: string, key: string, signal: AbortSignal): Promise<boolean> {
+  const res = await fetch(`https://api.elevenlabs.io/v1/convai/agents/${encodeURIComponent(agent)}`, { headers: { "xi-api-key": key }, signal }).catch(() => null);
+  const json = (await res?.json().catch(() => null)) as { platform_settings?: { overrides?: { conversation_config_override?: { agent?: { first_message?: boolean; prompt?: { prompt?: boolean } } } } } } | null;
+  const a = json?.platform_settings?.overrides?.conversation_config_override?.agent;
+  if (!res?.ok || !a) return true;
+  return a.first_message === true && a.prompt?.prompt === true;
+}
+
 /**
  * Starts a voice call with the ElevenLabs agent. The key stays here. The browser gets a short-lived token and the
  * tutor's brief for this concept, which replaces the agent's stored prompt for this one call.
@@ -31,6 +40,10 @@ async function POSTForUser(req: Request) {
   } catch (e) {
     if (e instanceof NotFoundError) return NextResponse.json({ error: "Not found." }, { status: 404 });
     throw e;
+  }
+
+  if (!(await overridesAllowed(agent, key, req.signal))) {
+    return NextResponse.json({ error: "The ElevenLabs agent doesn't allow overrides yet. In the agent's Security tab, turn on System prompt and First message under overrides, then publish." }, { status: 502 });
   }
 
   const res = await fetch(`https://api.elevenlabs.io/v1/convai/conversation/token?agent_id=${encodeURIComponent(agent)}`, {
