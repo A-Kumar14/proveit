@@ -12,11 +12,11 @@ describe("CourseRankBar", () => {
   it("shows the tier, and how far to the next one on this course's own ladder", () => {
     render(<CourseRankBar rank={rank(700)} />);
     expect(screen.getByText("Silver")).toBeTruthy();
-    expect(screen.getByText("300 to Gold")).toBeTruthy();
-    expect(screen.getByRole("progressbar", { name: "Progress to Gold" }).getAttribute("aria-valuenow")).toBe("50");
+    expect(screen.getByText("800 to Gold")).toBeTruthy();
+    expect(screen.getByRole("progressbar", { name: "Progress to Gold" }).getAttribute("aria-valuenow")).toBe("11");
   });
   it("says so at the top tier", () => {
-    render(<CourseRankBar rank={rank(4000)} />);
+    render(<CourseRankBar rank={rank(6000)} />);
     expect(screen.getByText("Top tier reached", { selector: "span" })).toBeTruthy();
   });
 });
