@@ -188,6 +188,24 @@ class LandmarkASLClassifier:
             "browEyeGap": min(float(brow_eye_gap), 5.0),
         }
 
+    @staticmethod
+    def _orientation_features(coordinates: Any) -> Any | None:
+        """Wrist-relative, scale-normalized landmarks as-is and mirrored left-right: a (2, 63) array.
+
+        Some webcams mirror their feed and signers use either hand, both of which turn a handshape into its
+        mirror image. Scoring both orientations gives the same letter on every camera and for either hand.
+        Returns None when the hand is too small to normalize.
+        """
+        import numpy as np
+
+        relative = np.asarray(coordinates, dtype=np.float32) - np.asarray(coordinates[0], dtype=np.float32)
+        scale = float(np.linalg.norm(relative[9]))
+        if scale <= 1e-6:
+            return None
+        normalized = relative / scale
+        mirrored = normalized * np.array([-1.0, 1.0, 1.0], dtype=np.float32)
+        return np.stack([normalized.reshape(-1), mirrored.reshape(-1)])
+
     def predict(self, frame: Any) -> tuple[
         str,
         float | None,
@@ -226,15 +244,16 @@ class LandmarkASLClassifier:
                 dtype=self.np.float32,
             )
             points = [[float(point.x), float(point.y)] for point in result.hand_landmarks[0]]
-            coordinates -= coordinates[0]
-            scale = float(self.np.linalg.norm(coordinates[9]))
-            if scale <= 1e-6:
+            orientations = self._orientation_features(coordinates)
+            if orientations is None:
                 return "Uncertain", 0.0, True, points, face_detected, face_points, facial_cues
-            features = self.torch.from_numpy((coordinates / scale).reshape(1, -1))
             with self.torch.inference_mode():
-                probabilities = self.torch.softmax(self.classifier(features), dim=1)[0]
-            index = int(self.torch.argmax(probabilities).item())
-            confidence = float(probabilities[index].item())
+                probabilities = self.torch.softmax(self.classifier(self.torch.from_numpy(orientations)), dim=1)
+            # Keep whichever orientation the model reads most clearly.
+            best_scores, best_labels = probabilities.max(dim=1)
+            row = int(self.torch.argmax(best_scores).item())
+            index = int(best_labels[row].item())
+            confidence = float(best_scores[row].item())
             return self.labels[index], confidence, True, points, face_detected, face_points, facial_cues
 
     def close(self) -> None:

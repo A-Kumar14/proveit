@@ -106,6 +106,28 @@ class SignBridgeProtocolTests(unittest.TestCase):
         self.assertAlmostEqual(cues["mouthOpen"], 0.1)
         self.assertAlmostEqual(cues["browEyeGap"], 1.0)
 
+    def test_scores_a_hand_the_same_on_mirrored_cameras_and_for_either_hand(self):
+        import numpy as np
+
+        rng = np.random.default_rng(7)
+        hand = rng.uniform(0.2, 0.8, size=(21, 3)).astype(np.float32)
+        mirrored_hand = hand.copy()
+        mirrored_hand[:, 0] = 1.0 - mirrored_hand[:, 0]
+
+        features = LandmarkASLClassifier._orientation_features(hand)
+        mirrored_features = LandmarkASLClassifier._orientation_features(mirrored_hand)
+
+        self.assertEqual(features.shape, (2, 63))
+        self.assertTrue(np.allclose(features[0, :3], 0.0))
+        # The as-is reading of one camera is the mirrored reading of the other, so the best score is identical.
+        self.assertTrue(np.allclose(features[0], mirrored_features[1], atol=1e-6))
+        self.assertTrue(np.allclose(features[1], mirrored_features[0], atol=1e-6))
+
+    def test_rejects_a_hand_too_small_to_normalize(self):
+        import numpy as np
+
+        self.assertIsNone(LandmarkASLClassifier._orientation_features(np.full((21, 3), 0.5, dtype=np.float32)))
+
 
 if __name__ == "__main__":
     unittest.main()

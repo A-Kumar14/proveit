@@ -23,10 +23,20 @@ if (Test-Path $python) {
     if ($LASTEXITCODE -ne 0) { throw "Could not create the SignBridge Python environment." }
 }
 
-& $python -m pip install --upgrade pip
+# pip checks HTTPS through the Windows certificate store by default, and on some Windows machines that crashes
+# with "access violation" and then hangs on retries. Try pip's bundled certificates first; fall back to the
+# Windows store, which networks with a custom root certificate (school or company proxies) need.
+function Invoke-Pip([string[]]$pipArgs) {
+    & $python -m pip --retries 1 --use-deprecated=legacy-certs @pipArgs
+    if ($LASTEXITCODE -eq 0) { return }
+    Write-Host "Retrying with the Windows certificate store..."
+    & $python -m pip @pipArgs
+}
+
+Invoke-Pip @("install", "--upgrade", "pip")
 if ($LASTEXITCODE -ne 0) { throw "Could not update pip in the SignBridge environment." }
 
-& $python -m pip install -r (Join-Path $scriptDir "requirements.txt")
+Invoke-Pip @("install", "-r", (Join-Path $scriptDir "requirements.txt"))
 if ($LASTEXITCODE -ne 0) { throw "Could not install the SignBridge dependencies." }
 
 & $python (Join-Path $scriptDir "download_landmark_model.py")
