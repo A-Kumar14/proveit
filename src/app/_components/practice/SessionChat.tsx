@@ -165,6 +165,12 @@ export function SessionChat({ userId, courseId, question, opening, resume }: {
   return (
     <>
       <Log>
+        <div className={cn("mx-auto flex w-full max-w-[760px] flex-col gap-5", !talked && items.length === 1 && "my-auto")}>
+        <header className="flex flex-col gap-1.5 pb-1">
+          <span className="eyebrow">Talking it through</span>
+          <h1 className="m-0 text-[1.625rem] font-semibold leading-tight tracking-[-0.01em]">{question.conceptName}</h1>
+          <p className="m-0 text-[0.8125rem] text-ink-muted">A conversation, not a quiz. Nothing here is graded until you ask to be checked.</p>
+        </header>
         {items.map((it) => {
           if (it.kind === "check") {
             return (
@@ -193,7 +199,7 @@ export function SessionChat({ userId, courseId, question, opening, resume }: {
           return (
             <AssistantMessage key={it.id}>
               {text
-                ? <div className="w-fit max-w-[640px] rounded-[14px_14px_14px_4px] border border-line bg-surface px-3.5 py-3"><Prose text={text} /></div>
+                ? <div className="max-w-[640px] pt-[3px]"><Prose text={text} className="text-[0.9375rem] leading-[1.65]" /></div>
                 : <Typing />}
               {showChips && (
                 <div role="group" aria-label="Quick replies" className="mt-2.5 flex flex-wrap gap-2">
@@ -204,7 +210,9 @@ export function SessionChat({ userId, courseId, question, opening, resume }: {
           );
         })}
         <div ref={end} />
+        </div>
       </Log>
+      <div className="mx-auto w-full max-w-[822px]">
       <Composer
         value={draft} onChange={setDraft} onSubmit={submit} status={status} error={error}
         placeholder={mode === "check" ? "Explain it in your own words" : talked ? "Reply to your tutor" : "Tell me what you think"}
@@ -222,6 +230,7 @@ export function SessionChat({ userId, courseId, question, opening, resume }: {
             </>
           )}
       />
+      </div>
     </>
   );
 }

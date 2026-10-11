@@ -9,8 +9,8 @@ export type Status = "idle" | "evaluating" | "error";
 /** Pill that opens voice mode. Same three-bar wave as the header action. */
 function TalkPill({ onClick, unavailable }: { onClick: () => void; unavailable: boolean }) {
   return (
-    <button type="button" onClick={onClick} disabled={unavailable} title={unavailable ? "Voice needs Chrome, Edge or Safari with a microphone" : undefined} className="disabled:cursor-not-allowed disabled:opacity-50 flex h-9 items-center gap-2 cursor-pointer rounded-full border border-line-button bg-surface px-3.5 text-xs font-semibold text-ink transition-colors hover:bg-surface-hover">
-      <span aria-hidden className="flex h-3.5 items-center gap-[2px]">{[0, 0.15, 0.3].map((d) => <span key={d} className="wv h-3.5 w-[3px] rounded-[2px] bg-ink" style={{ animationDelay: `${d}s` }} />)}</span>
+    <button type="button" onClick={onClick} disabled={unavailable} title={unavailable ? "Voice needs Chrome, Edge or Safari with a microphone" : undefined} className="disabled:cursor-not-allowed disabled:opacity-50 flex h-9 items-center gap-2 cursor-pointer rounded-full border border-ink bg-ink px-3.5 text-xs font-semibold text-white transition-colors hover:bg-ink-3">
+      <span aria-hidden className="flex h-3.5 items-center gap-[2px]">{[0, 0.15, 0.3].map((d) => <span key={d} className="wv h-3.5 w-[3px] rounded-[2px] bg-white" style={{ animationDelay: `${d}s` }} />)}</span>
       Talk it through
     </button>
   );
