@@ -452,11 +452,17 @@ function nextConceptFor(course: Course): Concept | null {
     cs.find((c) => c.state === "not_started") ??
     null;
 }
-function nextConcept(): Concept | null {
-  return nextConceptFor(db().course);
+function nextAcrossCourses(): { course: Course; concept: Concept } | null {
+  const courses = allCourses().filter((course) => !isCompleted(course));
+  for (const state of ["needs_work", "developing", "not_started"] as const) {
+    for (const course of courses) {
+      const concept = course.concepts.find((candidate) => candidate.state === state && canPractice(course, candidate));
+      if (concept) return { course, concept };
+    }
+  }
+  return null;
 }
 const practiceHrefFor = (courseId: string, c: Concept) => `/course/${courseId}/practice/${c.id}`;
-const practiceHref = (c: Concept) => practiceHrefFor(db().course.id, c);
 
 // ---- views ----
 
@@ -526,10 +532,15 @@ const isCompleted = (c: Course) => c.completedOverride ?? (c.concepts.length > 0
 
 export type SidebarView = { courses: { id: string; name: string; pct: number; completed: boolean }[]; streak: number; practiceHref: string | null; reviewsDue: number };
 export function getSidebar(): SidebarView {
-  const { course, samples } = db();
-  const next = nextConcept();
+  const courses = allCourses();
+  const next = nextAcrossCourses();
   const row = (c: Course) => ({ id: c.id, name: c.name, pct: coursePct(c.concepts), completed: isCompleted(c) });
-  return { courses: [course, ...samples].map(row), streak: streak(), practiceHref: next ? practiceHref(next) : null, reviewsDue: dueConcepts().length };
+  return {
+    courses: courses.map(row),
+    streak: streak(),
+    practiceHref: next ? practiceHrefFor(next.course.id, next.concept) : null,
+    reviewsDue: dueConcepts().length,
+  };
 }
 
 export type DashboardView = {
@@ -543,15 +554,17 @@ export type DashboardView = {
 };
 
 export function getDashboard(): DashboardView {
-  const { course, attempts } = db();
+  const { attempts } = db();
+  const courses = allCourses();
+  const concepts = courses.flatMap((course) => course.concepts.map((concept) => ({ course, concept })));
   const now = new Date();
-  const cs = course.concepts;
   const due = dueConcepts().length;
-  const bad = cs.find((c) => c.state === "needs_work");
-  // Seeded needs-work concepts have no attempt yet, so fall back to the authored misconception name.
-  const lastBad = (id: string) =>
-    latestConfirmedIncorrect(id, course.id)?.evaluation?.misconceptionName ?? primaryMisconceptionFor(course.id, id)?.name ?? null;
-  const next = nextConcept();
+  const bad = concepts.find(({ concept }) => concept.state === "needs_work") ?? null;
+  const next = nextAcrossCourses();
+  const lastBad = (courseId: string, conceptId: string) =>
+    latestConfirmedIncorrect(conceptId, courseId)?.evaluation?.misconceptionName ??
+    primaryMisconceptionFor(courseId, conceptId)?.name ??
+    null;
   const hour = now.getHours();
   const caught = [...attempts].reverse().filter((a) =>
     a.evaluation?.verdict === "incorrect" &&
@@ -559,18 +572,61 @@ export function getDashboard(): DashboardView {
     !diagnosisOverturned(a),
   );
   const seen = new Set<string>();
-  const recentlyCaught = caught.filter((a) => (seen.has(a.conceptId) ? false : (seen.add(a.conceptId), true))).slice(0, 3).map((a) => {
-    const c = conceptFor(a.courseId, a.conceptId);
-    return { misconception: a.evaluation!.misconceptionName!, concept: c.name, repaired: c.evidence.transferPassed && (c.state === "provisional" || c.state === "mastered") };
+  const recentlyCaught = caught
+    .filter((a) => {
+      const key = `${a.courseId}:${a.conceptId}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    })
+    .slice(0, 3)
+    .map((a) => {
+      const c = conceptFor(a.courseId, a.conceptId);
+      return {
+        misconception: a.evaluation!.misconceptionName!,
+        concept: c.name,
+        repaired: c.evidence.transferPassed && (c.state === "provisional" || c.state === "mastered"),
+      };
+    });
+
+  const courseRows = courses.map((course) => {
+    const open = course.concepts.find((concept) => concept.state === "needs_work");
+    return {
+      id: course.id,
+      name: course.name,
+      pct: coursePct(course.concepts),
+      proven: course.concepts.filter((concept) => concept.state === "mastered").length,
+      total: course.concepts.length,
+      openMisconception: open ? lastBad(course.id, open.id) : null,
+    };
   });
+
+  const badReason = bad
+    ? bad.course.deadline.startsWith("Quiz ")
+      ? `${lastBad(bad.course.id, bad.concept.id) ?? "An open misconception"} is still open. Fix it before ${bad.course.deadline.replace("Quiz ", "the quiz on ")}.`
+      : `${lastBad(bad.course.id, bad.concept.id) ?? "An open misconception"} is still open. Repair it before moving on.`
+    : null;
+
   return {
     greeting: hour < 12 ? "Good morning" : hour < 18 ? "Good afternoon" : "Good evening",
     dateLabel: now.toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" }).replace(",", "").toUpperCase(),
-    counts: { proven: cs.filter((c) => c.state === "mastered").length, due, needsWork: cs.filter((c) => c.state === "needs_work").length, courses: 1 },
-    courses: [{ id: course.id, name: course.name, pct: coursePct(cs), proven: cs.filter((c) => c.state === "mastered").length, total: cs.length, openMisconception: bad ? lastBad(bad.id) : null }],
-    risk: bad ? { concept: `${bad.name} in ${course.name}`, reason: `${lastBad(bad.id) ?? "An open misconception"} is still open. Fix it before ${course.deadline.replace("Quiz ", "the quiz on ")}.` } : null,
-    recommendation: next ? `${bad ? "Fix" : "Work on"} ${next.name} next${due > 0 ? ", then clear your reviews" : ""}.` : "Nothing left to test in the currently authored course content.",
-    nextActions: next ? [{ label: `Test ${next.name} · ${course.name}`, href: practiceHref(next) }] : [],
+    counts: {
+      proven: concepts.filter(({ concept }) => concept.state === "mastered").length,
+      due,
+      needsWork: concepts.filter(({ concept }) => concept.state === "needs_work").length,
+      courses: courses.length,
+    },
+    courses: courseRows,
+    risk: bad ? { concept: `${bad.concept.name} in ${bad.course.name}`, reason: badReason! } : null,
+    recommendation: next
+      ? `${bad ? "Fix" : "Work on"} ${next.concept.name} in ${next.course.name} next${due > 0 ? ", then clear your reviews" : ""}.`
+      : due > 0
+        ? "Your concept work is clear; finish the reviews that are due."
+        : "Nothing is waiting for mastery evidence right now.",
+    nextActions: next ? [{
+      label: `Test ${next.concept.name} · ${next.course.name}`,
+      href: practiceHrefFor(next.course.id, next.concept),
+    }] : [],
     recentlyCaught,
   };
 }
