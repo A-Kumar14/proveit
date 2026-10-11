@@ -46,8 +46,10 @@ function specFor(courseId: string, conceptId: string, revision = 1): ConceptLear
       kind: "material_excerpt",
       materialId: "bio-notes",
       title: "Biology notes",
-      locator: "paragraph 1",
-      excerpt: "The cell membrane controls what enters and leaves the cell.",
+      locator: revision === 1 ? "paragraph 1" : "paragraph 2",
+      excerpt: revision === 1
+        ? "The cell membrane controls what enters and leaves the cell."
+        : "Revision two says the membrane selectively regulates movement across the cell boundary.",
     }],
     assessment: {
       question: revision === 1 ? "What does the cell membrane do?" : "Explain the membrane's role.",
@@ -149,6 +151,12 @@ describe("runtime course mastery", () => {
     });
     const q = await ensureQuestion(courseId, conceptId);
     expect(q).toMatchObject({ courseName: "Biology", conceptId, prompt: "What does the cell membrane do?" });
+    expect(q.sources).toEqual([expect.objectContaining({
+      kind: "material_excerpt",
+      materialId: "bio-notes",
+      excerpt: "The cell membrane controls what enters and leaves the cell.",
+      retrieved: true,
+    })]);
     expect(ensureSpec).toHaveBeenCalledWith(courseId, conceptId);
     expect(getTodos().find((g) => g.courseId === courseId)?.open[0]?.href).toBe(`/course/${courseId}/practice/${conceptId}`);
   });
@@ -161,12 +169,21 @@ describe("runtime course mastery", () => {
       misconceptionId: "membrane_stores_dna",
       misconceptionName: "Membrane stores DNA",
     });
-    expect(getEvidenceAttempt(first.attemptId).learningSpecRevision).toBe(1);
+    const initialEvidence = getEvidenceAttempt(first.attemptId);
+    expect(initialEvidence.learningSpecRevision).toBe(1);
+    expect(initialEvidence.sources).toEqual([expect.objectContaining({
+      materialId: "bio-notes",
+      excerpt: "The cell membrane controls what enters and leaves the cell.",
+      retrieved: true,
+    })]);
     expect(getCourse(courseId).concepts[0]!.state).toBe("needs_work");
-    expect(getRemediation(first.attemptId).lesson).toMatchObject({
+    const remediation = getRemediation(first.attemptId);
+    expect(remediation.lesson).toMatchObject({
       title: "Separate transport from DNA storage.",
       aiWording: true,
     });
+    expect(remediation.lesson.sources).toEqual([expect.objectContaining({ materialId: "bio-notes", retrieved: true })]);
+    expect(remediation.transfer.sources).toEqual([expect.objectContaining({ materialId: "bio-notes", retrieved: true })]);
 
     const transfer = await submitTransfer(first.attemptId, "transfer pass: it controls what enters and leaves.");
     if (transfer.result !== "pass") throw new Error("expected pass");
@@ -180,7 +197,9 @@ describe("runtime course mastery", () => {
     const { courseId, conceptId } = runtimeCourse();
     const first = await assess({ courseId, conceptId, answer: "It controls what enters and leaves." });
     expect(first.evaluation.verdict).toBe("correct");
-    expect(getTransferChallenge(first.attemptId).transfer.question).toContain("molecule");
+    const firstTransfer = getTransferChallenge(first.attemptId);
+    expect(firstTransfer.transfer.question).toContain("molecule");
+    expect(firstTransfer.transfer.sources[0]?.excerpt).toBe("The cell membrane controls what enters and leaves the cell.");
 
     saveGeneratedLearningSpec(specFor(courseId, conceptId, 2), "fp-2");
     judgeTransferForSpec.mockImplementationOnce(async (used: ConceptLearningSpec) => {
@@ -189,17 +208,23 @@ describe("runtime course mastery", () => {
     });
     const transfer = await submitTransfer(first.attemptId, "transfer pass");
     if (transfer.result !== "pass") throw new Error("expected pass");
-    expect(getEvidenceAttempt(transfer.resultAttemptId).learningSpecRevision).toBe(1);
+    const transferEvidence = getEvidenceAttempt(transfer.resultAttemptId);
+    expect(transferEvidence.learningSpecRevision).toBe(1);
+    expect(transferEvidence.sources[0]?.excerpt).toBe("The cell membrane controls what enters and leaves the cell.");
 
     const due = new Date(Date.now() + 2 * 24 * 60 * 60 * 1000);
-    expect(getReviewChallenge(courseId, conceptId, due).review.question).toContain("classmate");
+    const reviewChallenge = getReviewChallenge(courseId, conceptId, due);
+    expect(reviewChallenge.review.question).toContain("classmate");
+    expect(reviewChallenge.review.sources[0]?.excerpt).toBe("The cell membrane controls what enters and leaves the cell.");
     judgeReviewForSpec.mockImplementationOnce(async (used: ConceptLearningSpec) => {
       expect(used.revision).toBe(1);
       return { verdict: "pass", quote: null, misconceptionId: null, feedback: null, votes: { agree: 3, of: 3 } };
     });
     const review = await submitReview(courseId, conceptId, "review pass", due);
     if (review.result !== "pass") throw new Error("expected review pass");
-    expect(getEvidenceAttempt(review.resultAttemptId).learningSpecRevision).toBe(1);
+    const reviewEvidence = getEvidenceAttempt(review.resultAttemptId);
+    expect(reviewEvidence.learningSpecRevision).toBe(1);
+    expect(reviewEvidence.sources[0]?.excerpt).toBe("The cell membrane controls what enters and leaves the cell.");
     expect(getCourse(courseId).concepts[0]!.state).toBe("mastered");
     expect(getReviewResult(review.resultAttemptId)).toMatchObject({ courseId, courseName: "Biology", next: "mastered" });
   });
