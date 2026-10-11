@@ -9,12 +9,12 @@ export function UploadReply({ upload, onRetry, onDismiss }: { upload: UploadStat
   return (
     <AssistantMessage>
       {upload.ok ? (
-        <div role="status" className="flex items-start gap-2 rounded-md border border-mastered-line bg-mastered-bg px-3.5 py-3 text-[13px] text-ink-2">
+        <div role="status" className="flex items-start gap-2 rounded-md border border-mastered-line bg-mastered-bg px-3.5 py-3 text-[0.8125rem] text-ink-2">
           <CheckCircle2 size={16} className="mt-px shrink-0 text-mastered-text" aria-hidden />
           <span><span className="font-semibold">{upload.name}</span> looks like your own work. I&apos;ll read it with your answer.</span>
         </div>
       ) : (
-        <div role="alert" className="flex flex-col gap-2.5 rounded-md border border-needswork-line bg-needswork-bg px-3.5 py-3 text-[13px] text-ink-2">
+        <div role="alert" className="flex flex-col gap-2.5 rounded-md border border-needswork-line bg-needswork-bg px-3.5 py-3 text-[0.8125rem] text-ink-2">
           <div className="flex items-start gap-2">
             <ShieldAlert size={16} className="mt-px shrink-0 text-needswork-text" aria-hidden />
             <span><span className="font-semibold text-needswork-text">Upload not used · {upload.name}</span><br />{upload.reason}</span>

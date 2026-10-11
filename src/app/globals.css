@@ -2,6 +2,8 @@
 
 @theme {
   --font-sans: var(--font-inter), system-ui, sans-serif;
+  /* Spacing stays in px so the Text size setting grows the text, not the padding around it. 4px is the stock 0.25rem. */
+  --spacing: 4px;
 
   --color-ink: #1f1f1f;
   --color-ink-2: #2b2b2b;
@@ -53,6 +55,37 @@ body {
   color: var(--color-ink);
   font-family: var(--font-sans);
 }
+
+/* ---- Accessibility settings (src/lib/a11y.ts writes these attributes and variables on <html>) ---- */
+
+/* Text sizes are in rem, so this one value scales every piece of text. 100% keeps the browser's own default. */
+html { font-size: calc(100% * var(--a11y-text, 1)); }
+
+/* Zoom scales the whole app like browser zoom. Full-height regions shrink by the same factor so the page still fits the window. */
+.a11y-app { zoom: var(--a11y-zoom, 1); }
+html[data-a11y-zoom] .a11y-app .h-screen { height: calc(100vh / var(--a11y-zoom, 1)); }
+
+html[data-a11y-font="lexend"] { --font-sans: var(--font-lexend), system-ui, sans-serif; }
+html[data-a11y-font="atkinson"] { --font-sans: var(--font-atkinson), system-ui, sans-serif; }
+html[data-a11y-font="andika"] { --font-sans: var(--font-andika), system-ui, sans-serif; }
+html[data-a11y-font="opendyslexic"] { --font-sans: "OpenDyslexic", system-ui, sans-serif; }
+
+/* Spacing is set on every element: em values are resolved per element, so small labels get proportionally less. The upper steps match WCAG 1.4.12. */
+html[data-a11y-letter="wide"] .a11y-app * { letter-spacing: 0.06em !important; }
+html[data-a11y-letter="wider"] .a11y-app * { letter-spacing: 0.12em !important; }
+html[data-a11y-word="wide"] .a11y-app * { word-spacing: 0.08em !important; }
+html[data-a11y-word="wider"] .a11y-app * { word-spacing: 0.16em !important; }
+html[data-a11y-line="relaxed"] .a11y-app *:not(svg, svg *) { line-height: 1.7 !important; }
+html[data-a11y-line="loose"] .a11y-app *:not(svg, svg *) { line-height: 2 !important; }
+
+/* Read aloud: the word being spoken. The Custom Highlight API paints it without touching the page's DOM. */
+::highlight(read-aloud-word) { background-color: #ffe08a; color: #1f1f1f; }
+
+/* Line focus: two dimmed panes leave a clear band around --focus-y. The band grows with text size and zoom. */
+.line-focus { position: fixed; inset: 0; z-index: 70; pointer-events: none; --band: calc(2.75rem * var(--a11y-zoom, 1)); }
+.line-focus > div { position: absolute; left: 0; right: 0; background: rgb(20 20 20 / 0.42); }
+.line-focus > div:first-child { top: 0; height: max(0px, calc(var(--focus-y, 0px) - var(--band) / 2)); }
+.line-focus > div:last-child { bottom: 0; top: calc(var(--focus-y, 0px) + var(--band) / 2); }
 
 :focus-visible {
   outline: 2px solid var(--color-ink);

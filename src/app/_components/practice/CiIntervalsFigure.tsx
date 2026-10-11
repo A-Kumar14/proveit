@@ -10,7 +10,7 @@ export function CiIntervalsFigure() {
         {BARS.map(([left, width], i) => (
           <div key={i} className="relative h-[5px]">
             <div style={{ left: `${left}%`, width: `${width}%` }} className={`absolute h-[5px] rounded-[3px] ${i === MISS ? "bg-needswork" : "bg-mastered"}`} />
-            {i === MISS && <span className="absolute -top-[5px] text-[10px] font-semibold text-needswork-text" style={{ left: `${left + width + 2}%` }}>miss</span>}
+            {i === MISS && <span className="absolute -top-[5px] text-[0.625rem] font-semibold text-needswork-text" style={{ left: `${left + width + 2}%` }}>miss</span>}
           </div>
         ))}
       </div>

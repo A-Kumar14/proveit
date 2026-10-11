@@ -13,7 +13,7 @@ export function AuthShell({ enabled, mode, children }: { enabled: boolean; mode:
       {enabled ? children : (
         <section className="flex max-w-sm flex-col gap-3 rounded-md border border-line bg-surface p-6">
           <h1 className="m-0 text-lg font-semibold">Accounts are turned off</h1>
-          <p className="m-0 text-[13px] leading-normal text-ink-muted">Sign-{mode} needs Clerk keys. Add NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY and CLERK_SECRET_KEY to the server environment and restart. Until then the app runs without an account.</p>
+          <p className="m-0 text-[0.8125rem] leading-normal text-ink-muted">Sign-{mode} needs Clerk keys. Add NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY and CLERK_SECRET_KEY to the server environment and restart. Until then the app runs without an account.</p>
           <Link href="/" className={buttonStyles({ size: "md" })}>Continue to the app</Link>
         </section>
       )}

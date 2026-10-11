@@ -46,9 +46,9 @@ export function AddFileMenu({ conceptId, demo, disabled, onChecked, onError, but
       </button>
       {open && (
         <div role="menu" className="absolute bottom-full left-0 z-10 mb-1.5 w-60 rounded-md border border-line bg-surface p-1 shadow-[0_8px_24px_rgba(0,0,0,0.10)]">
-          <button role="menuitem" type="button" className="w-full cursor-pointer rounded-sm border-0 bg-transparent px-2.5 py-2 text-left text-[13px] hover:bg-surface-hover" onClick={() => { setOpen(false); input.current?.click(); }}>Choose a file</button>
+          <button role="menuitem" type="button" className="w-full cursor-pointer rounded-sm border-0 bg-transparent px-2.5 py-2 text-left text-[0.8125rem] hover:bg-surface-hover" onClick={() => { setOpen(false); input.current?.click(); }}>Choose a file</button>
           {DEMO.map((d) => (
-            <button key={d.name} role="menuitem" type="button" className="w-full cursor-pointer rounded-sm border-0 bg-transparent px-2.5 py-2 text-left text-[13px] text-developing-text hover:bg-surface-hover" onClick={() => { setOpen(false); onChecked({ name: d.name, check: d.check }); }}>{d.label}</button>
+            <button key={d.name} role="menuitem" type="button" className="w-full cursor-pointer rounded-sm border-0 bg-transparent px-2.5 py-2 text-left text-[0.8125rem] text-developing-text hover:bg-surface-hover" onClick={() => { setOpen(false); onChecked({ name: d.name, check: d.check }); }}>{d.label}</button>
           ))}
         </div>
       )}

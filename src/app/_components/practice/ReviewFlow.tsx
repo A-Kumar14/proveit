@@ -58,7 +58,7 @@ export function ReviewFlow({ r }: { r: ReviewChallengeView }) {
             <UserBubble>{row.answer}</UserBubble>
             <AssistantMessage>
               <AssistantCard ariaLabel="Need more evidence" label="Need more evidence" headline="Your mastery state stays unchanged.">
-                <div className="px-[18px] py-3 text-[13px] leading-normal text-ink-2">{row.followUp}</div>
+                <div className="px-[18px] py-3 text-[0.8125rem] leading-normal text-ink-2">{row.followUp}</div>
               </AssistantCard>
             </AssistantMessage>
           </div>

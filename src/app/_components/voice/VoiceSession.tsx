@@ -148,7 +148,7 @@ export function VoiceSession({ courseId, question, typeHref, uploads }: { course
     : offTopic ? shown.reason
     : phase === "tutor" ? prompt
     : panelOpen ? "Talk while you work. The tutor follows along." : "Explain it like you would to a classmate.";
-  const seg = (on: boolean) => cn("flex h-10 cursor-pointer items-center gap-1.5 rounded-sm border px-3.5 text-[13px] disabled:cursor-not-allowed disabled:opacity-50", on ? "border-line-button bg-surface-hover font-semibold text-ink" : "border-transparent bg-transparent font-medium text-ink-3 hover:bg-surface-hover");
+  const seg = (on: boolean) => cn("flex h-10 cursor-pointer items-center gap-1.5 rounded-sm border px-3.5 text-[0.8125rem] disabled:cursor-not-allowed disabled:opacity-50", on ? "border-line-button bg-surface-hover font-semibold text-ink" : "border-transparent bg-transparent font-medium text-ink-3 hover:bg-surface-hover");
   const toggleTool = (t: Exclude<Tool, null>) => { setTool((cur) => (cur === t ? null : t)); setShown(null); setError(null); };
 
   if (!supported) {
@@ -173,7 +173,7 @@ export function VoiceSession({ courseId, question, typeHref, uploads }: { course
           <span className="font-semibold" aria-current="page">Voice session</span>
         </nav>
         <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 rounded-full border border-line px-3 py-[5px] text-[13px] text-ink-3"><span className="br size-2 rounded-full bg-needswork" />Live · {clock(seconds)}</div>
+          <div className="flex items-center gap-2 rounded-full border border-line px-3 py-[5px] text-[0.8125rem] text-ink-3"><span className="br size-2 rounded-full bg-needswork" />Live · {clock(seconds)}</div>
           <Link href={`/course/${courseId}`} aria-label="Exit session" className={cn(buttonStyles({ variant: "secondary" }), "size-10 p-0")}><X size={16} strokeWidth={2.2} aria-hidden /></Link>
         </div>
       </header>
@@ -190,7 +190,7 @@ export function VoiceSession({ courseId, question, typeHref, uploads }: { course
         {phase === "review" ? (
           <section aria-label="Check what I heard" className="flex w-[640px] flex-col gap-3 rounded-md border border-line p-5">
             <h2 className="m-0 text-lg font-semibold">Check what I heard</h2>
-            <p className="m-0 text-[13px] text-ink-muted">Fix any words I got wrong. This text is what gets graded.</p>
+            <p className="m-0 text-[0.8125rem] text-ink-muted">Fix any words I got wrong. This text is what gets graded.</p>
             <textarea aria-label="Transcript" rows={6} value={draft} onChange={(e) => setDraft(e.target.value)} className="resize-none rounded-sm border border-line p-3 text-sm leading-[1.55] outline-none" />
             {error && <div role="alert" className="text-xs text-needswork-text">{error}</div>}
             <div className="flex justify-end gap-2">
@@ -221,7 +221,7 @@ export function VoiceSession({ courseId, question, typeHref, uploads }: { course
                 {tool === "sketch" && <SketchPad onShow={checkFile} busy={checking} />}
                 {tool === "camera" && <CameraCapture onShow={checkFile} busy={checking} />}
                 {shown && (
-                  <div role={offTopic ? "alert" : "status"} className={cn("flex items-start gap-2 rounded-sm border p-3 text-[13px]", offTopic ? "border-needswork-line bg-needswork-bg text-ink-2" : "border-mastered-line bg-mastered-bg text-ink-2")}>
+                  <div role={offTopic ? "alert" : "status"} className={cn("flex items-start gap-2 rounded-sm border p-3 text-[0.8125rem]", offTopic ? "border-needswork-line bg-needswork-bg text-ink-2" : "border-mastered-line bg-mastered-bg text-ink-2")}>
                     {offTopic ? <ShieldAlert size={16} className="mt-px shrink-0 text-needswork-text" aria-hidden /> : <CheckCircle2 size={16} className="mt-px shrink-0 text-mastered-text" aria-hidden />}
                     <span><span className="font-semibold">{offTopic ? `Upload not used · ${shown.name}` : `${shown.name} · tutor can see it`}</span><br />{offTopic ? shown.reason : `Read: ${shown.summary}`}</span>
                   </div>

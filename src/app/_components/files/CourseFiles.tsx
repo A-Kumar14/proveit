@@ -57,9 +57,9 @@ export function CourseFiles({ courseId, files }: { courseId: string; files: File
       >
         <input ref={input} type="file" multiple accept={UPLOAD_ACCEPT} className="sr-only" tabIndex={-1} aria-label="Choose files to add" onChange={(e) => e.target.files && void send(e.target.files)} />
         {busy ? <LoaderCircle size={22} className="animate-spin" aria-hidden /> : <Upload size={22} strokeWidth={1.8} aria-hidden />}
-        <div className="text-[13px] font-semibold">{busy ? "Reading your files..." : "Add notes, slides or readings"}</div>
+        <div className="text-[0.8125rem] font-semibold">{busy ? "Reading your files..." : "Add notes, slides or readings"}</div>
         <div className="text-xs text-ink-muted">{UPLOAD_TYPES_LABEL}. Up to 5 files, 10 MB each. They become context for the tutor, notes, practice paper and quiz.</div>
-        <button type="button" onClick={() => input.current?.click()} disabled={busy} className="mt-1 cursor-pointer rounded-sm border border-line-button bg-surface px-3.5 py-1.5 text-[13px] font-semibold hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-60">Choose files</button>
+        <button type="button" onClick={() => input.current?.click()} disabled={busy} className="mt-1 cursor-pointer rounded-sm border border-line-button bg-surface px-3.5 py-1.5 text-[0.8125rem] font-semibold hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-60">Choose files</button>
       </div>
 
       <div aria-live="polite" className="flex flex-col gap-1.5">

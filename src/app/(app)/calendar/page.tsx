@@ -35,7 +35,7 @@ async function CalendarPage({ searchParams }: PageProps<"/calendar">) {
           <div className="flex items-center justify-between">
             <div>
               <div className="eyebrow">{connected ? `${calendar.provider} · synced ${calendar.syncedAt ? ago(calendar.syncedAt) : "just now"}` : "No calendar connected"}</div>
-              <h1 className="m-0 mt-1 text-[22px] font-semibold">{first.toLocaleDateString("en-US", { month: "long", year: "numeric" })}</h1>
+              <h1 className="m-0 mt-1 text-[1.375rem] font-semibold">{first.toLocaleDateString("en-US", { month: "long", year: "numeric" })}</h1>
             </div>
             <div className="flex items-center gap-1.5">
               <Link href={`/calendar?m=${prev}`} aria-label="Previous month" className={cn(buttonStyles({ variant: "secondary", size: "sm" }), "size-8 p-0")}><ChevronLeft size={16} aria-hidden /></Link>
@@ -44,29 +44,29 @@ async function CalendarPage({ searchParams }: PageProps<"/calendar">) {
             </div>
           </div>
           <MonthGrid month={month} selected={selected} today={today} events={events} />
-          <ul className="m-0 flex list-none flex-wrap gap-x-4 gap-y-1 p-0 text-[11px] text-ink-muted" aria-label="Legend">
+          <ul className="m-0 flex list-none flex-wrap gap-x-4 gap-y-1 p-0 text-[0.6875rem] text-ink-muted" aria-label="Legend">
             {(Object.keys(KIND) as (keyof typeof KIND)[]).map((k) => <li key={k} className="flex items-center gap-1.5"><span className={cn("size-2 rounded-full", KIND[k].dot)} aria-hidden />{KIND[k].label}</li>)}
           </ul>
         </section>
 
         <aside aria-label="Selected day" className="flex w-[280px] shrink-0 flex-col gap-3 rounded-md border border-line p-4 self-start">
           <h2 className="m-0 text-sm font-semibold">{dayHeading(parseDay(selected), now)}</h2>
-          {dayEvents.length === 0 && study.length === 0 && <p className="m-0 text-[13px] text-ink-muted">Nothing scheduled. A free day.</p>}
+          {dayEvents.length === 0 && study.length === 0 && <p className="m-0 text-[0.8125rem] text-ink-muted">Nothing scheduled. A free day.</p>}
           <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
             {dayEvents.map((e) => (
               <li key={e.id} className={cn("rounded-sm border-l-[3px] px-2.5 py-1.5", KIND[e.kind].chip)}>
-                <div className="text-[13px] font-medium">{e.href ? <Link href={e.href} className="text-ink no-underline hover:underline">{e.title}</Link> : e.title}</div>
-                <div className="text-[11px] text-ink-muted">{e.allDay ? "All day" : `${clock(e.start)} to ${clock(e.end)}`} · {KIND[e.kind].label}</div>
+                <div className="text-[0.8125rem] font-medium">{e.href ? <Link href={e.href} className="text-ink no-underline hover:underline">{e.title}</Link> : e.title}</div>
+                <div className="text-[0.6875rem] text-ink-muted">{e.allDay ? "All day" : `${clock(e.start)} to ${clock(e.end)}`} · {KIND[e.kind].label}</div>
               </li>
             ))}
             {study.map((t) => (
               <li key={t.id} className={cn("rounded-sm border border-l-[3px] px-2.5 py-1.5", KIND.study.chip)}>
-                <div className="text-[13px] font-medium">{t.href ? <Link href={t.href} className="text-ink no-underline hover:underline">{t.title}</Link> : t.title}</div>
-                <div className="text-[11px] text-ink-muted">{clock(t.slot!.start)} to {clock(t.slot!.end)} · {KIND.study.label}</div>
+                <div className="text-[0.8125rem] font-medium">{t.href ? <Link href={t.href} className="text-ink no-underline hover:underline">{t.title}</Link> : t.title}</div>
+                <div className="text-[0.6875rem] text-ink-muted">{clock(t.slot!.start)} to {clock(t.slot!.end)} · {KIND.study.label}</div>
               </li>
             ))}
           </ul>
-          {study.length > 0 && <p className="m-0 text-[11px] text-ink-faint">Suggested blocks use free gaps in your calendar. They aren&apos;t added to it.</p>}
+          {study.length > 0 && <p className="m-0 text-[0.6875rem] text-ink-faint">Suggested blocks use free gaps in your calendar. They aren&apos;t added to it.</p>}
         </aside>
       </div>
       {connect && <ConnectCalendarModal closeHref={`/calendar?m=${month}&d=${selected}`} />}

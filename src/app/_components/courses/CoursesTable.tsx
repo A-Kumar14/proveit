@@ -70,9 +70,9 @@ export function CoursesTable({ rows }: { rows: CourseRow[] }) {
               <div className="flex items-center gap-2">
                 <Link href={`/course/${r.id}`} className="truncate text-sm font-semibold text-ink no-underline hover:underline">{r.name}</Link>
                 {r.completed
-                  ? <span className="flex items-center gap-1 rounded-full bg-mastered-bg px-2 py-0.5 text-[11px] font-semibold text-mastered-text"><CircleCheck size={11} strokeWidth={2.2} aria-hidden />Completed</span>
-                  : <span className="rounded-full bg-developing-bg px-2 py-0.5 text-[11px] font-semibold text-developing-text">In progress</span>}
-                {r.manual && <span className="text-[11px] text-ink-faint">Set by you</span>}
+                  ? <span className="flex items-center gap-1 rounded-full bg-mastered-bg px-2 py-0.5 text-[0.6875rem] font-semibold text-mastered-text"><CircleCheck size={11} strokeWidth={2.2} aria-hidden />Completed</span>
+                  : <span className="rounded-full bg-developing-bg px-2 py-0.5 text-[0.6875rem] font-semibold text-developing-text">In progress</span>}
+                {r.manual && <span className="text-[0.6875rem] text-ink-faint">Set by you</span>}
               </div>
               <div className="mt-0.5 text-xs text-ink-muted">{r.proven} of {r.total} concepts mastered{r.openMisconception ? ` · open: ${r.openMisconception}` : ""}</div>
             </div>
@@ -94,7 +94,7 @@ export function CoursesTable({ rows }: { rows: CourseRow[] }) {
         <div role="group" aria-label="Filter courses" className="flex gap-1 rounded-sm border border-line bg-surface p-[3px]">
           {FILTERS.map((f) => (
             <button key={f.id} type="button" aria-pressed={filter === f.id} onClick={() => setFilter(f.id)}
-              className={cn("cursor-pointer rounded-[7px] border px-3 py-[6px] text-[13px]", filter === f.id ? "border-line-button bg-surface font-semibold text-ink" : "border-transparent bg-transparent font-medium text-ink-3")}>
+              className={cn("cursor-pointer rounded-[7px] border px-3 py-[6px] text-[0.8125rem]", filter === f.id ? "border-line-button bg-surface font-semibold text-ink" : "border-transparent bg-transparent font-medium text-ink-3")}>
               {f.label} <span className="text-ink-faint">{counts[f.id]}</span>
             </button>
           ))}
@@ -111,11 +111,11 @@ export function CoursesTable({ rows }: { rows: CourseRow[] }) {
       )}
 
       {notice && (
-        <div role={notice.error ? "alert" : "status"} className={cn("flex items-center justify-between gap-3 rounded-sm border px-3 py-2 text-[13px]", notice.error ? "border-needswork-line bg-needswork-bg text-needswork-text" : "border-line bg-surface-subtle text-ink-2")}>
+        <div role={notice.error ? "alert" : "status"} className={cn("flex items-center justify-between gap-3 rounded-sm border px-3 py-2 text-[0.8125rem]", notice.error ? "border-needswork-line bg-needswork-bg text-needswork-text" : "border-line bg-surface-subtle text-ink-2")}>
           <span>{notice.text}</span>
           <span className="flex gap-2">
-            {notice.undo && <button type="button" disabled={busy} onClick={() => apply(notice.undo!.ids, notice.undo!.completed)} className="cursor-pointer border-0 bg-transparent p-0 text-[13px] font-semibold underline">Undo</button>}
-            <button type="button" aria-label="Dismiss" onClick={() => setNotice(null)} className="cursor-pointer border-0 bg-transparent p-0 text-[13px] text-ink-muted">Dismiss</button>
+            {notice.undo && <button type="button" disabled={busy} onClick={() => apply(notice.undo!.ids, notice.undo!.completed)} className="cursor-pointer border-0 bg-transparent p-0 text-[0.8125rem] font-semibold underline">Undo</button>}
+            <button type="button" aria-label="Dismiss" onClick={() => setNotice(null)} className="cursor-pointer border-0 bg-transparent p-0 text-[0.8125rem] text-ink-muted">Dismiss</button>
           </span>
         </div>
       )}
@@ -162,7 +162,7 @@ function RowMenu({ menu, rows, onClose, onApply }: { menu: Menu; rows: CourseRow
     return () => { window.removeEventListener("click", close); window.removeEventListener("scroll", close, true); window.removeEventListener("resize", close); window.removeEventListener("keydown", key); };
   }, [onClose]);
 
-  const item = "flex w-full cursor-pointer items-center gap-2 rounded-sm border-0 bg-transparent px-2.5 py-2 text-left text-[13px] text-ink no-underline hover:bg-surface-hover";
+  const item = "flex w-full cursor-pointer items-center gap-2 rounded-sm border-0 bg-transparent px-2.5 py-2 text-left text-[0.8125rem] text-ink no-underline hover:bg-surface-hover";
   return (
     <div ref={ref} role="menu" aria-label="Course actions" onContextMenu={(e) => e.preventDefault()}
       style={{ left: Math.min(menu.x, window.innerWidth - 232), top: Math.min(menu.y, window.innerHeight - 140) }}

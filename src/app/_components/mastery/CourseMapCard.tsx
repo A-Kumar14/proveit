@@ -51,7 +51,7 @@ export function CourseMapCard({ course, initialId }: { course: CourseView; initi
         {show === "remaining" ? `${visible.length} left` : `${visible.length} completed`}
       </p>
       {visible.length === 0 && (
-        <p className="m-0 text-[13px] text-ink-muted">{show === "remaining" ? "Nothing left in this course." : "Nothing completed yet."}</p>
+        <p className="m-0 text-[0.8125rem] text-ink-muted">{show === "remaining" ? "Nothing left in this course." : "Nothing completed yet."}</p>
       )}
       <div className="flex flex-col">
         {units.map((unit, i) => {
@@ -62,9 +62,9 @@ export function CourseMapCard({ course, initialId }: { course: CourseView; initi
               {i < units.length - 1 && <span className="absolute top-2 bottom-0 left-[3px] w-px bg-line" aria-hidden />}
               <span className={cn("absolute top-1.5 left-0 size-2 rounded-full", open ? "bg-ink" : "bg-ink-faint")} aria-hidden />
               <div className="min-w-0">
-                <h3 className="m-0 flex items-baseline justify-between gap-2 text-[13px] font-semibold">
+                <h3 className="m-0 flex items-baseline justify-between gap-2 text-[0.8125rem] font-semibold">
                   {unitLabel(unit)}
-                  <span className="text-[11px] font-normal text-ink-faint">{list.length}</span>
+                  <span className="text-[0.6875rem] font-normal text-ink-faint">{list.length}</span>
                 </h3>
                 <ul className="relative m-0 mt-1 ml-[3px] flex list-none flex-col border-l border-line p-0">
                   {list.map((c) => (
@@ -78,7 +78,7 @@ export function CourseMapCard({ course, initialId }: { course: CourseView; initi
                         className={cn("flex w-full cursor-pointer items-center gap-2 rounded-sm border px-2 py-1.5 text-left", c.id === sel?.id ? "border-ink bg-surface-hover" : "border-transparent hover:bg-surface-hover")}
                       >
                         <span className={cn("size-2 shrink-0 rounded-full", statusDot(c.state))} aria-hidden />
-                        <span className="min-w-0 flex-1 text-[13px]">{c.name}</span>
+                        <span className="min-w-0 flex-1 text-[0.8125rem]">{c.name}</span>
                       </button>
                     </li>
                   ))}
@@ -92,15 +92,15 @@ export function CourseMapCard({ course, initialId }: { course: CourseView; initi
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm font-semibold">{sel.name}</span>
-            <span className={cn("rounded-full px-1.5 py-px text-[10px] font-semibold", LOOK[sel.state].pill)}>{LOOK[sel.state].label}</span>
+            <span className={cn("rounded-full px-1.5 py-px text-[0.625rem] font-semibold", LOOK[sel.state].pill)}>{LOOK[sel.state].label}</span>
           </div>
           <p className="m-0 mt-0.5 text-xs text-ink-muted">{sel.desc}</p>
         </div>
         {sel.cta.href
           ? <Link href={sel.cta.href} className={buttonStyles({ size: "sm" })}>{sel.cta.label}</Link>
-          : <span className="text-[11px] text-ink-faint">{sel.cta.label}</span>}
+          : <span className="text-[0.6875rem] text-ink-faint">{sel.cta.label}</span>}
       </div>}
-      <div className="flex flex-wrap gap-3 text-[11px] text-ink-faint">
+      <div className="flex flex-wrap gap-3 text-[0.6875rem] text-ink-faint">
         {(["mastered", "provisional", "developing", "needs_work", "not_started"] as const).map((s) => (
           <span key={s} className="flex items-center gap-[5px]"><span className={cn("size-[7px] rounded-full", statusDot(s))} />{LOOK[s].label}</span>
         ))}

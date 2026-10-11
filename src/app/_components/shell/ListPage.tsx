@@ -5,7 +5,7 @@ export function ListPage({ eyebrow, title, children }: { eyebrow: string; title:
       <div className="mx-auto flex max-w-[780px] flex-col gap-4">
         <div>
           <div className="eyebrow">{eyebrow}</div>
-          <h1 className="m-0 mt-1 text-[22px] font-semibold">{title}</h1>
+          <h1 className="m-0 mt-1 text-[1.375rem] font-semibold">{title}</h1>
         </div>
         {children}
       </div>

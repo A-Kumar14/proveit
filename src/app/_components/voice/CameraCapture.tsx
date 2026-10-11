@@ -33,7 +33,7 @@ export function CameraCapture({ onShow, busy }: { onShow: (file: File) => void; 
   return (
     <div className="flex flex-col gap-2.5">
       <div className="relative flex h-[280px] items-center justify-center overflow-hidden rounded-sm border border-line bg-surface-subtle">
-        {error ? <p role="alert" className="m-0 max-w-xs px-4 text-center text-[13px] text-needswork-text">{error}</p> : <video ref={video} autoPlay playsInline muted className="size-full object-cover" />}
+        {error ? <p role="alert" className="m-0 max-w-xs px-4 text-center text-[0.8125rem] text-needswork-text">{error}</p> : <video ref={video} autoPlay playsInline muted className="size-full object-cover" />}
       </div>
       <div className="flex items-center justify-between gap-3">
         <span className="text-xs text-ink-muted">Point it at your paper. Keep the page in frame.</span>

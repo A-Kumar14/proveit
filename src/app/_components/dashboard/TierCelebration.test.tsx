@@ -92,7 +92,7 @@ const COURSES = [rank("intro-stats", "Intro Statistics", 2600, 2), rank("pf", "P
 describe("RankCard", () => {
   it("shows the tier, points, distance to the next tier and the whole ladder", () => {
     render(<RankCard r={rewards(6000)} courses={COURSES} previewable={false} />);
-    expect(screen.getByText("Platinum", { selector: "span.text-\\[22px\\]" })).toBeTruthy();
+    expect(screen.getByText("Platinum", { selector: "span.text-\\[1\\.375rem\\]" })).toBeTruthy();
     expect(screen.getByText("1,000 to Diamond")).toBeTruthy();
     expect(screen.getByRole("progressbar", { name: "Progress to Diamond" }).getAttribute("aria-valuenow")).toBe("60");
     const steps = within(screen.getByRole("list", { name: "Tiers" })).getAllByRole("listitem");

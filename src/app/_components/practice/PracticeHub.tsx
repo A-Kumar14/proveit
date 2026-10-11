@@ -22,7 +22,7 @@ function Tool({ icon: Icon, title, text, button, run, onRun, disabled, href }: {
         <span className="flex size-8 items-center justify-center rounded-sm bg-surface-hover"><Icon size={16} strokeWidth={1.8} aria-hidden /></span>
         <h2 className="m-0 text-sm font-semibold">{title}</h2>
       </div>
-      <p className="m-0 flex-1 text-[13px] leading-normal text-ink-muted">{text}</p>
+      <p className="m-0 flex-1 text-[0.8125rem] leading-normal text-ink-muted">{text}</p>
       {run.status === "error" && <p role="alert" className="m-0 text-xs text-needswork-text">{run.error}</p>}
       {run.status === "done" && run.result && (
         <div className="flex flex-col gap-2">
@@ -36,7 +36,7 @@ function Tool({ icon: Icon, title, text, button, run, onRun, disabled, href }: {
           ))}
         </div>
       )}
-      {disabled ? <span className="text-[11px] text-ink-faint">{disabled}</span> : href ? (
+      {disabled ? <span className="text-[0.6875rem] text-ink-faint">{disabled}</span> : href ? (
         <Link href={href} className={cn(buttonStyles({ size: "sm" }), "w-fit")}>{button}</Link>
       ) : (
         <button type="button" onClick={onRun} disabled={busy} className={cn(buttonStyles({ size: "sm" }), "w-fit cursor-pointer")}>

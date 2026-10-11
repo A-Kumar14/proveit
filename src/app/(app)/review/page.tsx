@@ -29,8 +29,8 @@ function ReviewPage() {
         <section aria-label="Review queue" className="flex min-w-0 flex-col gap-4">
           <div>
             <div className="eyebrow">{connected ? calendar.provider : "No calendar connected"}</div>
-            <h1 className="m-0 mt-1 text-[22px] font-semibold">Review queue</h1>
-            <p className="m-0 mt-2 max-w-xl text-[13px] text-ink-muted">
+            <h1 className="m-0 mt-1 text-[1.375rem] font-semibold">Review queue</h1>
+            <p className="m-0 mt-2 max-w-xl text-[0.8125rem] text-ink-muted">
               Ordered by the next quiz or class on your calendar, then by what still needs work. Suggested times are free gaps. They are not added to the calendar.{" "}
               <Link href="/calendar" className="text-ink">Open the calendar</Link>
             </p>
@@ -45,15 +45,15 @@ function ReviewPage() {
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
                     <span className="text-sm font-semibold">{row.name}</span>
-                    {i === 0 && <span className="rounded-full bg-ink px-1.5 py-px text-[10px] font-semibold text-white">Next</span>}
-                    {row.state && <span className={cn("rounded-full px-1.5 py-px text-[10px] font-semibold", LOOK[row.state].pill)}>{LOOK[row.state].label}</span>}
-                    {row.pressure === "review" && <span className="rounded-full bg-developing-bg px-1.5 py-px text-[10px] font-semibold text-developing-text">Review</span>}
+                    {i === 0 && <span className="rounded-full bg-ink px-1.5 py-px text-[0.625rem] font-semibold text-white">Next</span>}
+                    {row.state && <span className={cn("rounded-full px-1.5 py-px text-[0.625rem] font-semibold", LOOK[row.state].pill)}>{LOOK[row.state].label}</span>}
+                    {row.pressure === "review" && <span className="rounded-full bg-developing-bg px-1.5 py-px text-[0.625rem] font-semibold text-developing-text">Review</span>}
                   </div>
                   <div className="mt-0.5 text-xs text-ink-muted">{row.courseName}</div>
                   <div className="mt-1 text-xs text-ink-3">{row.because}</div>
-                  {row.slot && <div className="mt-0.5 text-[11px] text-ink-muted">Suggested <time dateTime={row.slot.start} suppressHydrationWarning>{when(row.slot.start)}</time></div>}
+                  {row.slot && <div className="mt-0.5 text-[0.6875rem] text-ink-muted">Suggested <time dateTime={row.slot.start} suppressHydrationWarning>{when(row.slot.start)}</time></div>}
                 </div>
-                {row.href ? <Link href={row.href} className={buttonStyles({ size: "sm" })}>{row.pressure === "review" ? "Review now" : "Start"}</Link> : <span className="pt-1 text-[11px] text-ink-faint">Not authored yet</span>}
+                {row.href ? <Link href={row.href} className={buttonStyles({ size: "sm" })}>{row.pressure === "review" ? "Review now" : "Start"}</Link> : <span className="pt-1 text-[0.6875rem] text-ink-faint">Not authored yet</span>}
               </li>
             ))}
           </ol>
@@ -65,10 +65,10 @@ function ReviewPage() {
             <Link href="/calendar" className="text-xs text-ink-muted no-underline hover:text-ink">Calendar</Link>
           </div>
           <p className="m-0 text-xs text-ink-muted">{connected ? `Synced from ${calendar.provider}.` : "Connect a calendar to schedule around your real week."}</p>
-          {days.length === 0 && <p className="m-0 text-[13px] text-ink-muted">Nothing on the calendar for the next {DAYS} days.</p>}
+          {days.length === 0 && <p className="m-0 text-[0.8125rem] text-ink-muted">Nothing on the calendar for the next {DAYS} days.</p>}
           {days.map((day) => (
             <section key={day} aria-label={dayHeading(new Date(`${day}T00:00:00`), now)} className="flex flex-col gap-1">
-              <h3 className="m-0 text-[11px] font-medium text-ink-faint">{dayHeading(new Date(`${day}T00:00:00`), now)}</h3>
+              <h3 className="m-0 text-[0.6875rem] font-medium text-ink-faint">{dayHeading(new Date(`${day}T00:00:00`), now)}</h3>
               <ul className="m-0 flex list-none flex-col gap-1 p-0">
                 {upcoming.filter((e) => dayKey(new Date(e.start) < start ? start : new Date(e.start)) === day).map((e) => (
                   <li key={e.id} className={cn("flex items-center gap-2 rounded-sm border-l-[3px] px-2 py-1 text-xs", KIND[e.kind].chip)}>
@@ -81,7 +81,7 @@ function ReviewPage() {
           ))}
           {later.length > 0 && (
             <section aria-label="Later" className="flex flex-col gap-1">
-              <h3 className="m-0 text-[11px] font-medium text-ink-faint">Quizzes after this week</h3>
+              <h3 className="m-0 text-[0.6875rem] font-medium text-ink-faint">Quizzes after this week</h3>
               <ul className="m-0 flex list-none flex-col gap-1 p-0">
                 {later.map((e) => (
                   <li key={e.id} className={cn("rounded-sm border-l-[3px] px-2 py-1 text-xs", KIND[e.kind].chip)}>

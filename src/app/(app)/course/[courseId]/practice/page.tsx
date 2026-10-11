@@ -13,7 +13,7 @@ async function PracticeHubPage({ params }: PageProps<"/course/[courseId]/practic
   return (
     <AppShell active="practice" courseId={courseId} crumbs={[{ label: course.name, href: `/course/${courseId}` }, { label: "Practice" }]}>
       <ListPage eyebrow="Practice" title="Practice">
-        <p className="m-0 max-w-xl text-[13px] text-ink-muted">Material built from what you keep getting wrong. To be tested on one concept, use Test this concept on the course map.</p>
+        <p className="m-0 max-w-xl text-[0.8125rem] text-ink-muted">Material built from what you keep getting wrong. To be tested on one concept, use Test this concept on the course map.</p>
         <PracticeHub courseId={courseId} />
       </ListPage>
     </AppShell>

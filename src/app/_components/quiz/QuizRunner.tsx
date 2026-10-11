@@ -45,7 +45,7 @@ export function QuizRunner({ courseId, courseName }: { courseId: string; courseN
     return (
       <section aria-label="Quiz" className="flex max-w-xl flex-col gap-4 rounded-md border border-line bg-surface p-6">
         <h2 className="m-0 text-lg font-semibold">Quiz on {courseName}</h2>
-        <ul className="m-0 flex list-disc flex-col gap-1 pl-5 text-[13px] leading-normal text-ink-muted">
+        <ul className="m-0 flex list-disc flex-col gap-1 pl-5 text-[0.8125rem] leading-normal text-ink-muted">
           <li>8 multiple-choice questions, built from the course notes and your uploaded files.</li>
           <li>Questions lean on the concepts you are weakest in.</li>
           <li>You get a score and a review of every answer. A quiz is practice, so it never changes your mastery or rank.</li>
@@ -112,10 +112,10 @@ export function QuizRunner({ courseId, courseName }: { courseId: string; courseN
     <section aria-label="Quiz results" className="flex max-w-2xl flex-col gap-5">
       <div className="flex flex-col gap-3 rounded-md border border-line bg-surface p-5">
         <div className="eyebrow">Your score</div>
-        <div className="flex items-baseline gap-3"><span className="text-[32px] font-semibold leading-none tabular-nums">{result.score} / {result.total}</span><span className="text-sm text-ink-muted">{result.pct}%</span></div>
+        <div className="flex items-baseline gap-3"><span className="text-[2rem] font-semibold leading-none tabular-nums">{result.score} / {result.total}</span><span className="text-sm text-ink-muted">{result.pct}%</span></div>
         <ul className="m-0 flex list-none flex-col gap-1.5 p-0">
           {result.byConcept.map((c) => (
-            <li key={c.concept} className="flex items-center gap-3 text-[13px]">
+            <li key={c.concept} className="flex items-center gap-3 text-[0.8125rem]">
               <span className="min-w-0 flex-1 truncate">{c.concept}</span>
               <span className="tabular-nums text-ink-muted">{c.right} of {c.total}</span>
               <span className="h-1.5 w-24 rounded-full bg-surface-active"><span className={cn("block h-full rounded-full", c.right === c.total ? "bg-mastered" : c.right === 0 ? "bg-needswork" : "bg-developing")} style={{ width: `${Math.round((c.right / c.total) * 100)}%` }} /></span>
@@ -131,12 +131,12 @@ export function QuizRunner({ courseId, courseName }: { courseId: string; courseN
             <li key={it.id} className={cn("flex flex-col gap-2 rounded-md border bg-surface p-4", right ? "border-mastered-line" : "border-needswork-line")}>
               <div className="flex items-start gap-2">
                 {right ? <Check size={16} className="mt-0.5 shrink-0 text-mastered-text" aria-label="Correct" /> : <X size={16} className="mt-0.5 shrink-0 text-needswork-text" aria-label="Incorrect" />}
-                <div className="min-w-0"><div className="text-[11px] text-ink-faint">{i + 1}. {it.concept}</div><div className="text-sm font-semibold leading-normal">{it.prompt}</div></div>
+                <div className="min-w-0"><div className="text-[0.6875rem] text-ink-faint">{i + 1}. {it.concept}</div><div className="text-sm font-semibold leading-normal">{it.prompt}</div></div>
               </div>
-              <ul className="m-0 flex list-none flex-col gap-1 p-0 text-[13px]">
+              <ul className="m-0 flex list-none flex-col gap-1 p-0 text-[0.8125rem]">
                 {it.options.map((o, j) => (
                   <li key={j} className={cn("rounded-sm px-2.5 py-1.5", j === it.correct ? "bg-mastered-bg text-mastered-text" : j === it.picked ? "bg-needswork-bg text-needswork-text" : "text-ink-muted")}>
-                    <span className="mr-2 font-semibold">{LETTERS[j]}</span>{o}{j === it.correct && <span className="ml-2 text-[11px] font-semibold">Correct answer</span>}{j === it.picked && j !== it.correct && <span className="ml-2 text-[11px] font-semibold">Your answer</span>}
+                    <span className="mr-2 font-semibold">{LETTERS[j]}</span>{o}{j === it.correct && <span className="ml-2 text-[0.6875rem] font-semibold">Correct answer</span>}{j === it.picked && j !== it.correct && <span className="ml-2 text-[0.6875rem] font-semibold">Your answer</span>}
                   </li>
                 ))}
               </ul>
